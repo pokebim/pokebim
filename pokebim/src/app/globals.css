@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+  --card-bg: #111111;
+  --card-border: #333333;
+  --primary: #2F855A;
+  --primary-hover: #276749;
+  --text-primary: #ffffff;
+  --text-secondary: #A0AEC0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans);
+}
+
+/* Global styling for common elements */
+input, select, textarea {
+  background-color: #111111 !important;
+  color: white !important;
+  border-color: #333333 !important;
+}
+
+/* Focus and hover states */
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 1px var(--primary) !important;
+}
+
+option {
+  background-color: #111111;
+  color: white;
+}
+
+/* Placeholder text */
+::placeholder {
+  color: #666666 !important;
+  opacity: 1;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #111111;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444444;
+}
+
+/* Dropdown menu for task actions - fixing hover behavior */
+.dropdown .dropdown-menu {
+  display: none;
+  width: 150px;
+  right: 0;
+  z-index: 20;
+}
+
+.dropdown:hover .dropdown-menu {
+  display: block;
+}
+
+/* Task board styling */
+.task-column {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.task-card {
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.task-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
