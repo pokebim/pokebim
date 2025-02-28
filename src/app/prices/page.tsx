@@ -28,6 +28,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
 
 interface EnrichedPrice extends Price {
   product: {
@@ -73,6 +74,10 @@ export default function PricesPage() {
   const [editingPrice, setEditingPrice] = useState<EnrichedPrice | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  
+  // Nuevos estados para la vista detallada
+  const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
+  const [selectedPrice, setSelectedPrice] = useState<EnrichedPrice | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -567,6 +572,12 @@ export default function PricesPage() {
     return bestPriceProducts;
   }, [prices]);
 
+  // Función para abrir la vista detallada
+  const handleViewDetail = (price: EnrichedPrice) => {
+    setSelectedPrice(price);
+    setDetailViewOpen(true);
+  };
+
   // Preparar columnas para la tabla de precios
   const columnHelper = createColumnHelper<EnrichedPrice>();
   
@@ -630,6 +641,12 @@ export default function PricesPage() {
       header: 'Acciones',
       cell: info => (
         <div className="flex space-x-2">
+          <button
+            onClick={() => handleViewDetail(info.row.original)}
+            className="px-3 py-1 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600 transition-colors"
+          >
+            Ver
+          </button>
           <button
             onClick={() => handleEdit(info.row.original)}
             className="px-3 py-1 bg-green-700 text-white text-sm rounded hover:bg-green-600 transition-colors"
@@ -838,6 +855,125 @@ export default function PricesPage() {
           suppliers={suppliers}
         />
       </Modal>
+      
+      {/* Vista detallada del precio */}
+      {selectedPrice && (
+        <DetailView
+          isOpen={detailViewOpen}
+          onClose={() => setDetailViewOpen(false)}
+          title={`Detalle de Precio: ${selectedPrice.product.name}`}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setDetailViewOpen(false);
+                  setEditingPrice(selectedPrice);
+                  setModalOpen(true);
+                }}
+                className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailViewOpen(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Cerrar
+              </button>
+            </>
+          }
+        >
+          <DetailSection title="Información del Producto">
+            <DetailGrid>
+              <DetailField 
+                label="Producto" 
+                value={<span className="font-semibold">{selectedPrice.product.name}</span>} 
+              />
+              <DetailField 
+                label="Idioma" 
+                value={
+                  <DetailBadge 
+                    color={
+                      selectedPrice.product.language === 'Japanese' ? 'red' : 
+                      selectedPrice.product.language === 'English' ? 'blue' : 
+                      'green'
+                    }
+                  >
+                    {selectedPrice.product.language}
+                  </DetailBadge>
+                } 
+              />
+              <DetailField 
+                label="Tipo" 
+                value={selectedPrice.product.type || 'No especificado'} 
+              />
+            </DetailGrid>
+          </DetailSection>
+
+          <DetailSection title="Información del Proveedor">
+            <DetailGrid>
+              <DetailField 
+                label="Proveedor" 
+                value={selectedPrice.supplier.name} 
+              />
+              <DetailField 
+                label="País" 
+                value={selectedPrice.supplier.country || 'No especificado'} 
+              />
+            </DetailGrid>
+          </DetailSection>
+
+          <DetailSection title="Información del Precio">
+            <DetailGrid>
+              <DetailField 
+                label="Precio" 
+                value={
+                  <span className="font-semibold text-lg text-green-400">
+                    {formatCurrency(selectedPrice.price || 0, selectedPrice.currency as Currency)}
+                  </span>
+                } 
+              />
+              <DetailField 
+                label="Precio (EUR)" 
+                value={
+                  <span className="font-semibold text-lg text-green-400">
+                    {formatCurrency(
+                      convertCurrency(selectedPrice.price || 0, selectedPrice.currency as Currency, 'EUR'), 
+                      'EUR'
+                    )}
+                  </span>
+                } 
+              />
+              {selectedPrice.priceUnit && (
+                <DetailField 
+                  label="Unidad de precio" 
+                  value={selectedPrice.priceUnit} 
+                />
+              )}
+              {selectedPrice.bulkPrice !== undefined && selectedPrice.bulkPrice !== null && (
+                <DetailField 
+                  label="Precio por cantidad" 
+                  value={`${selectedPrice.bulkPrice} ${selectedPrice.currency}`} 
+                />
+              )}
+              {selectedPrice.shipping !== undefined && selectedPrice.shipping !== null && (
+                <DetailField 
+                  label="Coste de envío" 
+                  value={`${selectedPrice.shipping} ${selectedPrice.currency}`} 
+                />
+              )}
+            </DetailGrid>
+          </DetailSection>
+
+          {selectedPrice.notes && (
+            <DetailSection title="Notas">
+              <p className="text-gray-300 whitespace-pre-line">{selectedPrice.notes}</p>
+            </DetailSection>
+          )}
+        </DetailView>
+      )}
       
       <div className="py-6">
         <div className="px-4 sm:px-6 md:px-8">

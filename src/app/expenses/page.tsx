@@ -14,6 +14,7 @@ import {
   deleteCompanyExpense
 } from '@/lib/companyExpenseService';
 import { toast } from 'react-hot-toast';
+import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
 
 // Componente para mostrar el badge del estado de pago
 const PaymentStatusBadge = ({ isPaid }: { isPaid: boolean }) => (
@@ -34,6 +35,9 @@ export default function ExpensesPage() {
   const [modalOpen, setModalOpen] = useState<boolean>(false);
   const [editingExpense, setEditingExpense] = useState<CompanyExpense | null>(null);
   const [filterPaidBy, setFilterPaidBy] = useState<string>('all');
+  // Nuevo estado para la vista detallada
+  const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
+  const [selectedExpense, setSelectedExpense] = useState<CompanyExpense | null>(null);
 
   // Cargar los gastos al montar el componente
   useEffect(() => {
@@ -120,6 +124,12 @@ export default function ExpensesPage() {
     }
   };
 
+  // Función para abrir la vista detallada
+  const handleViewDetail = (expense: CompanyExpense) => {
+    setSelectedExpense(expense);
+    setDetailViewOpen(true);
+  };
+
   // Definir las columnas de la tabla
   const columnHelper = createColumnHelper<CompanyExpense>();
   
@@ -176,39 +186,16 @@ export default function ExpensesPage() {
       header: 'Estado',
       cell: info => <PaymentStatusBadge isPaid={info.getValue()} />
     }),
-    columnHelper.accessor('link', {
-      header: 'Enlace',
-      cell: info => {
-        const link = info.getValue();
-        return link ? (
-          <a 
-            href={link}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-blue-400 hover:text-blue-300 underline truncate block max-w-[200px]"
-          >
-            Ver producto
-          </a>
-        ) : (
-          <span className="text-gray-500">-</span>
-        );
-      }
-    }),
-    columnHelper.accessor('createdAt', {
-      header: 'Fecha',
-      cell: info => {
-        const date = info.getValue();
-        return date ? (
-          <span className="text-gray-300">
-            {new Date(date).toLocaleDateString()}
-          </span>
-        ) : '-';
-      }
-    }),
     columnHelper.accessor('id', {
       header: 'Acciones',
       cell: info => (
         <div className="flex space-x-2">
+          <button
+            onClick={() => handleViewDetail(info.row.original)}
+            className="px-3 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
+          >
+            Ver
+          </button>
           <button
             onClick={() => handleEdit(info.row.original)}
             className="px-3 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors"
@@ -254,6 +241,35 @@ export default function ExpensesPage() {
     return { total, byPerson, byCategory };
   }, [expenses]);
 
+  // Función para renderizar el paidBy como badge
+  const renderPaidByBadge = (paidBy: string) => {
+    let color: 'blue' | 'red' | 'yellow' | 'purple' = 'blue';
+    let displayText = '';
+    
+    switch(paidBy) {
+      case 'edmon':
+        displayText = 'Edmon';
+        color = 'blue';
+        break;
+      case 'albert':
+        displayText = 'Albert';
+        color = 'red';
+        break;
+      case 'biel':
+        displayText = 'Biel';
+        color = 'yellow';
+        break;
+      case 'todos':
+        displayText = 'Todos';
+        color = 'purple';
+        break;
+      default:
+        displayText = paidBy;
+    }
+    
+    return <DetailBadge color={color}>{displayText}</DetailBadge>;
+  };
+
   return (
     <MainLayout>
       <Modal
@@ -273,6 +289,94 @@ export default function ExpensesPage() {
           initialData={editingExpense}
         />
       </Modal>
+
+      {/* Vista detallada del gasto */}
+      {selectedExpense && (
+        <DetailView
+          isOpen={detailViewOpen}
+          onClose={() => setDetailViewOpen(false)}
+          title={`Detalle de Gasto: ${selectedExpense.name}`}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setDetailViewOpen(false);
+                  setEditingExpense(selectedExpense);
+                  setModalOpen(true);
+                }}
+                className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailViewOpen(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Cerrar
+              </button>
+            </>
+          }
+        >
+          <DetailSection title="Información General">
+            <DetailGrid>
+              <DetailField label="Nombre" value={selectedExpense.name} />
+              <DetailField 
+                label="Precio" 
+                value={
+                  <span className="font-semibold text-lg text-green-400">
+                    {selectedExpense.price.toFixed(2)} €
+                  </span>
+                } 
+              />
+              <DetailField 
+                label="Categoría" 
+                value={selectedExpense.category || 'Sin categoría'} 
+              />
+              <DetailField 
+                label="Pagado por" 
+                value={renderPaidByBadge(selectedExpense.paidBy)} 
+              />
+              <DetailField 
+                label="Estado" 
+                value={
+                  <DetailBadge color={selectedExpense.isPaid ? 'green' : 'yellow'}>
+                    {selectedExpense.isPaid ? 'Pagado' : 'Pendiente'}
+                  </DetailBadge>
+                } 
+              />
+              <DetailField 
+                label="Fecha de creación" 
+                value={selectedExpense.createdAt ? new Date(selectedExpense.createdAt).toLocaleDateString() : 'N/A'} 
+              />
+              {selectedExpense.isPaid && selectedExpense.paymentDate && (
+                <DetailField 
+                  label="Fecha de pago" 
+                  value={new Date(selectedExpense.paymentDate).toLocaleDateString()} 
+                />
+              )}
+              {selectedExpense.link && (
+                <DetailField 
+                  label="Enlace" 
+                  value={
+                    <DetailLink 
+                      href={selectedExpense.link} 
+                      label="Ver producto" 
+                    />
+                  } 
+                />
+              )}
+            </DetailGrid>
+          </DetailSection>
+
+          {selectedExpense.notes && (
+            <DetailSection title="Notas adicionales">
+              <p className="text-gray-300 whitespace-pre-line">{selectedExpense.notes}</p>
+            </DetailSection>
+          )}
+        </DetailView>
+      )}
 
       <div className="py-6">
         <div className="px-4 sm:px-6 md:px-8">

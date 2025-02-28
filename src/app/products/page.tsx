@@ -13,6 +13,7 @@ import {
   updateProduct, 
   deleteProduct 
 } from '@/lib/productService';
+import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailImage } from '@/components/ui/DetailView';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -22,6 +23,10 @@ export default function ProductsPage() {
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Nuevos estados para la vista detallada
+  const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     fetchProducts();
@@ -152,12 +157,75 @@ export default function ProductsPage() {
     );
   });
 
+  // Función para abrir la vista detallada
+  const handleViewDetail = (product: Product) => {
+    setSelectedProduct(product);
+    setDetailViewOpen(true);
+  };
+
+  // Modificar la función para renderizar los productos
+  const renderProducts = () => {
+    if (loading) return <div className="text-center py-8">Cargando productos...</div>;
+    if (error) return <div className="text-center py-8 text-red-500">{error}</div>;
+    if (products.length === 0) return <div className="text-center py-8">No hay productos registrados.</div>;
+
+    const filteredProducts = products.filter(product => 
+      product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.language?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.type?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    if (filteredProducts.length === 0) return <div className="text-center py-8">No se encontraron productos con el término de búsqueda.</div>;
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredProducts.map(product => (
+          <div key={product.id} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+            <div className="p-4">
+              <div className="flex justify-between items-start">
+                <h3 className="text-lg font-semibold text-white">{product.name}</h3>
+                <span className="px-2 py-1 bg-blue-900 text-blue-200 text-xs rounded-full">
+                  {product.language || 'Sin idioma'}
+                </span>
+              </div>
+              <div className="mt-2 text-gray-400 text-sm">
+                <p>Tipo: {product.type || 'No especificado'}</p>
+              </div>
+              <div className="mt-4 flex justify-between items-center">
+                <div className="space-x-2">
+                  <button 
+                    onClick={() => handleViewDetail(product)} 
+                    className="px-3 py-1 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600 transition-colors"
+                  >
+                    Ver
+                  </button>
+                  <button 
+                    onClick={() => handleEdit(product)} 
+                    className="px-3 py-1 bg-blue-700 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                  >
+                    Editar
+                  </button>
+                </div>
+                <button 
+                  onClick={() => product.id && handleDelete(product.id)} 
+                  className="px-3 py-1 bg-red-700 text-white text-sm rounded hover:bg-red-600 transition-colors"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <MainLayout>
       {notification.show && (
         <div className={`fixed top-5 right-5 p-4 rounded-md shadow-xl z-50 ${
-          notification.type === 'success' ? 'bg-green-800 text-white border-l-4 border-green-500' : 'bg-red-800 text-white border-l-4 border-red-500'
-        } transition-opacity duration-300 ease-in-out font-medium`}>
+          notification.type === 'success' ? 'bg-green-700 text-white' : 'bg-red-700 text-white'
+        }`}>
           {notification.message}
         </div>
       )}
@@ -168,7 +236,7 @@ export default function ProductsPage() {
           setShowModal(false);
           setEditingProduct(null);
         }}
-        title={editingProduct ? "Editar producto" : "Añadir nuevo producto"}
+        title={editingProduct ? "Editar Producto" : "Añadir Producto"}
       >
         <ProductForm
           onSubmit={handleSubmit}
@@ -179,6 +247,72 @@ export default function ProductsPage() {
           initialData={editingProduct}
         />
       </Modal>
+      
+      {/* Vista detallada del producto */}
+      {selectedProduct && (
+        <DetailView
+          isOpen={detailViewOpen}
+          onClose={() => setDetailViewOpen(false)}
+          title={`Detalle de Producto: ${selectedProduct.name}`}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setDetailViewOpen(false);
+                  setEditingProduct(selectedProduct);
+                  setShowModal(true);
+                }}
+                className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailViewOpen(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Cerrar
+              </button>
+            </>
+          }
+        >
+          <DetailSection title="Información General">
+            <DetailGrid>
+              <DetailField label="Nombre" value={selectedProduct.name || 'Sin nombre'} />
+              <DetailField 
+                label="Idioma" 
+                value={
+                  <DetailBadge color="blue">
+                    {selectedProduct.language || 'No especificado'}
+                  </DetailBadge>
+                } 
+              />
+              <DetailField 
+                label="Tipo" 
+                value={selectedProduct.type || 'No especificado'} 
+              />
+              <DetailField 
+                label="ID" 
+                value={
+                  <span className="text-xs font-mono bg-gray-700 px-2 py-1 rounded">
+                    {selectedProduct.id}
+                  </span>
+                } 
+              />
+            </DetailGrid>
+          </DetailSection>
+
+          {selectedProduct.notes && (
+            <DetailSection title="Notas">
+              <p className="text-gray-300 whitespace-pre-line">{selectedProduct.notes}</p>
+            </DetailSection>
+          )}
+
+          {/* Sección para precios relacionados si estuvieran disponibles */}
+          {/* Esta sección puede expandirse en futuras implementaciones */}
+        </DetailView>
+      )}
       
       <div className="container mx-auto p-4">
         <div className="flex justify-between items-center mb-6">
@@ -221,73 +355,47 @@ export default function ProductsPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredProducts.length > 0 ? (
-              filteredProducts.map((product) => (
-                <div key={product.id} className="bg-gray-900 shadow overflow-hidden rounded-lg">
-                  <div className="relative h-48 w-full overflow-hidden">
-                    {product.imageUrl && product.imageUrl.trim() !== '' ? (
-                      <Image
-                        src={product.imageUrl}
-                        alt={product.name || 'Product'}
-                        width={400}
-                        height={250}
-                        className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
-                        priority
-                      />
-                    ) : (
-                      <div className={`flex items-center justify-center h-full ${getRandomBgColor(product.id || '1')}`}>
-                        <span className="text-2xl font-bold text-white">
-                          {product.name ? product.name.charAt(0).toUpperCase() : 'P'}
-                        </span>
-                      </div>
-                    )}
-                    <div className="absolute top-0 right-0 p-2">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-200">
-                        {product.type || 'N/A'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="px-4 py-4">
-                    <h3 className="text-lg font-medium text-white truncate" title={product.name}>
-                      {product.name || 'Sin nombre'}
-                    </h3>
-                    <div className="mt-1 flex items-center">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        product.language === 'Japanese' ? 'bg-red-900 text-white' : 
-                        product.language === 'English' ? 'bg-blue-900 text-white' : 
-                        'bg-green-900 text-white'
-                      }`}>
-                        {product.language || 'N/A'}
-                      </span>
-                    </div>
-                    <p className="mt-3 text-sm text-gray-400 line-clamp-3">
-                      {product.description || 'Sin descripción disponible.'}
-                    </p>
-                  </div>
-                  <div className="border-t border-gray-800 px-4 py-3 flex justify-between items-center">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEdit(product)}
-                        className="px-3 py-1 bg-green-800 text-white rounded hover:bg-green-700 transition-colors"
-                      >
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDelete(product.id || '')}
-                        className="px-3 py-1 bg-red-800 text-white rounded hover:bg-red-700 transition-colors"
-                      >
-                        Eliminar
-                      </button>
-                    </div>
-                  </div>
+          <div className="py-6">
+            <div className="px-4 sm:px-6 md:px-8">
+              <div className="md:flex md:items-center md:justify-between">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-2xl font-semibold leading-tight text-white">
+                    Productos
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Gestiona el catálogo de productos de tu tienda
+                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="col-span-full text-center text-gray-400 py-8">
-                {searchTerm ? 'No se encontraron productos que coincidan con la búsqueda.' : 'No hay productos disponibles.'}
+                <div className="mt-4 flex md:mt-0 md:ml-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingProduct(null);
+                      setShowModal(true);
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    Añadir Producto
+                  </button>
+                </div>
               </div>
-            )}
+
+              <div className="mt-6">
+                <div className="mb-4">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Buscar productos..."
+                    className="w-full md:w-80 p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-white"
+                  />
+                </div>
+                
+                <div className="mt-6 bg-gray-900 rounded-lg p-4">
+                  {renderProducts()}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
