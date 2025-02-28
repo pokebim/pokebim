@@ -3,17 +3,18 @@ const nextConfig = {
   /* config options here */
   images: {
     domains: [
-      'm.media-amazon.com', // Para imágenes de Amazon
-      'images.unsplash.com', // Para imágenes de Unsplash
-      'via.placeholder.com', // Para imágenes placeholder
+      'via.placeholder.com',
+      'picsum.photos',
+      'images.unsplash.com',
+      'firebasestorage.googleapis.com',
+      'source.unsplash.com'
     ],
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**.amazon.com',
-        pathname: '/images/**',
+        hostname: '**',
       },
-    ],
+    ]
   },
   // Ensure we properly handle React 19
   reactStrictMode: true,
@@ -26,7 +27,9 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   output: 'standalone',
-  swcMinify: true
+  experimental: {
+    serverComponentsExternalPackages: ['prisma', '@prisma/client']
+  }
 };
 
 module.exports = nextConfig; 
