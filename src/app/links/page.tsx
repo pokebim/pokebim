@@ -362,11 +362,41 @@ export default function LinksPage() {
                 Organiza y gestiona tus enlaces en grupos personalizados
               </p>
             </div>
-            <div className="mt-4 flex md:mt-0 md:ml-4">
+            <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
+              {/* Botón para importar enlaces de Pokémon */}
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    if (confirm('¿Estás seguro de importar el grupo de enlaces de Pokémon? Esta acción creará más de 60 enlaces.')) {
+                      setLoading(true);
+                      const response = await fetch('/api/links/add-pokemon-links');
+                      const data = await response.json();
+                      
+                      if (data.success) {
+                        showNotification(data.message || 'Enlaces de Pokémon importados correctamente');
+                        // Recargar la página para mostrar los nuevos enlaces
+                        await fetchGroups();
+                      } else {
+                        showNotification(data.error || 'Error al importar enlaces de Pokémon', 'error');
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error:', error);
+                    showNotification('Error al importar enlaces de Pokémon', 'error');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-700 hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+              >
+                Importar enlaces Pokémon
+              </button>
+              
               <button
                 type="button"
                 onClick={() => setGroupModalOpen(true)}
-                className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-700 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-700 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
                 Nuevo grupo
               </button>
