@@ -17,7 +17,7 @@ datasource db {
 
 model Supplier {
   id        String     @id @default(uuid())
-  name      String
+  name      String     @unique
   contact   String?
   website   String?
   notes     String?
@@ -39,6 +39,9 @@ model Product {
   prices      Price[]
   supplier    Supplier  @relation(fields: [supplierId], references: [id])
   supplierId  String
+  stock       Stock[]
+
+  @@unique([name, language])
 }
 
 model Price {
@@ -55,6 +58,8 @@ model Price {
   productId  String
   supplier   Supplier @relation(fields: [supplierId], references: [id])
   supplierId String
+
+  @@unique([productId, supplierId])
 }
 
 model User {
@@ -65,4 +70,34 @@ model User {
   role      String   @default("user")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Stock {
+  id                String    @id @default(uuid())
+  product           Product   @relation(fields: [productId], references: [id])
+  productId         String
+  quantity          Int       @default(0)
+  storeQuantity     Int       @default(0)
+  investmentQuantity Int       @default(0)
+  holdStore         Int       @default(0)
+  unitPrice         Float
+  totalPrice        Float
+  vatIncluded       Boolean   @default(false)
+  arrivalDate       DateTime?
+  isPaid            Boolean   @default(false)
+  storeTotalPrice   Float?
+  costPerPerson     Float?
+  wallapopPrice     Float?
+  amazonPrice       Float?
+  cardmarketPrice   Float?
+  approxSellingPrice Float?
+  profitPerUnit     Float?
+  profitPercentage  Float?
+  totalProfit       Float?
+  tikTokPrice       Float?
+  storePrice        Float?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([productId])
 }

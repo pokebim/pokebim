@@ -16,12 +16,18 @@ import {
 } from '@/lib/priceService';
 import { 
   Product, 
-  getAllProducts 
+  getAllProducts, 
+  updateProduct, 
+  checkProductsExist 
 } from '@/lib/productService';
 import { 
   Supplier, 
-  getAllSuppliers 
+  getAllSuppliers, 
+  checkSuppliersExist 
 } from '@/lib/supplierService';
+import { toast } from 'react-hot-toast';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface EnrichedPrice extends Price {
   product: {
@@ -74,13 +80,36 @@ export default function PricesPage() {
 
   const fetchData = async () => {
     setLoading(true);
+    setError(''); // Clear any previous errors
     try {
-      // Cargar productos y proveedores primero para poder enriquecer los precios
-      await loadProductsAndSuppliers();
+      console.log('FIREBASE: Iniciando carga secuencial de datos COMPLETA');
       
-      // Luego cargar precios
-      await fetchPrices();
+      // 1. Primero cargar productos y proveedores y actualizar los que faltan tipo
+      let loadedData = await loadProductsAndSuppliers();
       
+      // Verificar si se cargaron productos
+      if (loadedData.products.length === 0) {
+        console.warn('FIREBASE: No se cargaron productos en fetchData. Reintentando...');
+        
+        // Esperar un momento y reintentar (para dar tiempo a que se actualice el estado)
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        loadedData = await loadProductsAndSuppliers();
+        
+        // Si aún no tenemos productos, mostrar error pero continuar
+        if (loadedData.products.length === 0) {
+          console.error('FIREBASE: Fallo al cargar productos después de múltiples intentos');
+          setError('No se han podido cargar todos los productos. Algunos precios pueden mostrarse incorrectamente.');
+        }
+      }
+      
+      // 2. Obtenemos todos los precios directamente de Firebase
+      const firebasePrices = await getAllPrices();
+      console.log('FIREBASE: Loaded prices:', firebasePrices.length, 'precios');
+      
+      // 3. Enriquecer precios con datos de productos y proveedores
+      await fetchPrices(loadedData.products, loadedData.suppliers);
+      
+      console.log('FIREBASE: Completada la carga de datos');
       setLoading(false);
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -89,40 +118,125 @@ export default function PricesPage() {
     }
   };
 
-  const fetchPrices = async () => {
+  const fetchPrices = async (productData: Product[] = [], supplierData: Supplier[] = []) => {
     try {
       // Obtener precios desde Firebase
       const firebasePrices = await getAllPrices();
-      console.log('FIREBASE: Loaded prices:', firebasePrices);
+      console.log('FIREBASE: Loaded prices:', firebasePrices.length, 'precios');
+      
+      // Use passed data or fall back to state
+      const productsToUse = productData.length > 0 ? productData : products;
+      const suppliersToUse = supplierData.length > 0 ? supplierData : suppliers;
+      
+      // Si no tenemos productos o proveedores, intentar cargarlos de nuevo
+      if (productsToUse.length === 0 || suppliersToUse.length === 0) {
+        console.warn('FIREBASE: Products or suppliers missing in fetchPrices, trying to reload them...');
+        
+        // Intentar cargar productos y proveedores de nuevo
+        const loadedData = await loadProductsAndSuppliers();
+        
+        // Verificar si se cargaron correctamente
+        if (loadedData.products.length === 0) {
+          console.error('FIREBASE: ¡No hay productos cargados después del reintento!');
+          setError('Error: No se han podido cargar los productos. Por favor, recarga la página.');
+          return;
+        }
+        
+        if (loadedData.suppliers.length === 0) {
+          console.error('FIREBASE: ¡No hay proveedores cargados después del reintento!');
+          setError('Error: No se han podido cargar los proveedores. Por favor, recarga la página.');
+          return;
+        }
+        
+        // Use newly loaded data
+        return await fetchPrices(loadedData.products, loadedData.suppliers);
+      }
+      
+      // Log actual data contents for debugging
+      console.log('FIREBASE: Products in fetchPrices:', productsToUse.map(p => p.id));
+      console.log('FIREBASE: Suppliers in fetchPrices:', suppliersToUse.map(s => s.id));
+      
+      // Crear mapa de productos para búsqueda rápida
+      const productsMap = new Map(productsToUse.map(product => [product.id, product]));
+      // Crear mapa de proveedores para búsqueda rápida
+      const suppliersMap = new Map(suppliersToUse.map(supplier => [supplier.id, supplier]));
+      
+      // Procesar y enriquecer precios con información de productos y proveedores
+      // Hacer un registro detallado de los IDs de productos y proveedores
+      const productIds = firebasePrices.map(p => p.productId);
+      const supplierIds = firebasePrices.map(p => p.supplierId);
+      
+      console.log('FIREBASE: Product IDs in prices:', productIds);
+      console.log('FIREBASE: Supplier IDs in prices:', supplierIds);
+      
+      // Detectar y registrar discrepancias
+      const missingProductIds = productIds.filter(id => id && !productsMap.has(id));
+      const missingSupplierIds = supplierIds.filter(id => id && !suppliersMap.has(id));
+      
+      if (missingProductIds.length > 0) {
+        console.warn('FIREBASE: Missing products:', missingProductIds);
+      }
+      
+      if (missingSupplierIds.length > 0) {
+        console.warn('FIREBASE: Missing suppliers:', missingSupplierIds);
+      }
       
       // Enriquecer los datos de precios con información de productos y proveedores
       const enrichedPrices = firebasePrices.map((price: Price) => {
-        const product = products.find(p => p.id === price.productId) || { 
-          name: 'Producto desconocido', 
-          language: 'N/A', 
-          type: 'N/A' 
-        };
+        // Usar el mapa para búsquedas más eficientes
+        const product = productsMap.get(price.productId);
+        const supplier = suppliersMap.get(price.supplierId);
         
-        const supplier = suppliers.find(s => s.id === price.supplierId) || { 
-          name: 'Proveedor desconocido', 
-          country: 'N/A' 
-        };
+        // Si no encontramos el producto/proveedor, registrarlo
+        if (!product && price.productId) {
+          console.log(`Producto con ID ${price.productId} no encontrado en el listado de productos disponibles`);
+        }
+        
+        if (!supplier && price.supplierId) {
+          console.log(`Proveedor con ID ${price.supplierId} no encontrado en el listado de proveedores disponibles`);
+        }
         
         return {
           ...price,
           product: {
-            name: product.name || 'Producto desconocido',
-            language: product.language || 'N/A',
-            type: product.type || 'N/A'
+            name: product?.name || 'Producto desconocido',
+            language: product?.language || 'N/A',
+            type: product?.type || 'N/A'
           },
           supplier: {
-            name: supplier.name || 'Proveedor desconocido',
-            country: supplier.country || 'N/A'
+            name: supplier?.name || 'Proveedor desconocido',
+            country: supplier?.country || 'N/A'
           }
         };
       });
       
+      // Registrar los productos/proveedores que faltan
+      const unknownProducts = enrichedPrices.filter(p => p.product.name === 'Producto desconocido');
+      const unknownSuppliers = enrichedPrices.filter(p => p.supplier.name === 'Proveedor desconocido');
+      
+      if (unknownProducts.length > 0) {
+        console.warn('FIREBASE: Hay precios con productos desconocidos:', unknownProducts.length);
+        console.log('IDs de productos desconocidos:', unknownProducts.map(p => p.productId));
+      }
+      
+      if (unknownSuppliers.length > 0) {
+        console.warn('FIREBASE: Hay precios con proveedores desconocidos:', unknownSuppliers.length);
+        console.log('IDs de proveedores desconocidos:', unknownSuppliers.map(p => p.supplierId));
+      }
+      
+      // Ordenar precios por fecha (más recientes primero)
+      enrichedPrices.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0;
+        const dateB = b.date ? new Date(b.date).getTime() : 0;
+        return dateB - dateA;
+      });
+      
       setPrices(enrichedPrices);
+      
+      // Si hay productos o proveedores faltantes, mostrar un mensaje de advertencia
+      if (missingProductIds.length > 0 || missingSupplierIds.length > 0) {
+        setError(`Hay ${missingProductIds.length} productos y ${missingSupplierIds.length} proveedores que faltan en la base de datos. Los precios asociados se muestran como "desconocidos".`);
+      }
     } catch (err) {
       console.error('Error fetching prices:', err);
       setError('No se pudieron cargar los precios. Por favor, inténtalo de nuevo más tarde.');
@@ -131,18 +245,161 @@ export default function PricesPage() {
 
   const loadProductsAndSuppliers = async () => {
     try {
-      // Cargar productos de Firebase
-      const firebaseProducts = await getAllProducts();
-      console.log('FIREBASE: Loaded products for prices page:', firebaseProducts);
-      setProducts(firebaseProducts);
+      console.log('FIREBASE: Iniciando carga de productos y proveedores');
       
-      // Cargar proveedores de Firebase
-      const firebaseSuppliers = await getAllSuppliers();
-      console.log('FIREBASE: Loaded suppliers for prices page:', firebaseSuppliers);
-      setSuppliers(firebaseSuppliers);
+      // Diagnóstico: verificar si los productos existen en Firebase
+      const productsCheck = await checkProductsExist();
+      if (!productsCheck.exists || productsCheck.count === 0) {
+        console.error("FIREBASE DIAGNÓSTICO: No se encontraron productos en la base de datos");
+        toast.error("No se encontraron productos en la base de datos");
+      } else {
+        console.log(`FIREBASE DIAGNÓSTICO: Se encontraron ${productsCheck.count} productos en la base de datos`);
+      }
+      
+      // Diagnóstico: verificar si los proveedores existen en Firebase
+      const suppliersCheck = await checkSuppliersExist();
+      if (!suppliersCheck.exists || suppliersCheck.count === 0) {
+        console.error("FIREBASE DIAGNÓSTICO: No se encontraron proveedores en la base de datos");
+        toast.error("No se encontraron proveedores en la base de datos");
+      } else {
+        console.log(`FIREBASE DIAGNÓSTICO: Se encontraron ${suppliersCheck.count} proveedores en la base de datos`);
+      }
+      
+      // Continuar con la carga normal
+      let firebaseProducts = await getAllProducts();
+      console.log('FIREBASE: Productos cargados:', firebaseProducts);
+      
+      // Si no hay productos después de intentar cargarlos, registrar un error detallado
+      if (!Array.isArray(firebaseProducts) || firebaseProducts.length === 0) {
+        console.error("FIREBASE: No se pudieron cargar productos después de los reintentos", 
+          { diagnosticCheck: productsCheck, loadAttemptResult: firebaseProducts });
+        setError('No se pudieron cargar los productos');
+        setProducts([]);
+        firebaseProducts = [];
+      } else {
+        setProducts(firebaseProducts);
+        
+        // Asegurarnos de que todos los productos tienen un campo type
+        const productsWithoutType = firebaseProducts.filter(p => !p.type);
+        if (productsWithoutType.length > 0) {
+          console.warn(`Hay ${productsWithoutType.length} productos sin campo 'type'. Actualizando productos...`);
+          await updateProductsMissingType(productsWithoutType);
+          
+          // Volver a cargar productos después de actualizar para asegurar datos frescos
+          try {
+            const updatedProducts = await getAllProducts();
+            console.log('FIREBASE: Productos recargados después de actualizar:', updatedProducts.length, 'productos');
+            setProducts(updatedProducts);
+            firebaseProducts = updatedProducts; // Actualizar la variable local también
+          } catch (updateError) {
+            console.error('FIREBASE: Error al recargar productos después de actualizar:', updateError);
+          }
+        }
+        
+        // Logging detallado para depuración
+        console.log('FIREBASE: Detalles de productos:', firebaseProducts.map(p => ({
+          id: p.id, 
+          name: p.name, 
+          language: p.language,
+          type: p.type
+        })));
+      }
+
+      let firebaseSuppliers = await getAllSuppliers();
+      console.log('FIREBASE: Proveedores cargados:', firebaseSuppliers);
+      
+      // Si no hay proveedores después de intentar cargarlos, registrar un error detallado
+      if (!Array.isArray(firebaseSuppliers) || firebaseSuppliers.length === 0) {
+        console.error("FIREBASE: No se pudieron cargar proveedores después de los reintentos", 
+          { diagnosticCheck: suppliersCheck, loadAttemptResult: firebaseSuppliers });
+        setError('No se pudieron cargar los proveedores');
+        setSuppliers([]);
+        firebaseSuppliers = [];
+      } else {
+        setSuppliers(firebaseSuppliers);
+        
+        // Logging detallado para depuración
+        console.log('FIREBASE: Detalles de proveedores:', firebaseSuppliers.map(s => ({
+          id: s.id, 
+          name: s.name
+        })));
+      }
+
+      return { products: firebaseProducts || [], suppliers: firebaseSuppliers || [] };
     } catch (error) {
-      console.error('Error loading products and suppliers:', error);
-      setError('Error al cargar productos y proveedores');
+      console.error('Error al cargar productos y proveedores:', error);
+      setError(`Error al cargar datos: ${error.message}`);
+      setProducts([]);
+      setSuppliers([]);
+      return { products: [], suppliers: [] };
+    }
+  };
+
+  // Función para determinar el tipo de producto basado en el idioma
+  const getProductType = (language: string): string => {
+    switch (language) {
+      case "Japanese":
+        return "JPN";
+      case "Korean":
+        return "KOR";
+      case "Chinese":
+        return "CHN";
+      case "English":
+        return "ENG";
+      default:
+        return "OTHER";
+    }
+  };
+  
+  // Función para actualizar productos sin tipo
+  const updateProductsMissingType = async (productsToUpdate: Product[]) => {
+    let updatedCount = 0;
+    let totalToUpdate = productsToUpdate.length;
+    
+    // Mostrar un mensaje temporal mientras se actualizan los productos
+    setError(`Actualizando ${totalToUpdate} productos sin el campo 'type'. Por favor, espere...`);
+    
+    console.log(`Iniciando actualización de ${totalToUpdate} productos sin tipo`);
+    
+    try {
+      // Usar un método más eficiente para actualizar múltiples productos
+      const updatePromises = productsToUpdate.map(async (product) => {
+        if (!product.id) return null;
+        
+        try {
+          const type = getProductType(product.language || "Unknown");
+          console.log(`Actualizando producto ${product.name} (${product.id}) con tipo: ${type}`);
+          
+          await updateProduct(product.id, { type });
+          
+          // Actualizar también el producto en memoria
+          product.type = type;
+          return product.id;
+        } catch (error) {
+          console.error(`Error actualizando producto ${product.id}:`, error);
+          return null;
+        }
+      });
+      
+      // Esperar a que se completen todas las actualizaciones
+      const results = await Promise.allSettled(updatePromises);
+      
+      // Contar cuántos se actualizaron correctamente
+      updatedCount = results.filter(r => r.status === 'fulfilled' && r.value !== null).length;
+      
+      console.log(`Actualizados ${updatedCount} de ${totalToUpdate} productos con el campo type`);
+      
+      if (updatedCount === totalToUpdate) {
+        setError(null); // Limpiar el mensaje de error si todo se actualizó
+        return true;
+      } else {
+        setError(`Se actualizaron ${updatedCount} de ${totalToUpdate} productos. Algunos productos no pudieron ser actualizados.`);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error masivo durante la actualización de productos:', error);
+      setError(`Error durante la actualización de productos: ${error.message}`);
+      return false;
     }
   };
 
@@ -443,6 +700,115 @@ export default function PricesPage() {
     })
   ], []);
 
+  // Modificar la función repairMissingRelations para un mejor manejo
+  const repairMissingRelations = async () => {
+    if (!confirm('¿Estás seguro de que quieres intentar reparar las relaciones perdidas? Esto puede modificar la base de datos.')) {
+      return;
+    }
+    
+    setLoading(true);
+    const fixedItems = [];
+    const errorItems = [];
+    
+    try {
+      // 1. Forzar la recarga completa de datos
+      await fetchData();
+      
+      // 2. Cargar explícitamente los productos una vez más para garantizar datos frescos
+      const loadedData = await loadProductsAndSuppliers();
+      
+      // 3. Verificar si hay productos sin tipo después de la recarga
+      const productsWithoutType = loadedData.products.filter(p => !p.type);
+      if (productsWithoutType.length > 0) {
+        console.warn(`Aún hay ${productsWithoutType.length} productos sin campo 'type'. Actualizando...`);
+        await updateProductsMissingType(productsWithoutType);
+        // Recargar productos una vez más
+        const updatedData = await loadProductsAndSuppliers();
+        
+        // Use the updated data to re-fetch prices
+        await fetchPrices(updatedData.products, updatedData.suppliers);
+      }
+      
+      // 3. Mostrar resultados
+      const unknownProducts = prices.filter(p => p.product.name === 'Producto desconocido');
+      const unknownSuppliers = prices.filter(p => p.supplier.name === 'Proveedor desconocido');
+      
+      if (unknownProducts.length === 0 && unknownSuppliers.length === 0) {
+        showNotification('Todas las relaciones están correctas. No se encontraron problemas.');
+      } else {
+        setError(`Aún hay ${unknownProducts.length} productos y ${unknownSuppliers.length} proveedores desconocidos. Es posible que estos IDs ya no existan en la base de datos.`);
+      }
+    } catch (error) {
+      console.error('Error repairing prices:', error);
+      showNotification('Error al intentar reparar los precios: ' + error.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Función para ejecutar diagnóstico completo
+  const runDiagnostics = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      
+      console.log("🔍 DIAGNÓSTICO: Iniciando diagnóstico completo de Firebase");
+      
+      // Verificar productos
+      const productsCheck = await checkProductsExist();
+      const suppliersCheck = await checkSuppliersExist();
+      
+      let mensaje = "📊 Resultados del diagnóstico:\n";
+      
+      if (productsCheck.exists) {
+        mensaje += `✅ Colección 'products' existe con ${productsCheck.count} documentos\n`;
+      } else {
+        mensaje += `❌ Colección 'products' no existe o está vacía\n`;
+      }
+      
+      if (suppliersCheck.exists) {
+        mensaje += `✅ Colección 'suppliers' existe con ${suppliersCheck.count} documentos\n`;
+      } else {
+        mensaje += `❌ Colección 'suppliers' no existe o está vacía\n`;
+      }
+      
+      // Intentar cargar directamente los productos y proveedores
+      try {
+        const productsCol = collection(db, "products");
+        const productsSnapshot = await getDocs(productsCol);
+        
+        mensaje += `\n📋 Primeros 3 productos encontrados:\n`;
+        let count = 0;
+        productsSnapshot.forEach(doc => {
+          if (count < 3) {
+            const data = doc.data();
+            mensaje += `- ID: ${doc.id}, Nombre: ${data.name}, Tipo: ${data.type || 'sin tipo'}\n`;
+            count++;
+          }
+        });
+      } catch (error) {
+        mensaje += `❌ Error al consultar productos directamente: ${error.message}\n`;
+      }
+      
+      console.log(mensaje);
+      toast.success("Diagnóstico completado. Revisa la consola para más detalles.");
+      
+      // Mostrar toast con resultado básico
+      if (productsCheck.count > 0 && suppliersCheck.count > 0) {
+        toast.success(`Se encontraron ${productsCheck.count} productos y ${suppliersCheck.count} proveedores`);
+      } else {
+        toast.error("No se encontraron datos suficientes en la base de datos");
+      }
+      
+      setLoading(false);
+    } catch (error) {
+      console.error("Error en diagnóstico:", error);
+      setError(`Error en diagnóstico: ${error.message}`);
+      setLoading(false);
+      toast.error("Error al ejecutar diagnóstico");
+    }
+  };
+
   return (
     <MainLayout>
       {notification?.show && (
@@ -485,13 +851,43 @@ export default function PricesPage() {
               </p>
             </div>
             <div className="mt-4 flex md:mt-0 md:ml-4">
-              <button
-                type="button"
-                onClick={() => setModalOpen(true)}
-                className="ml-3 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-700 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                Añadir Precio
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={fetchData}
+                  disabled={loading}
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-700 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  {loading ? 'Cargando...' : 'Recargar datos'}
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={runDiagnostics}
+                  disabled={loading}
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-700 hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+                >
+                  Ejecutar Diagnóstico
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={repairMissingRelations}
+                  disabled={loading}
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-700 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
+                >
+                  Reparar relaciones
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => setModalOpen(true)}
+                  disabled={loading}
+                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-700 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  Añadir Precio
+                </button>
+              </div>
             </div>
           </div>
           
@@ -505,6 +901,22 @@ export default function PricesPage() {
                 </div>
                 <div className="ml-3">
                   <p className="text-sm text-red-200">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {loading && (
+            <div className="mt-4 bg-blue-900 border-l-4 border-blue-500 p-4">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="animate-spin h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-blue-200">Cargando datos. Por favor, espere...</p>
                 </div>
               </div>
             </div>
@@ -552,7 +964,7 @@ export default function PricesPage() {
                 </button>
               </div>
             ) : (
-              <div className="bg-gray-900 shadow rounded-lg p-4">
+              <div className="bg-gray-900 shadow rounded-lg p-2 sm:p-4 overflow-x-auto">
                 <DataTable
                   data={prices}
                   columns={columns}

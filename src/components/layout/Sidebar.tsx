@@ -61,6 +61,11 @@ const icons = {
       <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
     </svg>
   ),
+  close: (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  )
 };
 
 const menuItems = [
@@ -76,7 +81,13 @@ const menuItems = [
   { name: 'Links', path: '/links', icon: icons.links },
 ];
 
-export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCollapsed: (value: boolean) => void }) {
+interface SidebarProps {
+  collapsed: boolean;
+  setCollapsed: (value: boolean) => void;
+  isMobile: boolean;
+}
+
+export default function Sidebar({ collapsed, setCollapsed, isMobile }: SidebarProps) {
   const pathname = usePathname();
 
   // Función para determinar si un elemento de menú está activo
@@ -87,30 +98,66 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
     return pathname.startsWith(menuPath);
   };
 
+  // Calcular posición y estilo del sidebar según el modo (móvil/desktop) y estado (colapsado/expandido)
+  const sidebarClasses = `
+    fixed transition-all duration-300 ease-in-out bg-black text-white h-screen
+    ${isMobile 
+      ? collapsed 
+        ? '-left-64 z-40' // Móvil colapsado: fuera de la pantalla
+        : 'left-0 z-50'   // Móvil expandido: visible
+      : collapsed 
+        ? 'w-16 left-0'   // Desktop colapsado: ancho mínimo
+        : 'w-64 left-0'   // Desktop expandido: ancho completo
+    }
+  `;
+
+  // Añade botón de cierre si está en móvil y sidebar abierto
+  const renderCloseButton = () => {
+    if (isMobile && !collapsed) {
+      return (
+        <button
+          className="absolute top-4 right-4 p-1 rounded-full bg-gray-800 hover:bg-gray-700"
+          onClick={() => setCollapsed(true)}
+          aria-label="Cerrar menú"
+        >
+          {icons.close}
+        </button>
+      );
+    }
+    return null;
+  };
+
   return (
-    <div className={`transition-all duration-300 ease-in-out bg-black text-white h-screen ${collapsed ? 'w-16' : 'w-64'} fixed left-0 top-0 z-40`}>
+    <div className={sidebarClasses}>
       <div className="flex items-center justify-between h-16 px-4 border-b border-gray-800">
-        {!collapsed && (
+        {(!collapsed || isMobile) && (
           <div className="font-bold text-xl">
             PokeBim
           </div>
         )}
-        <button
-          className={`p-1 rounded-md hover:bg-gray-900 ${collapsed ? 'mx-auto' : ''}`}
-          onClick={() => setCollapsed(!collapsed)}
-        >
-          {collapsed ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            </svg>
-          )}
-        </button>
+        
+        {renderCloseButton()}
+        
+        {!isMobile && (
+          <button
+            className={`p-1 rounded-md hover:bg-gray-900 ${collapsed ? 'mx-auto' : ''}`}
+            onClick={() => setCollapsed(!collapsed)}
+            aria-label={collapsed ? "Expandir menú" : "Colapsar menú"}
+          >
+            {collapsed ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            )}
+          </button>
+        )}
       </div>
-      <nav className="mt-5">
+      
+      <nav className="mt-5 overflow-y-auto max-h-[calc(100vh-4rem)]">
         <ul className="space-y-2 px-2">
           {menuItems.map((item) => (
             <li key={item.path}>
@@ -121,9 +168,12 @@ export default function Sidebar({ collapsed, setCollapsed }: { collapsed: boolea
                     ? 'bg-green-900 text-white'
                     : 'text-gray-300 hover:bg-gray-900'
                 }`}
+                onClick={() => isMobile && setCollapsed(true)} // Cierra el menú en móvil al hacer clic
               >
-                <span className="mr-3">{item.icon}</span>
-                {!collapsed && <span>{item.name}</span>}
+                <span className={`flex-shrink-0 ${isMobile || !collapsed ? 'mr-3' : 'mx-auto'}`}>
+                  {item.icon}
+                </span>
+                {(!collapsed || isMobile) && <span className="whitespace-nowrap">{item.name}</span>}
               </Link>
             </li>
           ))}
