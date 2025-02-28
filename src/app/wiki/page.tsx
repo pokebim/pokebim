@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { WikiPost, getAllWikiPosts, deleteWikiPost } from '@/lib/wikiService';
 import Link from 'next/link';
+import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
 
 interface Notification {
   show: boolean;
@@ -24,6 +25,10 @@ export default function WikiPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const router = useRouter();
+  
+  // Nuevos estados para vista detallada
+  const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
+  const [selectedPost, setSelectedPost] = useState<WikiPost | null>(null);
   
   // Obtener todos los posts al cargar la página
   useEffect(() => {
@@ -102,6 +107,53 @@ export default function WikiPage() {
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  // Nueva función para ver detalles
+  const handleViewDetail = (post: WikiPost) => {
+    setSelectedPost(post);
+    setDetailViewOpen(true);
+  };
+
+  // En la tarjeta de cada post, agregar un botón Ver
+  const renderPosts = () => {
+    if (loading) return <div className="text-center py-8">Cargando artículos...</div>;
+    if (error) return <div className="text-center py-8 text-red-500">{error}</div>;
+    if (posts.length === 0) return <div className="text-center py-8">No hay artículos en la wiki.</div>;
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {posts.map(post => (
+          <div key={post.id} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+            {/* Contenido existente de la tarjeta */}
+            <div className="p-4">
+              <h3 className="text-lg font-semibold text-white">{post.title}</h3>
+              <p className="text-gray-400 mt-1 line-clamp-2">{post.description || 'Sin descripción'}</p>
+              <div className="mt-4 flex justify-between items-center">
+                <div className="space-x-2">
+                  <button
+                    onClick={() => handleViewDetail(post)}
+                    className="px-3 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
+                  >
+                    Ver
+                  </button>
+                  <Link href={`/wiki/${post.id}`}>
+                    <button className="px-3 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors">
+                      Abrir
+                    </button>
+                  </Link>
+                </div>
+                <Link href={`/wiki/edit/${post.id}`}>
+                  <button className="px-3 py-1 text-xs bg-green-700 text-white rounded hover:bg-green-600 transition-colors">
+                    Editar
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
@@ -187,80 +239,100 @@ export default function WikiPage() {
           
           {/* Lista de artículos */}
           <div className="mt-8">
-            {loading ? (
-              <div className="flex justify-center p-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-              </div>
-            ) : filteredPosts.length === 0 ? (
-              <div className="bg-gray-900 shadow rounded-lg p-6 text-center">
-                <p className="text-gray-300">No hay artículos disponibles.</p>
-                <button
-                  onClick={() => router.push('/wiki/new')}
-                  className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-700 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  Crear el primer artículo
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {filteredPosts.map(post => (
-                  <div key={post.id} className="bg-gray-900 shadow rounded-lg p-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <Link href={`/wiki/${post.id}`} className="text-xl font-semibold text-white hover:text-green-400 transition-colors">
-                          {post.title}
-                        </Link>
-                        {post.category && (
-                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-900 text-blue-200">
-                            {post.category}
-                          </span>
-                        )}
-                        {!post.published && (
-                          <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-900 text-yellow-200">
-                            Borrador
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => router.push(`/wiki/edit/${post.id}`)}
-                          className="px-3 py-1 bg-green-700 text-white text-sm rounded hover:bg-green-600 transition-colors"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleDelete(post.id!)}
-                          className="px-3 py-1 bg-red-700 text-white text-sm rounded hover:bg-red-600 transition-colors"
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <p className="mt-2 text-gray-400 line-clamp-2">
-                      {post.content.replace(/<[^>]*>?/gm, '').substring(0, 200)}...
-                    </p>
-                    
-                    <div className="mt-4 flex justify-between items-center">
-                      <div className="text-sm text-gray-500">
-                        {post.author && <span>Por: {post.author} | </span>}
-                        <span>Actualizado: {formatDate(post.updatedAt || post.createdAt)}</span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {post.tags?.map((tag, index) => (
-                          <span key={index} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-300">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {renderPosts()}
           </div>
         </div>
       </div>
+      
+      {/* Vista detallada del post de wiki */}
+      {selectedPost && (
+        <DetailView
+          isOpen={detailViewOpen}
+          onClose={() => setDetailViewOpen(false)}
+          title={`Detalle de Artículo: ${selectedPost.title}`}
+          actions={
+            <>
+              <Link href={`/wiki/${selectedPost.id}`}>
+                <button
+                  type="button"
+                  className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Ver completo
+                </button>
+              </Link>
+              <Link href={`/wiki/edit/${selectedPost.id}`}>
+                <button
+                  type="button" 
+                  className="px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                >
+                  Editar
+                </button>
+              </Link>
+              <button
+                type="button"
+                onClick={() => setDetailViewOpen(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Cerrar
+              </button>
+            </>
+          }
+        >
+          <DetailSection title="Información del Artículo">
+            <DetailGrid>
+              <DetailField 
+                label="Título" 
+                value={<span className="font-semibold">{selectedPost.title}</span>} 
+              />
+              {selectedPost.category && (
+                <DetailField 
+                  label="Categoría" 
+                  value={
+                    <DetailBadge color="blue">
+                      {selectedPost.category}
+                    </DetailBadge>
+                  } 
+                />
+              )}
+              <DetailField 
+                label="Fecha de Creación" 
+                value={selectedPost.createdAt ? new Date(selectedPost.createdAt).toLocaleDateString() : 'No disponible'} 
+              />
+              <DetailField 
+                label="Última Actualización" 
+                value={selectedPost.updatedAt ? new Date(selectedPost.updatedAt).toLocaleDateString() : 'No disponible'} 
+              />
+            </DetailGrid>
+          </DetailSection>
+
+          {selectedPost.description && (
+            <DetailSection title="Descripción">
+              <p className="text-gray-300 whitespace-pre-line">{selectedPost.description}</p>
+            </DetailSection>
+          )}
+
+          <DetailSection title="Vista Previa del Contenido">
+            <div className="bg-gray-900 p-4 rounded-md">
+              <p className="text-gray-300">
+                {selectedPost.content ? (
+                  selectedPost.content.length > 300 
+                    ? selectedPost.content.substring(0, 300) + '...' 
+                    : selectedPost.content
+                ) : (
+                  'Sin contenido'
+                )}
+              </p>
+              <div className="mt-4">
+                <Link href={`/wiki/${selectedPost.id}`}>
+                  <button className="text-blue-400 hover:text-blue-300 hover:underline">
+                    Ver artículo completo →
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </DetailSection>
+        </DetailView>
+      )}
     </MainLayout>
   );
 } 

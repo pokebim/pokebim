@@ -12,6 +12,7 @@ import {
   updateTask, 
   deleteTask 
 } from '@/lib/taskService';
+import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
 
 // Define column colors statically for Tailwind
 const columnStyles = {
@@ -141,13 +142,26 @@ const TaskColumn = ({ column, tasks, onAddTask, onEditTask, onDeleteTask, onMove
       </div>
       <div>
         {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onEdit={onEditTask}
-            onDelete={onDeleteTask}
-            onMove={onMoveTask}
-          />
+          <div className="flex space-x-2 mt-2">
+            <button
+              onClick={() => handleViewDetail(task)}
+              className="px-2 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
+            >
+              Ver
+            </button>
+            <button
+              onClick={() => handleEditTask(task)}
+              className="px-2 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors"
+            >
+              Editar
+            </button>
+            <button
+              onClick={() => handleDeleteTask(task.id || '')}
+              className="px-2 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
+            >
+              Eliminar
+            </button>
+          </div>
         ))}
       </div>
       <button
@@ -233,6 +247,11 @@ export default function TasksPage() {
   const [activeColumn, setActiveColumn] = useState<string | null>(null);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  
+  // Nuevos estados para vista detallada
+  const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
   // Define columns
   const columns: Column[] = [
@@ -381,6 +400,12 @@ export default function TasksPage() {
     return tasks.filter(task => task.status === columnId);
   };
 
+  // Nueva función para ver detalles
+  const handleViewDetail = (task: Task) => {
+    setSelectedTask(task);
+    setDetailViewOpen(true);
+  };
+
   return (
     <MainLayout>
       {/* Notification */}
@@ -412,6 +437,93 @@ export default function TasksPage() {
           initialTask={editingTask}
         />
       </Modal>
+
+      {/* Vista detallada de la tarea */}
+      {selectedTask && (
+        <DetailView
+          isOpen={detailViewOpen}
+          onClose={() => setDetailViewOpen(false)}
+          title={`Detalle de Tarea: ${selectedTask.title}`}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setDetailViewOpen(false);
+                  handleEditTask(selectedTask);
+                }}
+                className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailViewOpen(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Cerrar
+              </button>
+            </>
+          }
+        >
+          <DetailSection title="Información de la Tarea">
+            <DetailGrid>
+              <DetailField 
+                label="Título" 
+                value={<span className="font-semibold">{selectedTask.title}</span>} 
+              />
+              <DetailField 
+                label="Estado" 
+                value={
+                  <DetailBadge 
+                    color={
+                      selectedTask.status === 'completed' ? 'green' : 
+                      selectedTask.status === 'in-progress' ? 'blue' : 
+                      'yellow'
+                    }
+                  >
+                    {selectedTask.status === 'completed' ? 'Completada' : 
+                     selectedTask.status === 'in-progress' ? 'En Progreso' : 
+                     'Pendiente'}
+                  </DetailBadge>
+                } 
+              />
+              <DetailField 
+                label="Fecha de Creación" 
+                value={selectedTask.createdAt ? new Date(selectedTask.createdAt).toLocaleDateString() : 'No disponible'} 
+              />
+              {selectedTask.dueDate && (
+                <DetailField 
+                  label="Fecha Límite" 
+                  value={new Date(selectedTask.dueDate).toLocaleDateString()} 
+                />
+              )}
+              <DetailField 
+                label="Prioridad" 
+                value={
+                  <DetailBadge 
+                    color={
+                      selectedTask.priority === 'high' ? 'red' : 
+                      selectedTask.priority === 'medium' ? 'yellow' : 
+                      'blue'
+                    }
+                  >
+                    {selectedTask.priority === 'high' ? 'Alta' : 
+                     selectedTask.priority === 'medium' ? 'Media' : 
+                     'Baja'}
+                  </DetailBadge>
+                } 
+              />
+            </DetailGrid>
+          </DetailSection>
+
+          {selectedTask.description && (
+            <DetailSection title="Descripción">
+              <p className="text-gray-300 whitespace-pre-line">{selectedTask.description}</p>
+            </DetailSection>
+          )}
+        </DetailView>
+      )}
 
       <div className="py-6">
         <div className="px-4 sm:px-6 md:px-8">

@@ -21,6 +21,7 @@ import {
   updateMissingSupplier,
   deleteMissingSupplier
 } from '@/lib/supplierService';
+import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
 
 // Define the tabs for the page
 type TabType = 'asian' | 'european' | 'missing';
@@ -58,6 +59,10 @@ export default function SuppliersPage() {
   const [editingMissingSupplier, setEditingMissingSupplier] = useState<MissingSupplier | null>(null);
   const [updateCounter, setUpdateCounter] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Nuevo estado para vista detallada
+  const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -402,17 +407,23 @@ export default function SuppliersPage() {
     }),
     columnHelper.accessor('id', {
       header: 'Acciones',
-      cell: info => (
-        <div className="flex space-x-2">
+      cell: ({ row, getValue }) => (
+        <div className="flex items-center space-x-2">
           <button
-            onClick={() => handleEdit(info.row.original)}
-            className="px-3 py-1 bg-green-700 text-white rounded hover:bg-green-600 transition-colors"
+            onClick={() => handleViewDetail(row.original)}
+            className="px-3 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
+          >
+            Ver
+          </button>
+          <button
+            onClick={() => handleEdit(row.original)}
+            className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-500 transition-colors"
           >
             Editar
           </button>
           <button
-            onClick={() => handleDelete(info.getValue() || '')}
-            className="px-3 py-1 bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
+            onClick={() => handleDelete(getValue() as string)}
+            className="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-500 transition-colors"
           >
             Eliminar
           </button>
@@ -515,6 +526,12 @@ export default function SuppliersPage() {
   // de lo contrario usamos los proveedores filtrados por región
   const displayedSuppliers = searchTerm ? filteredSuppliersBySearch : filteredSuppliers;
 
+  // Nueva función para mostrar los detalles
+  const handleViewDetail = (supplier: Supplier) => {
+    setSelectedSupplier(supplier);
+    setDetailViewOpen(true);
+  };
+
   return (
     <MainLayout>
       {/* Notification */}
@@ -564,6 +581,70 @@ export default function SuppliersPage() {
         />
       </Modal>
       
+      {/* Vista detallada del proveedor */}
+      {selectedSupplier && (
+        <DetailView
+          isOpen={detailViewOpen}
+          onClose={() => setDetailViewOpen(false)}
+          title={`Detalle del Proveedor: ${selectedSupplier.name}`}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setDetailViewOpen(false);
+                  setEditingSupplier(selectedSupplier);
+                  setShowModal(true);
+                }}
+                className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailViewOpen(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Cerrar
+              </button>
+            </>
+          }
+        >
+          <DetailSection title="Información General">
+            <DetailGrid>
+              <DetailField label="Nombre" value={selectedSupplier.name || 'Sin nombre'} />
+              <DetailField label="País" value={selectedSupplier.country || 'No especificado'} />
+              <DetailField label="Contacto" value={selectedSupplier.contact || 'No especificado'} />
+              {selectedSupplier.website && (
+                <DetailField 
+                  label="Sitio Web" 
+                  value={
+                    <DetailLink 
+                      href={selectedSupplier.website.startsWith('http') ? selectedSupplier.website : `https://${selectedSupplier.website}`} 
+                      label={selectedSupplier.website} 
+                    />
+                  } 
+                />
+              )}
+              <DetailField 
+                label="ID" 
+                value={
+                  <span className="text-xs font-mono bg-gray-700 px-2 py-1 rounded">
+                    {selectedSupplier.id}
+                  </span>
+                } 
+              />
+            </DetailGrid>
+          </DetailSection>
+
+          {selectedSupplier.notes && (
+            <DetailSection title="Notas">
+              <p className="text-gray-300 whitespace-pre-line">{selectedSupplier.notes}</p>
+            </DetailSection>
+          )}
+        </DetailView>
+      )}
+
       <div className="py-6">
         <div className="px-4 sm:px-6 md:px-8">
           <div className="md:flex md:items-center md:justify-between mb-6">

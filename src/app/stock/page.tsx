@@ -14,6 +14,7 @@ import {
   updateStockItem,
   deleteStockItem
 } from '@/lib/stockService';
+import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
 
 interface Notification {
   show: boolean;
@@ -32,6 +33,10 @@ export default function StockPage() {
   });
   const [editingItem, setEditingItem] = useState<StockItem | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Nuevos estados para vista detallada
+  const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
+  const [selectedStock, setSelectedStock] = useState<StockItem | null>(null);
 
   useEffect(() => {
     fetchStockData();
@@ -230,24 +235,36 @@ export default function StockPage() {
     }),
     columnHelper.accessor('id', {
       header: 'Acciones',
-      cell: info => (
+      cell: ({ row, getValue }) => (
         <div className="flex space-x-2">
           <button
-            onClick={() => handleEdit(info.row.original)}
-            className="px-3 py-1 bg-green-700 text-white text-sm rounded hover:bg-green-600 transition-colors"
+            onClick={() => handleViewDetail(row.original)}
+            className="px-3 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
+          >
+            Ver
+          </button>
+          <button
+            onClick={() => handleEdit(row.original)}
+            className="px-3 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors"
           >
             Editar
           </button>
           <button
-            onClick={() => handleDelete(info.getValue() || '')}
-            className="px-3 py-1 bg-red-700 text-white text-sm rounded hover:bg-red-600 transition-colors"
+            onClick={() => handleDelete(getValue() as string)}
+            className="px-3 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
           >
             Eliminar
           </button>
         </div>
-      )
+      ),
     })
   ], []);
+
+  // Nueva función para ver detalles
+  const handleViewDetail = (stock: StockItem) => {
+    setSelectedStock(stock);
+    setDetailViewOpen(true);
+  };
 
   return (
     <MainLayout>
@@ -276,6 +293,181 @@ export default function StockPage() {
           initialData={editingItem}
         />
       </Modal>
+      
+      {/* Vista detallada del stock */}
+      {selectedStock && (
+        <DetailView
+          isOpen={detailViewOpen}
+          onClose={() => setDetailViewOpen(false)}
+          title={`Detalle de Stock: ${selectedStock.product || 'Producto'}`}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setDetailViewOpen(false);
+                  setEditingItem(selectedStock);
+                  setModalOpen(true);
+                }}
+                className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDetailViewOpen(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Cerrar
+              </button>
+            </>
+          }
+        >
+          <DetailSection title="Información del Producto">
+            <DetailGrid>
+              <DetailField 
+                label="Producto" 
+                value={selectedStock.product || 'Producto desconocido'} 
+              />
+              <DetailField 
+                label="Idioma" 
+                value={
+                  <DetailBadge 
+                    color={
+                      selectedStock.language === 'Japanese' ? 'red' : 
+                      selectedStock.language === 'English' ? 'blue' : 
+                      'green'
+                    }
+                  >
+                    {selectedStock.language || 'No especificado'}
+                  </DetailBadge>
+                } 
+              />
+            </DetailGrid>
+          </DetailSection>
+
+          <DetailSection title="Información de Stock">
+            <DetailGrid>
+              <DetailField 
+                label="Cantidad" 
+                value={selectedStock.quantity} 
+              />
+              <DetailField 
+                label="Precio Unitario" 
+                value={formatCurrency(selectedStock.unitPrice, 'EUR')} 
+              />
+              <DetailField 
+                label="Precio Total" 
+                value={
+                  <span className="font-semibold text-lg text-green-400">
+                    {formatCurrency(selectedStock.totalPrice, 'EUR')}
+                  </span>
+                } 
+              />
+              <DetailField 
+                label="Estado de Pago" 
+                value={selectedStock.isPaid ? 'Pagado' : 'Pendiente de pago'} 
+              />
+              <DetailField 
+                label="Fecha de Llegada" 
+                value={selectedStock.arrivalDate ? new Date(selectedStock.arrivalDate).toLocaleDateString() : 'No especificado'} 
+              />
+              <DetailField 
+                label="IVA Incluido" 
+                value={selectedStock.vatIncluded ? 'Sí' : 'No'} 
+              />
+            </DetailGrid>
+          </DetailSection>
+
+          {/* Sección de distribución */}
+          <DetailSection title="Distribución">
+            <DetailGrid>
+              <DetailField 
+                label="Cantidad en Tienda" 
+                value={selectedStock.storeQuantity || 0} 
+              />
+              <DetailField 
+                label="Cantidad de Inversión" 
+                value={selectedStock.investmentQuantity || 0} 
+              />
+              <DetailField 
+                label="En Reserva para Tienda" 
+                value={selectedStock.holdStore || 0} 
+              />
+            </DetailGrid>
+          </DetailSection>
+
+          {/* Sección de precios de venta */}
+          <DetailSection title="Precios de Venta">
+            <DetailGrid>
+              {selectedStock.wallapopPrice && (
+                <DetailField 
+                  label="Precio Wallapop" 
+                  value={formatCurrency(selectedStock.wallapopPrice, 'EUR')} 
+                />
+              )}
+              {selectedStock.amazonPrice && (
+                <DetailField 
+                  label="Precio Amazon" 
+                  value={formatCurrency(selectedStock.amazonPrice, 'EUR')} 
+                />
+              )}
+              {selectedStock.cardmarketPrice && (
+                <DetailField 
+                  label="Precio Cardmarket" 
+                  value={formatCurrency(selectedStock.cardmarketPrice, 'EUR')} 
+                />
+              )}
+              {selectedStock.tikTokPrice && (
+                <DetailField 
+                  label="Precio TikTok" 
+                  value={formatCurrency(selectedStock.tikTokPrice, 'EUR')} 
+                />
+              )}
+              {selectedStock.storePrice && (
+                <DetailField 
+                  label="Precio en Tienda" 
+                  value={formatCurrency(selectedStock.storePrice, 'EUR')} 
+                />
+              )}
+              {selectedStock.approxSellingPrice && (
+                <DetailField 
+                  label="Precio Aprox. de Venta" 
+                  value={formatCurrency(selectedStock.approxSellingPrice, 'EUR')} 
+                />
+              )}
+            </DetailGrid>
+          </DetailSection>
+
+          {/* Sección de rentabilidad */}
+          <DetailSection title="Análisis de Rentabilidad">
+            <DetailGrid>
+              {selectedStock.profitPerUnit && (
+                <DetailField 
+                  label="Beneficio por Unidad" 
+                  value={formatCurrency(selectedStock.profitPerUnit, 'EUR')} 
+                />
+              )}
+              {selectedStock.profitPercentage && (
+                <DetailField 
+                  label="Porcentaje de Beneficio" 
+                  value={`${selectedStock.profitPercentage.toFixed(2)}%`} 
+                />
+              )}
+              {selectedStock.totalProfit && (
+                <DetailField 
+                  label="Beneficio Total" 
+                  value={
+                    <span className="font-semibold text-green-400">
+                      {formatCurrency(selectedStock.totalProfit, 'EUR')}
+                    </span>
+                  } 
+                />
+              )}
+            </DetailGrid>
+          </DetailSection>
+        </DetailView>
+      )}
       
       <div className="py-6">
         <div className="px-4 sm:px-6 md:px-8">
