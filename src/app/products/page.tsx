@@ -21,6 +21,7 @@ export default function ProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchProducts();
@@ -141,6 +142,16 @@ export default function ProductsPage() {
     return colors[index];
   };
 
+  // Filtrar productos basado en el término de búsqueda
+  const filteredProducts = products.filter(product => {
+    return (
+      product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.language.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.type && product.type.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  });
+
   return (
     <MainLayout>
       {notification.show && (
@@ -169,40 +180,50 @@ export default function ProductsPage() {
         />
       </Modal>
       
-      <div className="py-6">
-        <div className="px-4 sm:px-6 md:px-8">
-          <div className="md:flex md:items-center md:justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-semibold text-white">Productos</h1>
-              <p className="mt-1 text-sm text-gray-300">Gestiona tu catálogo de productos Pokémon</p>
-            </div>
-            <div className="mt-4 md:mt-0">
-              <button
-                onClick={() => setShowModal(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-800 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                Añadir Producto
-              </button>
-            </div>
+      <div className="container mx-auto p-4">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-bold text-white">Productos</h1>
+          <button
+            onClick={() => {
+              setEditingProduct(null);
+              setShowModal(true);
+            }}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+          >
+            Añadir Producto
+          </button>
+        </div>
+        
+        {/* Agregar el buscador */}
+        <div className="relative w-full max-w-md mb-6">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
+            </svg>
           </div>
-          
-          {loading ? (
-            <div className="flex justify-center p-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-            </div>
-          ) : products.length === 0 ? (
-            <div className="bg-gray-900 shadow overflow-hidden sm:rounded-md p-6 text-center">
-              <p className="text-gray-200">No hay productos registrados aún.</p>
-              <button
-                onClick={() => setShowModal(true)}
-                className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-800 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                Añade tu primer producto
-              </button>
-            </div>
-          ) : (
-            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {products.map((product) => (
+          <input
+            type="text"
+            className="block w-full p-2 pl-10 text-sm border rounded-lg bg-gray-800 border-gray-700 placeholder-gray-400 text-white focus:ring-green-500 focus:border-green-500"
+            placeholder="Buscar productos por nombre, idioma, tipo..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        {error && (
+          <div className="bg-red-600 text-white p-4 rounded mb-6">
+            {error}
+          </div>
+        )}
+        
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {filteredProducts.length > 0 ? (
+              filteredProducts.map((product) => (
                 <div key={product.id} className="bg-gray-900 shadow overflow-hidden rounded-lg">
                   <div className="relative h-48 w-full overflow-hidden">
                     {product.imageUrl && product.imageUrl.trim() !== '' ? (
@@ -261,10 +282,14 @@ export default function ProductsPage() {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              ))
+            ) : (
+              <div className="col-span-full text-center text-gray-400 py-8">
+                {searchTerm ? 'No se encontraron productos que coincidan con la búsqueda.' : 'No hay productos disponibles.'}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </MainLayout>
   );

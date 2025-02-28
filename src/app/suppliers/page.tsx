@@ -57,6 +57,7 @@ export default function SuppliersPage() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [editingMissingSupplier, setEditingMissingSupplier] = useState<MissingSupplier | null>(null);
   const [updateCounter, setUpdateCounter] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -498,6 +499,16 @@ export default function SuppliersPage() {
     })
   ], []);
 
+  // Filtrar proveedores basado en el término de búsqueda
+  const filteredSuppliers = suppliers.filter(supplier => {
+    return (
+      supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (supplier.phone && supplier.phone.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (supplier.address && supplier.address.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  });
+
   return (
     <MainLayout>
       {/* Notification */}
@@ -688,6 +699,23 @@ export default function SuppliersPage() {
             // Regular Suppliers Table
             <div className="bg-gray-900 shadow overflow-hidden sm:rounded-md">
               <div className="p-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-medium text-white">Proveedores</h3>
+                  <div className="relative w-full max-w-md">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                      <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
+                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      className="block w-full p-2 pl-10 text-sm border rounded-lg bg-gray-800 border-gray-700 placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Buscar proveedores por nombre, email, teléfono..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                </div>
                 <DataTable 
                   data={filteredSuppliers} 
                   columns={supplierColumns} 
