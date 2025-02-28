@@ -1,17 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// Tipo correcto según la documentación de Next.js 15.2.0
-type RouteContext = {
-  params: {
-    id: string;
-  }
-};
-
 // GET /api/prices/[id] - Obtener un precio específico
 export async function GET(
   request: NextRequest, 
-  { params }: RouteContext
+  { params }: { params: { id: string } }
 ) {
   try {
     const { id } = params;
@@ -44,7 +37,7 @@ export async function GET(
 // PUT /api/prices/[id] - Actualizar un precio
 export async function PUT(
   request: NextRequest, 
-  { params }: RouteContext
+  { params }: { params: { id: string } }
 ) {
   try {
     const { id } = params;
@@ -126,7 +119,7 @@ export async function PUT(
 // DELETE /api/prices/[id] - Eliminar un precio
 export async function DELETE(
   request: NextRequest, 
-  { params }: RouteContext
+  { params }: { params: { id: string } }
 ) {
   try {
     const { id } = params;
