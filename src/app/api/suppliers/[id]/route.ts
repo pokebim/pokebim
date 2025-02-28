@@ -1,16 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+// Tipo correcto según la documentación de Next.js 15.2.0
+type RouteContext = {
+  params: {
+    id: string;
+  }
+};
+
 // GET /api/suppliers/[id] - Obtener un proveedor específico
 export async function GET(
   request: NextRequest, 
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     
     const supplier = await prisma.supplier.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        products: true,
+        prices: true,
+      }
     });
     
     if (!supplier) {
@@ -33,11 +44,19 @@ export async function GET(
 // PUT /api/suppliers/[id] - Actualizar un proveedor
 export async function PUT(
   request: NextRequest, 
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     const data = await request.json();
+    
+    // Validación básica
+    if (!data.name) {
+      return NextResponse.json(
+        { error: 'El nombre del proveedor es obligatorio' },
+        { status: 400 }
+      );
+    }
     
     // Verificar si el proveedor existe
     const existingSupplier = await prisma.supplier.findUnique({
@@ -54,7 +73,12 @@ export async function PUT(
     // Actualizar proveedor
     const updatedSupplier = await prisma.supplier.update({
       where: { id },
-      data
+      data: {
+        name: data.name,
+        contact: data.contact !== undefined ? data.contact : existingSupplier.contact,
+        website: data.website !== undefined ? data.website : existingSupplier.website,
+        notes: data.notes !== undefined ? data.notes : existingSupplier.notes,
+      }
     });
     
     return NextResponse.json(updatedSupplier);
@@ -70,14 +94,18 @@ export async function PUT(
 // DELETE /api/suppliers/[id] - Eliminar un proveedor
 export async function DELETE(
   request: NextRequest, 
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     
     // Verificar si el proveedor existe
     const existingSupplier = await prisma.supplier.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        products: true,
+        prices: true,
+      }
     });
     
     if (!existingSupplier) {
@@ -87,14 +115,10 @@ export async function DELETE(
       );
     }
     
-    // Verificar si hay precios asociados a este proveedor
-    const associatedPrices = await prisma.price.findMany({
-      where: { supplierId: id }
-    });
-    
-    if (associatedPrices.length > 0) {
+    // Verificar si tiene productos o precios asociados
+    if (existingSupplier.products.length > 0 || existingSupplier.prices.length > 0) {
       return NextResponse.json(
-        { error: 'No se puede eliminar el proveedor porque tiene precios asociados' },
+        { error: 'No se puede eliminar un proveedor con productos o precios asociados' },
         { status: 400 }
       );
     }

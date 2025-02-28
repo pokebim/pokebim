@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+// Tipo correcto según la documentación de Next.js 15.2.0
+type RouteContext = {
+  params: {
+    id: string;
+  }
+};
+
 // GET /api/prices/[id] - Obtener un precio específico
 export async function GET(
   request: NextRequest, 
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     
     const price = await prisma.price.findUnique({
       where: { id },
@@ -37,10 +44,10 @@ export async function GET(
 // PUT /api/prices/[id] - Actualizar un precio
 export async function PUT(
   request: NextRequest, 
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     const data = await request.json();
     
     // Verificar si el precio existe
@@ -119,10 +126,10 @@ export async function PUT(
 // DELETE /api/prices/[id] - Eliminar un precio
 export async function DELETE(
   request: NextRequest, 
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     
     // Verificar si el precio existe
     const existingPrice = await prisma.price.findUnique({

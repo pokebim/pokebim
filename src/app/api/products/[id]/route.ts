@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
+// Tipo correcto según la documentación de Next.js 15.2.0
+type RouteContext = {
+  params: {
+    id: string;
+  }
+};
+
 // GET /api/products/[id] - Obtener un producto específico
 export async function GET(
   request: NextRequest, 
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     
     const product = await prisma.product.findUnique({
       where: { id },
@@ -41,10 +48,10 @@ export async function GET(
 // PUT /api/products/[id] - Actualizar un producto
 export async function PUT(
   request: NextRequest, 
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     const data = await request.json();
     
     // Validación básica
@@ -107,10 +114,10 @@ export async function PUT(
 // DELETE /api/products/[id] - Eliminar un producto
 export async function DELETE(
   request: NextRequest, 
-  context: { params: { id: string } }
+  { params }: RouteContext
 ) {
   try {
-    const { id } = context.params;
+    const { id } = params;
     
     // Verificar si el producto existe
     const existingProduct = await prisma.product.findUnique({
@@ -128,11 +135,7 @@ export async function DELETE(
     }
     
     // Verificar si hay precios asociados a este producto
-    const associatedPrices = await prisma.price.findMany({
-      where: { productId: id }
-    });
-    
-    if (associatedPrices.length > 0) {
+    if (existingProduct.prices.length > 0) {
       return NextResponse.json(
         { error: 'No se puede eliminar el producto porque tiene precios asociados' },
         { status: 400 }
