@@ -101,3 +101,18 @@ model Stock {
 
   @@index([productId])
 }
+
+// Modelo para gastos empresariales
+model CompanyExpense {
+  id          String   @id @default(uuid())
+  name        String   // Nombre del gasto/producto
+  price       Float    // Precio
+  link        String?  // Enlace del producto (opcional)
+  paidBy      String   // Quién pagó: "edmon", "albert", "biel" o "todos"
+  isPaid      Boolean  @default(false) // Si ya está pagado
+  paymentDate DateTime? // Fecha de pago
+  category    String? // Categoría del gasto (ej: "Material", "Web", "Oficina")
+  notes       String? // Notas adicionales
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
