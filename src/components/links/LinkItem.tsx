@@ -1,5 +1,5 @@
 import { Link } from '@/lib/linkService';
-import { ExternalLinkIcon, PencilIcon, TrashIcon } from '@heroicons/react/solid';
+import { ArrowTopRightOnSquareIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 interface LinkItemProps {
   link: Link;
@@ -65,7 +65,7 @@ export default function LinkItem({ link, onEdit, onDelete, onClick }: LinkItemPr
           onClick={(e) => e.stopPropagation()}
           aria-label="Abrir enlace en nueva pestaña"
         >
-          <ExternalLinkIcon className="h-5 w-5" />
+          <ArrowTopRightOnSquareIcon className="h-5 w-5" />
         </a>
         
         <button

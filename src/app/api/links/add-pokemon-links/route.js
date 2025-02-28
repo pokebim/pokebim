@@ -4,14 +4,6 @@ import { createPokemonLinksGroup } from '@/scripts/createPokemonLinks';
 // La API route para ejecutar el script
 export async function GET() {
   try {
-    // Verificar que estamos en desarrollo (opcional, como medida de seguridad)
-    if (process.env.NODE_ENV !== 'development') {
-      return NextResponse.json(
-        { success: false, error: 'Esta API solo está disponible en entorno de desarrollo' },
-        { status: 403 }
-      );
-    }
-
     // Ejecutar el script
     const result = await createPokemonLinksGroup();
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { LinkGroup, Link } from '@/lib/linkService';
 import LinkItem from './LinkItem';
-import { ChevronDownIcon, ChevronUpIcon, PencilIcon, TrashIcon, SearchIcon, ExternalLinkIcon } from '@heroicons/react/solid';
+import { ChevronUpIcon, ChevronDownIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon, ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 
 interface LinkGroupCardProps {
   group: LinkGroup;
@@ -140,7 +140,7 @@ export default function LinkGroupCard({
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
             <div className="relative w-full sm:w-64">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <SearchIcon className="h-5 w-5 text-gray-400" />
+                <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
               </div>
               <input
                 type="text"
@@ -182,7 +182,7 @@ export default function LinkGroupCard({
                 className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-700 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                 title="Abrir todos los enlaces"
               >
-                <ExternalLinkIcon className="h-5 w-5 mr-1" />
+                <ArrowTopRightOnSquareIcon className="h-5 w-5 mr-1" />
                 Abrir todos
               </button>
             </div>
@@ -267,7 +267,7 @@ export default function LinkGroupCard({
                         onClick={(e) => e.stopPropagation()}
                         aria-label="Abrir enlace en nueva pestaña"
                       >
-                        <ExternalLinkIcon className="h-5 w-5" />
+                        <ArrowTopRightOnSquareIcon className="h-5 w-5" />
                       </a>
                     </div>
                   </div>

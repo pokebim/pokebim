@@ -4,7 +4,10 @@ import { getFirestore } from 'firebase/firestore';
 import {
   collection,
   addDoc,
-  serverTimestamp
+  serverTimestamp,
+  getDocs,
+  query,
+  where
 } from 'firebase/firestore';
 
 // Configuración de Firebase (copiar de src/lib/firebase.ts)
@@ -94,9 +97,34 @@ const pokemonLinks = [
   { url: "https://www.kelz0r.dk/magic/pokemon-boosters-c-187_191.html", title: "Kelz0r Boosters", description: "Tienda danesa de boosters" }
 ];
 
+// Función para comprobar si ya existe un grupo con el mismo nombre
+async function checkGroupExists(groupName) {
+  try {
+    const linkGroupsCollection = collection(db, "linkGroups");
+    const q = query(linkGroupsCollection, where("name", "==", groupName));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      // Devolver el ID del grupo existente
+      return querySnapshot.docs[0].id;
+    }
+    return null;
+  } catch (error) {
+    console.error("Error al verificar grupo existente:", error);
+    return null;
+  }
+}
+
 // Función para crear un grupo de enlaces
 async function createLinkGroup(groupData) {
   try {
+    // Primero verificar si el grupo ya existe
+    const existingGroupId = await checkGroupExists(groupData.name);
+    if (existingGroupId) {
+      console.log(`El grupo "${groupData.name}" ya existe con ID: ${existingGroupId}`);
+      return existingGroupId;
+    }
+    
     const linkGroupsCollection = collection(db, "linkGroups");
     
     // Añadir timestamp
@@ -107,6 +135,7 @@ async function createLinkGroup(groupData) {
     };
     
     const docRef = await addDoc(linkGroupsCollection, groupWithTimestamp);
+    console.log(`Grupo "${groupData.name}" creado con ID: ${docRef.id}`);
     return docRef.id;
   } catch (error) {
     console.error("Error al crear grupo de enlaces:", error);
@@ -142,6 +171,46 @@ async function createLink(linkData) {
   }
 }
 
+// Función para añadir enlaces en lotes
+async function addLinksInBatches(groupId, links, batchSize = 5) {
+  const totalLinks = links.length;
+  let processedCount = 0;
+  let successCount = 0;
+  let failedCount = 0;
+  
+  console.log(`Añadiendo ${totalLinks} enlaces en lotes de ${batchSize}...`);
+  
+  for (let i = 0; i < totalLinks; i += batchSize) {
+    const batch = links.slice(i, i + batchSize);
+    const promises = batch.map(async (linkData, idx) => {
+      try {
+        const linkId = await createLink({
+          groupId: groupId,
+          title: linkData.title,
+          url: linkData.url,
+          description: linkData.description || '',
+          icon: '',
+          order: i + idx,
+          active: true
+        });
+        successCount++;
+        return { success: true, id: linkId, title: linkData.title };
+      } catch (error) {
+        failedCount++;
+        console.error(`Error al crear enlace ${linkData.title}:`, error);
+        return { success: false, title: linkData.title, error };
+      }
+    });
+    
+    const results = await Promise.all(promises);
+    processedCount += batch.length;
+    
+    console.log(`Progreso: ${processedCount}/${totalLinks} (${Math.round(processedCount/totalLinks*100)}%)`);
+  }
+  
+  return { totalLinks, successCount, failedCount };
+}
+
 // Función principal
 export async function createPokemonLinksGroup() {
   try {
@@ -155,29 +224,23 @@ export async function createPokemonLinksGroup() {
       order: 0  // Se ajustará automáticamente
     });
     
-    console.log(`Grupo creado con ID: ${groupId}`);
-    
-    // Añadir todos los enlaces al grupo
-    let counter = 0;
-    for (const linkData of pokemonLinks) {
-      await createLink({
-        groupId: groupId,
-        title: linkData.title,
-        url: linkData.url,
-        description: linkData.description || '',
-        icon: '',  // No asignamos icono a cada enlace individual
-        order: counter,  // Orden secuencial
-        active: true
-      });
-      
-      counter++;
-      console.log(`Enlace creado (${counter}/${pokemonLinks.length}): ${linkData.title}`);
+    if (!groupId) {
+      throw new Error("No se pudo crear o encontrar el grupo de enlaces");
     }
     
-    console.log('¡Proceso completado con éxito!');
-    console.log(`Se han creado ${counter} enlaces en el grupo "Webs Compra Pokemon".`);
+    // Añadir todos los enlaces al grupo en lotes para mejor rendimiento
+    const result = await addLinksInBatches(groupId, pokemonLinks);
     
-    return { success: true, message: `Grupo creado con ${counter} enlaces.` };
+    console.log('¡Proceso completado con éxito!');
+    console.log(`Se han creado ${result.successCount} enlaces en el grupo "Webs Compra Pokemon".`);
+    if (result.failedCount > 0) {
+      console.warn(`Atención: ${result.failedCount} enlaces no pudieron ser creados.`);
+    }
+    
+    return { 
+      success: true, 
+      message: `Grupo creado con ${result.successCount} enlaces.${result.failedCount > 0 ? ` (${result.failedCount} enlaces fallaron)` : ''}` 
+    };
   } catch (error) {
     console.error('Error durante la creación de enlaces:', error);
     return { success: false, error: error.message };
