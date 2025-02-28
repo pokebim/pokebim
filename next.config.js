@@ -27,9 +27,6 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   output: 'standalone',
-  experimental: {
-    serverComponentsExternalPackages: ['prisma', '@prisma/client']
-  }
 };
 
 module.exports = nextConfig; 
