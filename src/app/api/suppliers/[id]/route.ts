@@ -1,23 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-interface Params {
-  params: {
-    id: string;
-  };
-}
-
 // GET /api/suppliers/[id] - Obtener un proveedor específico
-export async function GET(request: NextRequest, { params }: Params) {
+export async function GET(
+  request: NextRequest, 
+  context: { params: { id: string } }
+) {
   try {
-    const { id } = params;
+    const { id } = context.params;
     
     const supplier = await prisma.supplier.findUnique({
-      where: { id },
-      include: {
-        products: true,
-        prices: true,
-      },
+      where: { id }
     });
     
     if (!supplier) {
@@ -38,22 +31,17 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 // PUT /api/suppliers/[id] - Actualizar un proveedor
-export async function PUT(request: NextRequest, { params }: Params) {
+export async function PUT(
+  request: NextRequest, 
+  context: { params: { id: string } }
+) {
   try {
-    const { id } = params;
+    const { id } = context.params;
     const data = await request.json();
-    
-    // Validación básica
-    if (!data.name) {
-      return NextResponse.json(
-        { error: 'El nombre del proveedor es obligatorio' },
-        { status: 400 }
-      );
-    }
     
     // Verificar si el proveedor existe
     const existingSupplier = await prisma.supplier.findUnique({
-      where: { id },
+      where: { id }
     });
     
     if (!existingSupplier) {
@@ -66,12 +54,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     // Actualizar proveedor
     const updatedSupplier = await prisma.supplier.update({
       where: { id },
-      data: {
-        name: data.name,
-        contact: data.contact || null,
-        website: data.website || null,
-        notes: data.notes || null,
-      },
+      data
     });
     
     return NextResponse.json(updatedSupplier);
@@ -85,17 +68,16 @@ export async function PUT(request: NextRequest, { params }: Params) {
 }
 
 // DELETE /api/suppliers/[id] - Eliminar un proveedor
-export async function DELETE(request: NextRequest, { params }: Params) {
+export async function DELETE(
+  request: NextRequest, 
+  context: { params: { id: string } }
+) {
   try {
-    const { id } = params;
+    const { id } = context.params;
     
     // Verificar si el proveedor existe
     const existingSupplier = await prisma.supplier.findUnique({
-      where: { id },
-      include: {
-        products: true,
-        prices: true,
-      },
+      where: { id }
     });
     
     if (!existingSupplier) {
@@ -105,17 +87,21 @@ export async function DELETE(request: NextRequest, { params }: Params) {
       );
     }
     
-    // Verificar si tiene productos o precios asociados
-    if (existingSupplier.products.length > 0 || existingSupplier.prices.length > 0) {
+    // Verificar si hay precios asociados a este proveedor
+    const associatedPrices = await prisma.price.findMany({
+      where: { supplierId: id }
+    });
+    
+    if (associatedPrices.length > 0) {
       return NextResponse.json(
-        { error: 'No se puede eliminar un proveedor con productos o precios asociados' },
+        { error: 'No se puede eliminar el proveedor porque tiene precios asociados' },
         { status: 400 }
       );
     }
     
     // Eliminar proveedor
     await prisma.supplier.delete({
-      where: { id },
+      where: { id }
     });
     
     return NextResponse.json({ success: true });

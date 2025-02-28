@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-interface Params {
-  params: {
-    id: string;
-  };
-}
-
 // GET /api/prices/[id] - Obtener un precio específico
-export async function GET(request: NextRequest, { params }: Params) {
+export async function GET(
+  request: NextRequest, 
+  context: { params: { id: string } }
+) {
   try {
-    const { id } = params;
+    const { id } = context.params;
     
     const price = await prisma.price.findUnique({
       where: { id },
@@ -38,9 +35,12 @@ export async function GET(request: NextRequest, { params }: Params) {
 }
 
 // PUT /api/prices/[id] - Actualizar un precio
-export async function PUT(request: NextRequest, { params }: Params) {
+export async function PUT(
+  request: NextRequest, 
+  context: { params: { id: string } }
+) {
   try {
-    const { id } = params;
+    const { id } = context.params;
     const data = await request.json();
     
     // Verificar si el precio existe
@@ -117,9 +117,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
 }
 
 // DELETE /api/prices/[id] - Eliminar un precio
-export async function DELETE(request: NextRequest, { params }: Params) {
+export async function DELETE(
+  request: NextRequest, 
+  context: { params: { id: string } }
+) {
   try {
-    const { id } = params;
+    const { id } = context.params;
     
     // Verificar si el precio existe
     const existingPrice = await prisma.price.findUnique({
