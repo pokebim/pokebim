@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import MainLayout from '@/components/MainLayout';
+import MainLayout from '@/components/layout/MainLayout';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Product, Supplier, InventoryEntry } from '@/types';
