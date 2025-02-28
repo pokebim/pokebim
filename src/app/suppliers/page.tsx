@@ -500,14 +500,20 @@ export default function SuppliersPage() {
   ], []);
 
   // Filtrar proveedores basado en el término de búsqueda
-  const filteredSuppliers = suppliers.filter(supplier => {
-    return (
-      supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (supplier.phone && supplier.phone.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (supplier.address && supplier.address.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  });
+  const filteredSuppliersBySearch = useMemo(() => {
+    return suppliers.filter(supplier => {
+      return (
+        supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        supplier.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (supplier.phone && supplier.phone.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (supplier.address && supplier.address.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    });
+  }, [suppliers, searchTerm]);
+
+  // Usamos los proveedores filtrados por búsqueda cuando hay un término de búsqueda,
+  // de lo contrario usamos los proveedores filtrados por región
+  const displayedSuppliers = searchTerm ? filteredSuppliersBySearch : filteredSuppliers;
 
   return (
     <MainLayout>
@@ -660,7 +666,7 @@ export default function SuppliersPage() {
             <div className="flex justify-center p-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
             </div>
-          ) : activeTab !== 'missing' && filteredSuppliers.length === 0 ? (
+          ) : activeTab !== 'missing' && displayedSuppliers.length === 0 ? (
             <div className="bg-gray-900 shadow overflow-hidden sm:rounded-md p-6 text-center">
               <p className="text-gray-300">No hay proveedores registrados en esta categoría aún.</p>
               <button
@@ -717,7 +723,7 @@ export default function SuppliersPage() {
                   </div>
                 </div>
                 <DataTable 
-                  data={filteredSuppliers} 
+                  data={displayedSuppliers} 
                   columns={supplierColumns} 
                   searchPlaceholder="Buscar proveedores..."
                   itemsPerPage={10}
