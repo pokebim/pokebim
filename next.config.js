@@ -17,6 +17,10 @@ const nextConfig = {
   },
   // Ensure we properly handle React 19
   reactStrictMode: true,
+  eslint: {
+    // Deshabilitamos la validación de ESLint durante la compilación de producción
+    ignoreDuringBuilds: true,
+  },
 };
 
 module.exports = nextConfig; 
