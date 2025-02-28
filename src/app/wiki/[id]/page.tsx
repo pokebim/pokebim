@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import MainLayout from '@/components/layout/MainLayout';
 import { WikiPost, getWikiPostById, deleteWikiPost } from '@/lib/wikiService';
@@ -23,15 +23,18 @@ export default function WikiPostPage({ params }: { params: { id: string } }) {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   
+  // Obtenemos el ID de manera segura usando React.use()
+  const postId = use(params).id;
+  
   // Obtener el post al cargar la página
   useEffect(() => {
     fetchPost();
-  }, [params.id]);
+  }, [postId]);
 
   const fetchPost = async () => {
     setLoading(true);
     try {
-      const fetchedPost = await getWikiPostById(params.id);
+      const fetchedPost = await getWikiPostById(postId);
       console.log('FIREBASE: Loaded wiki post:', fetchedPost);
       
       if (!fetchedPost) {
@@ -51,8 +54,8 @@ export default function WikiPostPage({ params }: { params: { id: string } }) {
   const handleDelete = async () => {
     if (window.confirm('¿Estás seguro de que deseas eliminar este post?')) {
       try {
-        await deleteWikiPost(params.id);
-        console.log(`FIREBASE: Deleted wiki post ${params.id}`);
+        await deleteWikiPost(postId);
+        console.log(`FIREBASE: Deleted wiki post ${postId}`);
         showNotification('Post eliminado correctamente');
         
         // Redirigir a la página principal de la wiki después de eliminar
