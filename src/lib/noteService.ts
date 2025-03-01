@@ -24,28 +24,45 @@ export interface Note {
   updatedAt?: any;
 }
 
+// Verificar que estamos en el cliente
+const isClient = typeof window !== 'undefined';
+
 // Acceder a la colección notes solo cuando estamos en el cliente
 const getNotesCollection = () => {
+  // Si no estamos en el cliente, ni siquiera intentar cargar Firestore
+  if (!isClient) {
+    console.warn('Intentando acceder a notes desde el servidor - operación cancelada');
+    return null;
+  }
+  
   try {
     // Obtener la instancia de Firestore
     const firestore = getFirestoreDb();
     if (!firestore) {
-      console.warn('Firestore no está disponible');
+      console.warn('Firestore no está disponible - posiblemente ejecutando en SSR o la inicialización falló');
       return null;
     }
+    
+    // Crear la referencia a la colección
     return collection(firestore, 'notes');
   } catch (error) {
-    console.error('Error al acceder a la colección notes:', error);
+    console.error('Error crítico al acceder a la colección notes:', error);
     return null;
   }
 };
 
 // Obtener todas las notas
 export async function getAllNotes(includeArchived = false) {
+  // Si no estamos en el cliente, devolver un array vacío inmediatamente
+  if (!isClient) {
+    console.warn('getAllNotes llamado en el servidor - devolviendo array vacío');
+    return [];
+  }
+  
   try {
     const notesCollection = getNotesCollection();
     if (!notesCollection) {
-      console.warn('La colección de notas no está disponible');
+      console.warn('La colección de notas no está disponible - posiblemente en SSR o inicialización fallida');
       return []; // Si estamos en el servidor o hay error, devolvemos un array vacío
     }
     
@@ -78,10 +95,15 @@ export async function getAllNotes(includeArchived = false) {
 
 // Añadir una nueva nota
 export async function addNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) {
+  // Verificar que estamos en el cliente
+  if (!isClient) {
+    throw new Error('No se puede añadir una nota en el servidor');
+  }
+  
   try {
     const notesCollection = getNotesCollection();
     if (!notesCollection) {
-      throw new Error('No se puede acceder a la colección de notas');
+      throw new Error('No se puede acceder a la colección de notas - Firestore no está disponible');
     }
     
     const newNote = {
@@ -103,6 +125,11 @@ export async function addNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>
 
 // Actualizar una nota existente
 export async function updateNote(id: string, noteData: Partial<Note>) {
+  // Verificar que estamos en el cliente
+  if (!isClient) {
+    throw new Error('No se puede actualizar una nota en el servidor');
+  }
+  
   try {
     const firestore = getFirestoreDb();
     if (!firestore) {
@@ -125,11 +152,21 @@ export async function updateNote(id: string, noteData: Partial<Note>) {
 
 // Archivar/desarchivar una nota
 export async function toggleArchiveNote(id: string, archived: boolean) {
+  // Verificar que estamos en el cliente
+  if (!isClient) {
+    throw new Error('No se puede archivar/desarchivar una nota en el servidor');
+  }
+  
   return updateNote(id, { archived });
 }
 
 // Eliminar una nota
 export async function deleteNote(id: string) {
+  // Verificar que estamos en el cliente
+  if (!isClient) {
+    throw new Error('No se puede eliminar una nota en el servidor');
+  }
+  
   try {
     const firestore = getFirestoreDb();
     if (!firestore) {

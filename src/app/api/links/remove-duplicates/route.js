@@ -9,11 +9,24 @@ export const runtime = 'nodejs';
 export const fetchCache = 'force-no-store';
 export const revalidate = 0;
 
-export async function GET(request) {
-  let firebaseApp = null;
-  
+// Función segura para inicializar Firebase específicamente para esta API
+function initializeFirebaseForApi() {
   try {
-    // Inicializar Firebase específicamente para esta API
+    // Verificar que las variables de entorno necesarias estén configuradas
+    const requiredEnvVars = [
+      'NEXT_PUBLIC_FIREBASE_API_KEY',
+      'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN',
+      'NEXT_PUBLIC_FIREBASE_PROJECT_ID'
+    ];
+    
+    for (const envVar of requiredEnvVars) {
+      if (!process.env[envVar]) {
+        console.error(`Variable de entorno requerida no configurada: ${envVar}`);
+        return null;
+      }
+    }
+    
+    // Configuración de Firebase
     const firebaseConfig = {
       apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
       authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -24,10 +37,32 @@ export async function GET(request) {
       measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
     };
 
-    // Nombre único para evitar conflictos
+    // Crear un nombre único para la aplicación para evitar problemas con múltiples instancias
     const uniqueAppName = `remove-duplicates-api-${Date.now()}`;
-    firebaseApp = initializeApp(firebaseConfig, uniqueAppName);
-    const db = getFirestore(firebaseApp);
+    
+    // Inicializar la app con el nombre único
+    const app = initializeApp(firebaseConfig, uniqueAppName);
+    console.log(`Firebase inicializado para API con nombre: ${uniqueAppName}`);
+    
+    // Devolver la instancia de Firestore
+    return getFirestore(app);
+  } catch (error) {
+    console.error('Error al inicializar Firebase para API:', error);
+    return null;
+  }
+}
+
+export async function GET(request) {
+  try {
+    // Inicializar Firebase específicamente para esta API
+    const db = initializeFirebaseForApi();
+    
+    if (!db) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'No se pudo inicializar Firebase' 
+      }, { status: 500 });
+    }
     
     // Obtener el groupId de los parámetros de consulta
     const { searchParams } = new URL(request.url);
@@ -61,6 +96,11 @@ export async function GET(request) {
     // Identificar duplicados
     linksSnapshot.forEach((linkDoc) => {
       const link = { id: linkDoc.id, ...linkDoc.data() };
+      
+      if (!link.url) {
+        console.warn(`Enlace sin URL encontrado con ID: ${link.id}`);
+        return; // Continuar con el siguiente enlace
+      }
       
       // Normalizar URL para comparación (eliminar http://, https://, www.)
       let normalizedUrl = link.url.toLowerCase()

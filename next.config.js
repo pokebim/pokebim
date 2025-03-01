@@ -16,15 +16,31 @@ const nextConfig = {
       },
     ]
   },
-  // Ensure we properly handle React 19
+  // Ensure we properly handle React
   reactStrictMode: true,
   swcMinify: true,
-  // Configurar el entorno como exclusivamente cliente
+  
+  // Configuración para manejar Firebase en Next.js
   experimental: {
     // Evitar problemas con SSR en Firebase
     appDir: true,
-    serverComponentsExternalPackages: ["firebase", "@firebase/app", "@firebase/firestore"],
+    // Indicar a Next.js que estos paquetes son externos y no deben incluirse en SSR
+    serverComponentsExternalPackages: [
+      "firebase", 
+      "@firebase/app", 
+      "@firebase/firestore",
+      "@firebase/auth",
+      "@firebase/storage",
+      "@firebase/analytics",
+      "@firebase/functions",
+      "@firebase/database"
+    ],
+    // Optimizaciones para entorno de producción
+    optimizeCss: true,
+    workerThreads: true,
+    scrollRestoration: true,
   },
+  
   // Ignorar errores de TypeScript durante el build
   typescript: {
     // !! ADVERTENCIA !!
@@ -32,6 +48,7 @@ const nextConfig = {
     // No hacer esto en un entorno de producción normal
     ignoreBuildErrors: true,
   },
+  
   // Ignorar errores de ESLint durante el build
   eslint: {
     // !! ADVERTENCIA !!
@@ -39,7 +56,24 @@ const nextConfig = {
     // No hacer esto en un entorno de producción normal
     ignoreDuringBuilds: true,
   },
+  
+  // Optimizar el output para producción
   output: 'standalone',
+  
+  // Configuración específica para Webpack para manejar Firebase
+  webpack: (config, { isServer }) => {
+    // En el servidor, añadir módulos de Firebase a externals
+    if (isServer) {
+      const nodeExternals = ['firebase', '@firebase/app', '@firebase/firestore', '@firebase/auth', '@firebase/storage'];
+      
+      // Asegurar que estos módulos no se incluyan en el bundle del servidor
+      nodeExternals.forEach(module => {
+        config.externals.push(module);
+      });
+    }
+    
+    return config;
+  },
 };
 
 module.exports = nextConfig; 
