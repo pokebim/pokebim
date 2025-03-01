@@ -43,6 +43,8 @@ export default function DataTable<T extends object>({
       globalFilter,
       columnFilters,
     },
+    autoResetPageIndex: false,
+    getRowId: (row: any) => row.id || Math.random().toString(36),
   });
 
   // Initialize pagination settings

@@ -29,6 +29,7 @@ import { toast } from 'react-hot-toast';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
+import PriceInlineEdit from '@/components/ui/PriceInlineEdit';
 
 interface EnrichedPrice extends Price {
   product: {
@@ -614,10 +615,31 @@ export default function PricesPage() {
       header: 'Precio',
       cell: info => {
         const { price, currency } = info.getValue();
+        const row = info.row.original;
         return (
-          <span className="text-gray-300">
-            {formatCurrency(price || 0, currency as Currency)}
-          </span>
+          <PriceInlineEdit
+            id={row.id}
+            price={price || 0}
+            currency={currency as Currency}
+            directUpdate={true}
+            onUpdate={(newPrice) => {
+              // Actualizar el estado local para evitar recargar toda la tabla
+              // Usamos un enfoque de referencia inmutable para minimizar los re-renderizados
+              setPrices(prev => {
+                // Crear un mapa para búsqueda rápida por ID
+                const priceMap = new Map(prev.map(p => [p.id, p]));
+                
+                // Actualizar solo el precio en el mapa
+                if (priceMap.has(row.id)) {
+                  const updatedPrice = priceMap.get(row.id);
+                  priceMap.set(row.id, { ...updatedPrice, price: newPrice });
+                }
+                
+                // Convertir el mapa de vuelta a un array
+                return Array.from(priceMap.values());
+              });
+            }}
+          />
         );
       }
     }),
@@ -626,10 +648,41 @@ export default function PricesPage() {
       header: 'Precio (EUR)',
       cell: info => {
         const { price, currency } = info.getValue();
+        const row = info.row.original;
+        const priceInEUR = convertCurrency(price || 0, currency as Currency, 'EUR');
+        
         return (
-          <span className="text-gray-300">
-            {formatCurrency(convertCurrency(price || 0, currency as Currency, 'EUR'), 'EUR')}
-          </span>
+          <PriceInlineEdit
+            id={row.id}
+            price={priceInEUR}
+            currency="EUR"
+            directUpdate={false}
+            onUpdate={(newPriceEUR) => {
+              // Convertir el precio de EUR a la moneda original
+              const newOriginalPrice = convertCurrency(newPriceEUR, 'EUR', currency as Currency);
+              
+              // Actualizar en Firebase
+              updatePrice(row.id, { price: newOriginalPrice }).then(() => {
+                // Actualizar el estado local con el mismo enfoque inmutable
+                setPrices(prev => {
+                  // Crear un mapa para búsqueda rápida por ID
+                  const priceMap = new Map(prev.map(p => [p.id, p]));
+                  
+                  // Actualizar solo el precio en el mapa
+                  if (priceMap.has(row.id)) {
+                    const updatedPrice = priceMap.get(row.id);
+                    priceMap.set(row.id, { ...updatedPrice, price: newOriginalPrice });
+                  }
+                  
+                  // Convertir el mapa de vuelta a un array
+                  return Array.from(priceMap.values());
+                });
+              }).catch(error => {
+                console.error('Error al actualizar el precio:', error);
+                toast.error('Error al actualizar el precio');
+              });
+            }}
+          />
         );
       }
     }),
