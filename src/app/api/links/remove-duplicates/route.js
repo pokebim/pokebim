@@ -5,7 +5,13 @@ import { getFirestore, collection, query, where, getDocs, deleteDoc, doc } from 
 // Configurar las opciones de la ruta para que sea compatible con Node.js Runtime
 export const runtime = 'nodejs';
 
+// Timeout aumentado para operaciones de Firebase que pueden tardar
+export const fetchCache = 'force-no-store';
+export const revalidate = 0;
+
 export async function GET(request) {
+  let firebaseApp = null;
+  
   try {
     // Inicializar Firebase específicamente para esta API
     const firebaseConfig = {
@@ -18,8 +24,10 @@ export async function GET(request) {
       measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
     };
 
-    const app = initializeApp(firebaseConfig, 'remove-duplicates-api');
-    const db = getFirestore(app);
+    // Nombre único para evitar conflictos
+    const uniqueAppName = `remove-duplicates-api-${Date.now()}`;
+    firebaseApp = initializeApp(firebaseConfig, uniqueAppName);
+    const db = getFirestore(firebaseApp);
     
     // Obtener el groupId de los parámetros de consulta
     const { searchParams } = new URL(request.url);
@@ -95,7 +103,7 @@ export async function GET(request) {
     
     return NextResponse.json({ 
       success: false, 
-      error: 'Error al eliminar enlaces duplicados: ' + error.message 
+      error: 'Error al eliminar enlaces duplicados: ' + (error?.message || 'Error desconocido')
     }, { status: 500 });
   }
 } 

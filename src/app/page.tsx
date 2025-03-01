@@ -10,8 +10,8 @@ import { getAllProducts } from '@/lib/productService';
 import { getAllPrices } from '@/lib/priceService';
 import { getAllStockItems } from '@/lib/stockService';
 
-// Cargar el componente de notas de forma dinámica sin SSR
-const NotesWidget = dynamic(() => import('@/components/NotesWidget'), {
+// Cargar el componente ClientNotes de forma dinámica sin SSR
+const ClientNotes = dynamic(() => import('@/components/ClientNotes'), {
   ssr: false,
 });
 
@@ -397,7 +397,7 @@ export default function HomePage() {
         </div>
 
         {/* Componente de Notas (visible en todas las páginas) */}
-        <NotesWidget />
+        <ClientNotes />
       </div>
     </MainLayout>
   );

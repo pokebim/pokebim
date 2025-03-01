@@ -1,6 +1,6 @@
 'use client';
 
-import { db } from './firebase';
+import { db, getFirestoreDb } from './firebase';
 import { 
   collection, 
   addDoc, 
@@ -26,11 +26,12 @@ export interface Note {
 
 // Acceder a la colección notes solo cuando estamos en el cliente
 const getNotesCollection = () => {
-  if (typeof window === 'undefined') {
-    // Estamos en el servidor, devolver un objeto vacío para no causar errores
+  // Obtener la instancia de Firestore
+  const firestore = getFirestoreDb();
+  if (!firestore) {
     return null;
   }
-  return collection(db, 'notes');
+  return collection(firestore, 'notes');
 };
 
 // Obtener todas las notas
@@ -96,11 +97,12 @@ export async function addNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>
 // Actualizar una nota existente
 export async function updateNote(id: string, noteData: Partial<Note>) {
   try {
-    if (typeof window === 'undefined') {
-      throw new Error('No se puede actualizar la nota en el servidor');
+    const firestore = getFirestoreDb();
+    if (!firestore) {
+      throw new Error('Firestore no está disponible');
     }
     
-    const noteRef = doc(db, 'notes', id);
+    const noteRef = doc(firestore, 'notes', id);
     const updateData = {
       ...noteData,
       updatedAt: serverTimestamp()
@@ -122,11 +124,12 @@ export async function toggleArchiveNote(id: string, archived: boolean) {
 // Eliminar una nota
 export async function deleteNote(id: string) {
   try {
-    if (typeof window === 'undefined') {
-      throw new Error('No se puede eliminar la nota en el servidor');
+    const firestore = getFirestoreDb();
+    if (!firestore) {
+      throw new Error('Firestore no está disponible');
     }
     
-    const noteRef = doc(db, 'notes', id);
+    const noteRef = doc(firestore, 'notes', id);
     await deleteDoc(noteRef);
     return { success: true };
   } catch (error) {
