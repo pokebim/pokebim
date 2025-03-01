@@ -1,6 +1,6 @@
 'use client';
 
-import { db, getFirestoreDb } from './firebase';
+import { getFirestoreDb } from './firebase';
 import { 
   collection, 
   addDoc, 
@@ -26,12 +26,18 @@ export interface Note {
 
 // Acceder a la colección notes solo cuando estamos en el cliente
 const getNotesCollection = () => {
-  // Obtener la instancia de Firestore
-  const firestore = getFirestoreDb();
-  if (!firestore) {
+  try {
+    // Obtener la instancia de Firestore
+    const firestore = getFirestoreDb();
+    if (!firestore) {
+      console.warn('Firestore no está disponible');
+      return null;
+    }
+    return collection(firestore, 'notes');
+  } catch (error) {
+    console.error('Error al acceder a la colección notes:', error);
     return null;
   }
-  return collection(firestore, 'notes');
 };
 
 // Obtener todas las notas
@@ -39,7 +45,8 @@ export async function getAllNotes(includeArchived = false) {
   try {
     const notesCollection = getNotesCollection();
     if (!notesCollection) {
-      return []; // Si estamos en el servidor, devolvemos un array vacío
+      console.warn('La colección de notas no está disponible');
+      return []; // Si estamos en el servidor o hay error, devolvemos un array vacío
     }
     
     let q;
@@ -74,7 +81,7 @@ export async function addNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>
   try {
     const notesCollection = getNotesCollection();
     if (!notesCollection) {
-      throw new Error('No se puede acceder a la colección de notas en el servidor');
+      throw new Error('No se puede acceder a la colección de notas');
     }
     
     const newNote = {
