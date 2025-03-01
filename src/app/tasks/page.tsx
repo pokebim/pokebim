@@ -142,25 +142,39 @@ const TaskColumn = ({ column, tasks, onAddTask, onEditTask, onDeleteTask, onMove
       </div>
       <div>
         {tasks.map((task) => (
-          <div className="flex space-x-2 mt-2">
-            <button
-              onClick={() => handleViewDetail(task)}
-              className="px-2 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
-            >
-              Ver
-            </button>
-            <button
-              onClick={() => handleEditTask(task)}
-              className="px-2 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors"
-            >
-              Editar
-            </button>
-            <button
-              onClick={() => handleDeleteTask(task.id || '')}
-              className="px-2 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
-            >
-              Eliminar
-            </button>
+          <div key={task.id} className="mb-3 bg-gray-800 rounded p-3">
+            <div className="mb-2">
+              <div className="flex items-center space-x-2 mb-1">
+                <div className={`h-2.5 w-2.5 rounded-full 
+                  ${task.priority === 'high' ? 'bg-red-400' :
+                    task.priority === 'medium' ? 'bg-yellow-400' : 'bg-blue-400'}`}>
+                </div>
+                <h4 className="font-medium text-white">{task.title}</h4>
+              </div>
+              {task.description && (
+                <p className="text-sm text-gray-400 mb-2">{task.description}</p>
+              )}
+            </div>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => handleViewDetail(task)}
+                className="px-2 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
+              >
+                Ver
+              </button>
+              <button
+                onClick={() => handleEditTask(task)}
+                className="px-2 py-1 text-xs bg-yellow-700 text-white rounded hover:bg-yellow-600 transition-colors"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => handleDeleteTask(task.id)}
+                className="px-2 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
+              >
+                Eliminar
+              </button>
+            </div>
           </div>
         ))}
       </div>
