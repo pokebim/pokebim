@@ -2,18 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
 import MainLayout from '@/components/layout/MainLayout';
 import { Task, getAllTasks } from '@/lib/taskService';
 import { getAllSuppliers } from '@/lib/supplierService';
 import { getAllProducts } from '@/lib/productService';
 import { getAllPrices } from '@/lib/priceService';
 import { getAllStockItems } from '@/lib/stockService';
-
-// Cargar el componente ClientNotes de forma dinámica sin SSR
-const ClientNotes = dynamic(() => import('@/components/ClientNotes'), {
-  ssr: false,
-});
 
 export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -395,9 +389,6 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
-
-        {/* Componente de Notas (visible en todas las páginas) */}
-        <ClientNotes />
       </div>
     </MainLayout>
   );
