@@ -1,5 +1,7 @@
+'use client';
+
 // Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
 // Your web app's Firebase configuration
@@ -13,10 +15,17 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Inicializar Firebase condicionalmente (solo en el cliente)
+let app;
+let firestoreDB;
 
-// Initialize Firestore
-export const db = getFirestore(app);
+// Verificar si estamos en el navegador y si Firebase ya ha sido inicializado
+if (typeof window !== 'undefined' && !getApps().length) {
+  app = initializeApp(firebaseConfig);
+  firestoreDB = getFirestore(app);
+}
+
+// Exportar instancia de Firestore
+export const db = firestoreDB;
 
 export default app; 

@@ -1,7 +1,13 @@
 {
   "version": 2,
   "buildCommand": "npm run build",
-  "installCommand": "npm install",
+  "cleanUrls": true,
+  "devCommand": "npm run dev",
   "framework": "nextjs",
-  "outputDirectory": ".next"
+  "outputDirectory": ".next",
+  "build": {
+    "env": {
+      "PRISMA_CLIENT_ENGINE_TYPE": "dataproxy"
+    }
+  }
 } 

@@ -1,3 +1,5 @@
+'use client';
+
 import { db } from './firebase';
 import { 
   collection, 
@@ -22,11 +24,23 @@ export interface Note {
   updatedAt?: any;
 }
 
-const notesCollection = collection(db, 'notes');
+// Acceder a la colección notes solo cuando estamos en el cliente
+const getNotesCollection = () => {
+  if (typeof window === 'undefined') {
+    // Estamos en el servidor, devolver un objeto vacío para no causar errores
+    return null;
+  }
+  return collection(db, 'notes');
+};
 
 // Obtener todas las notas
 export async function getAllNotes(includeArchived = false) {
   try {
+    const notesCollection = getNotesCollection();
+    if (!notesCollection) {
+      return []; // Si estamos en el servidor, devolvemos un array vacío
+    }
+    
     let q;
     
     if (!includeArchived) {
@@ -50,13 +64,18 @@ export async function getAllNotes(includeArchived = false) {
     })) as Note[];
   } catch (error) {
     console.error('Error al obtener las notas:', error);
-    throw error;
+    return []; // En caso de error, devolvemos un array vacío
   }
 }
 
 // Añadir una nueva nota
 export async function addNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) {
   try {
+    const notesCollection = getNotesCollection();
+    if (!notesCollection) {
+      throw new Error('No se puede acceder a la colección de notas en el servidor');
+    }
+    
     const newNote = {
       ...note,
       createdAt: serverTimestamp(),
@@ -77,6 +96,10 @@ export async function addNote(note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>
 // Actualizar una nota existente
 export async function updateNote(id: string, noteData: Partial<Note>) {
   try {
+    if (typeof window === 'undefined') {
+      throw new Error('No se puede actualizar la nota en el servidor');
+    }
+    
     const noteRef = doc(db, 'notes', id);
     const updateData = {
       ...noteData,
@@ -99,6 +122,10 @@ export async function toggleArchiveNote(id: string, archived: boolean) {
 // Eliminar una nota
 export async function deleteNote(id: string) {
   try {
+    if (typeof window === 'undefined') {
+      throw new Error('No se puede eliminar la nota en el servidor');
+    }
+    
     const noteRef = doc(db, 'notes', id);
     await deleteDoc(noteRef);
     return { success: true };
