@@ -2,11 +2,11 @@
 // En una aplicación real, estas tasas se obtendrían de una API externa
 const exchangeRates = {
   EUR: 1,      // Euro (base)
-  USD: 0.91,   // Dólar estadounidense a Euro (1 USD = 0.91 EUR)
-  JPY: 0.0061, // Yen japonés a Euro (1 JPY = 0.0061 EUR)
-  GBP: 1.18,   // Libra esterlina a Euro (1 GBP = 1.18 EUR)
-  CNY: 0.13,   // Yuan chino a Euro (1 CNY = 0.13 EUR)
-  KRW: 0.00068 // Won coreano a Euro (1 KRW = 0.00068 EUR)
+  USD: 0.96,   // Dólar estadounidense a Euro (1 USD = 0.96 EUR) - Actualizado 28/02/2024
+  JPY: 0.0064, // Yen japonés a Euro (1 JPY = 0.0064 EUR) - Actualizado 01/03/2024
+  GBP: 1.21,   // Libra esterlina a Euro (1 GBP = 1.21 EUR) - Actualizado 01/03/2024
+  CNY: 0.13,   // Yuan chino a Euro (1 CNY = 0.13 EUR) - Actualizado 01/03/2024
+  KRW: 0.00066 // Won coreano a Euro (1 KRW = 0.00066 EUR) - Actualizado 28/02/2024
 };
 
 export type Currency = 'EUR' | 'USD' | 'JPY' | 'GBP' | 'CNY' | 'KRW';
