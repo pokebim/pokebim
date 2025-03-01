@@ -1,3 +1,5 @@
+'use client';
+
 // Archivo restaurado a una versión básica
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
