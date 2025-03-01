@@ -2,13 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import MainLayout from '@/components/layout/MainLayout';
 import { Task, getAllTasks } from '@/lib/taskService';
 import { getAllSuppliers } from '@/lib/supplierService';
 import { getAllProducts } from '@/lib/productService';
 import { getAllPrices } from '@/lib/priceService';
 import { getAllStockItems } from '@/lib/stockService';
-import NotesWidget from '@/components/NotesWidget';
+
+// Cargar el componente de notas de forma dinámica sin SSR
+const NotesWidget = dynamic(() => import('@/components/NotesWidget'), {
+  ssr: false,
+});
 
 export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);

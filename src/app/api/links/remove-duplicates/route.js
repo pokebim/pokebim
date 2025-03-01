@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
 
+// Configurar las opciones de la ruta para que sea compatible con Node.js Runtime
+export const runtime = 'nodejs';
+
 export async function GET(request) {
   try {
     // Obtener el groupId de los parámetros de consulta

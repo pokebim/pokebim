@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { getAllNotes, addNote, updateNote, deleteNote, toggleArchiveNote, Note } from '@/lib/noteService';
 import { PencilIcon, TrashIcon, ArchiveBoxIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
