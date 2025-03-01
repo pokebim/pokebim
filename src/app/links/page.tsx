@@ -363,35 +363,51 @@ export default function LinksPage() {
               </p>
             </div>
             <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
-              {/* Botón para importar enlaces de Pokémon */}
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    if (confirm('¿Estás seguro de importar el grupo de enlaces de Pokémon? Esta acción creará más de 60 enlaces.')) {
-                      setLoading(true);
-                      const response = await fetch('/api/links/add-pokemon-links');
-                      const data = await response.json();
-                      
-                      if (data.success) {
-                        showNotification(data.message || 'Enlaces de Pokémon importados correctamente');
-                        // Recargar la página para mostrar los nuevos enlaces
-                        await fetchGroups();
-                      } else {
-                        showNotification(data.error || 'Error al importar enlaces de Pokémon', 'error');
+              {/* El botón para importar enlaces de Pokémon está ahora oculto */}
+              {/* Botón para eliminar duplicados */}
+              {groups.length > 0 && (
+                <div className="relative group">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        // Buscar el grupo "Webs Compra Pokemon"
+                        const pokemonGroup = groups.find(g => g.name === "Webs Compra Pokemon");
+                        
+                        if (!pokemonGroup || !pokemonGroup.id) {
+                          showNotification('No se encontró el grupo "Webs Compra Pokemon"', 'error');
+                          return;
+                        }
+                        
+                        if (confirm(`¿Eliminar enlaces duplicados del grupo "${pokemonGroup.name}"?`)) {
+                          setLoading(true);
+                          const response = await fetch(`/api/links/remove-duplicates?groupId=${pokemonGroup.id}`);
+                          const data = await response.json();
+                          
+                          if (data.success) {
+                            showNotification(data.message);
+                            // Recargar la página para mostrar los cambios
+                            await fetchGroups();
+                          } else {
+                            showNotification(data.error || 'Error al eliminar duplicados', 'error');
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Error:', error);
+                        showNotification('Error al eliminar duplicados', 'error');
+                      } finally {
+                        setLoading(false);
                       }
-                    }
-                  } catch (error) {
-                    console.error('Error:', error);
-                    showNotification('Error al importar enlaces de Pokémon', 'error');
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-700 hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-              >
-                Importar enlaces Pokémon
-              </button>
+                    }}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-700 hover:bg-amber-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+                  >
+                    Eliminar Duplicados
+                  </button>
+                  <div className="absolute bottom-full mb-2 hidden group-hover:block bg-gray-900 text-xs text-gray-300 p-2 rounded shadow-lg w-48">
+                    Elimina enlaces duplicados en el grupo "Webs Compra Pokemon"
+                  </div>
+                </div>
+              )}
               
               <button
                 type="button"

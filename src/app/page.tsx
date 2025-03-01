@@ -8,6 +8,7 @@ import { getAllSuppliers } from '@/lib/supplierService';
 import { getAllProducts } from '@/lib/productService';
 import { getAllPrices } from '@/lib/priceService';
 import { getAllStockItems } from '@/lib/stockService';
+import NotesWidget from '@/components/NotesWidget';
 
 export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -389,6 +390,9 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
+
+        {/* Componente de Notas (visible en todas las páginas) */}
+        <NotesWidget />
       </div>
     </MainLayout>
   );
