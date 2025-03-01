@@ -11,7 +11,6 @@ const nextConfig = {
     ]
   },
   reactStrictMode: true,
-  swcMinify: true,
   
   // Ignorar errores de TypeScript durante el build
   typescript: {
