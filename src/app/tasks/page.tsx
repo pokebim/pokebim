@@ -44,7 +44,7 @@ interface Column {
 const ITEM_TYPE = 'TASK';
 
 // Task component with drag functionality
-const TaskCard = ({ task, onEdit, onDelete, onMove }) => {
+const TaskCard = ({ task, onEdit, onDelete, onMove, onView }) => {
   const [{ isDragging }, drag] = useDrag(() => ({
     type: ITEM_TYPE,
     item: { id: task.id, status: task.status },
@@ -60,21 +60,38 @@ const TaskCard = ({ task, onEdit, onDelete, onMove }) => {
         isDragging ? 'opacity-50' : 'opacity-100'
       }`}
     >
-      <div className="text-white">{task.title}</div>
-      <div className="mt-2 flex justify-between items-center">
+      <div className="mb-2">
+        <div className="flex items-center space-x-2 mb-1">
+          <div className={`h-2.5 w-2.5 rounded-full 
+            ${task.priority === 'high' ? 'bg-red-400' :
+              task.priority === 'medium' ? 'bg-yellow-400' : 'bg-blue-400'}`}>
+          </div>
+          <h4 className="font-medium text-white">{task.title}</h4>
+        </div>
+        {task.description && (
+          <p className="text-sm text-gray-400 mb-2">{task.description}</p>
+        )}
+      </div>
+      <div className="flex justify-between items-center">
         <div className="text-xs text-gray-400">
           {new Date(task.createdAt).toLocaleDateString()}
         </div>
         <div className="space-x-1">
           <button
+            onClick={() => onView(task)}
+            className="px-2 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
+          >
+            Ver
+          </button>
+          <button
             onClick={() => onEdit(task)}
-            className="px-2 py-1 text-xs bg-green-700 text-white rounded hover:bg-green-600"
+            className="px-2 py-1 text-xs bg-yellow-700 text-white rounded hover:bg-yellow-600 transition-colors"
           >
             Editar
           </button>
           <button
             onClick={() => onDelete(task.id)}
-            className="px-2 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600"
+            className="px-2 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
           >
             Eliminar
           </button>
@@ -102,17 +119,12 @@ const TaskCard = ({ task, onEdit, onDelete, onMove }) => {
           </div>
         </div>
       </div>
-      {task.description && (
-        <div className="mt-2 text-xs text-gray-400">
-          {task.description}
-        </div>
-      )}
     </div>
   );
 };
 
 // Column component with drop functionality
-const TaskColumn = ({ column, tasks, onAddTask, onEditTask, onDeleteTask, onMoveTask }) => {
+const TaskColumn = ({ column, tasks, onAddTask, onEditTask, onDeleteTask, onMoveTask, onViewTask }) => {
   const [{ isOver }, drop] = useDrop({
     accept: ITEM_TYPE,
     drop: (item) => {
@@ -142,40 +154,14 @@ const TaskColumn = ({ column, tasks, onAddTask, onEditTask, onDeleteTask, onMove
       </div>
       <div>
         {tasks.map((task) => (
-          <div key={task.id} className="mb-3 bg-gray-800 rounded p-3">
-            <div className="mb-2">
-              <div className="flex items-center space-x-2 mb-1">
-                <div className={`h-2.5 w-2.5 rounded-full 
-                  ${task.priority === 'high' ? 'bg-red-400' :
-                    task.priority === 'medium' ? 'bg-yellow-400' : 'bg-blue-400'}`}>
-                </div>
-                <h4 className="font-medium text-white">{task.title}</h4>
-              </div>
-              {task.description && (
-                <p className="text-sm text-gray-400 mb-2">{task.description}</p>
-              )}
-            </div>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => handleViewDetail(task)}
-                className="px-2 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
-              >
-                Ver
-              </button>
-              <button
-                onClick={() => handleEditTask(task)}
-                className="px-2 py-1 text-xs bg-yellow-700 text-white rounded hover:bg-yellow-600 transition-colors"
-              >
-                Editar
-              </button>
-              <button
-                onClick={() => handleDeleteTask(task.id)}
-                className="px-2 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
-              >
-                Eliminar
-              </button>
-            </div>
-          </div>
+          <TaskCard 
+            key={task.id}
+            task={task}
+            onEdit={onEditTask}
+            onDelete={onDeleteTask}
+            onMove={onMoveTask}
+            onView={onViewTask}
+          />
         ))}
       </div>
       <button
@@ -564,6 +550,7 @@ export default function TasksPage() {
                     onEditTask={handleEditTask}
                     onDeleteTask={handleDeleteTask}
                     onMoveTask={handleMoveTask}
+                    onViewTask={handleViewDetail}
                   />
                 ))}
               </div>

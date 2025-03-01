@@ -5,7 +5,6 @@ import Image from 'next/image';
 import { formatCurrency } from '@/lib/currencyConverter';
 import Modal from '@/components/ui/Modal';
 import ProductForm from '@/components/forms/ProductForm';
-import MainLayout from '@/components/layout/MainLayout';
 import { 
   Product, 
   getAllProducts, 
@@ -221,7 +220,7 @@ export default function ProductsPage() {
   };
 
   return (
-    <MainLayout>
+    <>
       {notification.show && (
         <div className={`fixed top-5 right-5 p-4 rounded-md shadow-xl z-50 ${
           notification.type === 'success' ? 'bg-green-700 text-white' : 'bg-red-700 text-white'
@@ -314,9 +313,12 @@ export default function ProductsPage() {
         </DetailView>
       )}
       
-      <div className="container mx-auto p-4">
+      <div className="py-6 px-4 sm:px-6 md:px-8">
         <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-white">Productos</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Productos</h1>
+            <p className="mt-1 text-gray-400 text-sm">Gestiona el catálogo de productos de tu tienda</p>
+          </div>
           <button
             onClick={() => {
               setEditingProduct(null);
@@ -328,7 +330,7 @@ export default function ProductsPage() {
           </button>
         </div>
         
-        {/* Agregar el buscador */}
+        {/* Buscador */}
         <div className="relative w-full max-w-md mb-6">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
             <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
@@ -355,50 +357,11 @@ export default function ProductsPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
           </div>
         ) : (
-          <div className="py-6">
-            <div className="px-4 sm:px-6 md:px-8">
-              <div className="md:flex md:items-center md:justify-between">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-2xl font-semibold leading-tight text-white">
-                    Productos
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-400">
-                    Gestiona el catálogo de productos de tu tienda
-                  </p>
-                </div>
-                <div className="mt-4 flex md:mt-0 md:ml-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingProduct(null);
-                      setShowModal(true);
-                    }}
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    Añadir Producto
-                  </button>
-                </div>
-              </div>
-
-              <div className="mt-6">
-                <div className="mb-4">
-                  <input
-                    type="text"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Buscar productos..."
-                    className="w-full md:w-80 p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-white"
-                  />
-                </div>
-                
-                <div className="mt-6 bg-gray-900 rounded-lg p-4">
-                  {renderProducts()}
-                </div>
-              </div>
-            </div>
+          <div className="bg-gray-900 rounded-lg p-4">
+            {renderProducts()}
           </div>
         )}
       </div>
-    </MainLayout>
+    </>
   );
 } 
