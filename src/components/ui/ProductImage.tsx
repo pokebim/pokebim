@@ -4,7 +4,7 @@ import { useState } from 'react';
 interface ProductImageProps {
   imageUrl?: string;
   productName?: string;
-  size?: 'small' | 'medium' | 'large';
+  size?: 'tiny' | 'small' | 'medium' | 'large';
   className?: string;
 }
 
@@ -22,9 +22,10 @@ export default function ProductImage({
   
   // Determinar dimensiones basadas en el tamaño
   const dimensions = {
-    small: { width: 12, height: 12 },
-    medium: { width: 24, height: 24 },
-    large: { width: 48, height: 48 }
+    tiny: { width: 8, height: 8 },     // 32px preview
+    small: { width: 12, height: 12 },   // 48px normal
+    medium: { width: 24, height: 24 },  // 96px medium
+    large: { width: 48, height: 48 }    // 192px large
   }[size];
   
   // URL de fallback si no hay imagen disponible o hay error

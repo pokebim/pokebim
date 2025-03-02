@@ -595,7 +595,8 @@ export default function PricesPage() {
         <ProductImage 
           imageUrl={info.getValue()} 
           productName={info.row.original.product.name}
-          size="small"
+          size="tiny"
+          className="mx-auto"
         />
       )
     }),
@@ -743,7 +744,8 @@ export default function PricesPage() {
         <ProductImage 
           imageUrl={info.getValue()} 
           productName={info.row.original.productName}
-          size="small"
+          size="tiny"
+          className="mx-auto"
         />
       )
     }),

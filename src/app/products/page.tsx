@@ -182,11 +182,12 @@ export default function ProductsPage() {
         {filteredProducts.map(product => (
           <div key={product.id} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
             {/* Imagen del producto usando el componente ProductImage */}
-            <div className="w-full flex justify-center p-4">
-              <ProductImage 
-                imageUrl={product.imageUrl} 
+            <div className="mb-4">
+              <ProductImage
+                imageUrl={product.imageUrl}
                 productName={product.name}
-                size="large"
+                size="tiny"
+                className="mx-auto"
               />
             </div>
             <div className="p-4">
@@ -287,16 +288,14 @@ export default function ProductsPage() {
         >
           <DetailSection title="Información General">
             {/* Mostrar imagen del producto */}
-            {selectedProduct.imageUrl && (
-              <div className="mb-6 flex justify-center">
-                <ProductImage 
-                  imageUrl={selectedProduct.imageUrl} 
-                  productName={selectedProduct.name}
-                  size="large"
-                  className="border-2 border-gray-700"
-                />
-              </div>
-            )}
+            <div className="mb-6">
+              <ProductImage
+                imageUrl={selectedProduct.imageUrl}
+                productName={selectedProduct.name}
+                size="large"
+                className="mx-auto"
+              />
+            </div>
             <DetailGrid>
               <DetailField label="Nombre" value={selectedProduct.name || 'Sin nombre'} />
               <DetailField 
