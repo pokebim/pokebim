@@ -9,7 +9,8 @@
   "build": {
     "env": {
       "PRISMA_CLIENT_ENGINE_TYPE": "dataproxy",
-      "NODE_OPTIONS": "--max-old-space-size=4096"
+      "NODE_OPTIONS": "--max-old-space-size=4096",
+      "VERCEL_FORCE_NO_BUILD_CACHE": "1"
     }
   },
   "functions": {
