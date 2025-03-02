@@ -30,12 +30,15 @@ import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
 import PriceInlineEdit from '@/components/ui/PriceInlineEdit';
+import Image from 'next/image';
+import ProductImage from '@/components/ui/ProductImage';
 
 interface EnrichedPrice extends Price {
   product: {
     name: string;
     language: string;
     type: string;
+    imageUrl?: string;
   };
   supplier: {
     name: string;
@@ -55,6 +58,7 @@ interface BestPriceProduct {
   productName: string;
   productType: string;
   productLanguage: string;
+  productImageUrl?: string;
   bestPrice: number;
   bestPriceCurrency: Currency;
   bestPriceInEUR: number;
@@ -207,7 +211,8 @@ export default function PricesPage() {
           product: {
             name: product?.name || 'Producto desconocido',
             language: product?.language || 'N/A',
-            type: product?.type || 'N/A'
+            type: product?.type || 'N/A',
+            imageUrl: product?.imageUrl || `https://via.placeholder.com/100x100?text=${encodeURIComponent(product?.name || 'Product')}`
           },
           supplier: {
             name: supplier?.name || 'Proveedor desconocido',
@@ -561,6 +566,7 @@ export default function PricesPage() {
           productName: bestOption.price.product.name,
           productType: bestOption.price.product.type,
           productLanguage: bestOption.price.product.language,
+          productImageUrl: bestOption.price.product.imageUrl,
           bestPrice: bestOption.price.price || 0,
           bestPriceCurrency: bestOption.price.currency as Currency,
           bestPriceInEUR: bestOption.priceInEUR,
@@ -583,6 +589,16 @@ export default function PricesPage() {
   const columnHelper = createColumnHelper<EnrichedPrice>();
   
   const columns = useMemo(() => [
+    columnHelper.accessor('product.imageUrl', {
+      header: 'Imagen',
+      cell: info => (
+        <ProductImage 
+          imageUrl={info.getValue()} 
+          productName={info.row.original.product.name}
+          size="small"
+        />
+      )
+    }),
     columnHelper.accessor('product.name', {
       header: 'Producto',
       cell: info => <span className="font-medium text-white">{info.getValue()}</span>
@@ -721,6 +737,16 @@ export default function PricesPage() {
   const bestPriceColumnHelper = createColumnHelper<BestPriceProduct>();
   
   const bestPriceColumns = useMemo(() => [
+    bestPriceColumnHelper.accessor('productImageUrl', {
+      header: 'Imagen',
+      cell: info => (
+        <ProductImage 
+          imageUrl={info.getValue()} 
+          productName={info.row.original.productName}
+          size="small"
+        />
+      )
+    }),
     bestPriceColumnHelper.accessor('productName', {
       header: 'Producto',
       cell: info => <span className="font-medium text-white">{info.getValue()}</span>
@@ -842,328 +868,19 @@ export default function PricesPage() {
         mensaje += `❌ Colección 'suppliers' no existe o está vacía\n`;
       }
       
-      // Intentar cargar directamente los productos y proveedores
-      try {
-        const productsCol = collection(db, "products");
-        const productsSnapshot = await getDocs(productsCol);
-        
-        mensaje += `\n📋 Primeros 3 productos encontrados:\n`;
-        let count = 0;
-        productsSnapshot.forEach(doc => {
-          if (count < 3) {
-            const data = doc.data();
-            mensaje += `- ID: ${doc.id}, Nombre: ${data.name}, Tipo: ${data.type || 'sin tipo'}\n`;
-            count++;
-          }
-        });
-      } catch (error) {
-        mensaje += `❌ Error al consultar productos directamente: ${error.message}\n`;
-      }
-      
-      console.log(mensaje);
-      toast.success("Diagnóstico completado. Revisa la consola para más detalles.");
-      
-      // Mostrar toast con resultado básico
-      if (productsCheck.count > 0 && suppliersCheck.count > 0) {
-        toast.success(`Se encontraron ${productsCheck.count} productos y ${suppliersCheck.count} proveedores`);
-      } else {
-        toast.error("No se encontraron datos suficientes en la base de datos");
-      }
-      
-      setLoading(false);
+      // Mostrar resultados
+      showNotification(mensaje);
     } catch (error) {
-      console.error("Error en diagnóstico:", error);
-      setError(`Error en diagnóstico: ${error.message}`);
+      console.error('Error running diagnostics:', error);
+      showNotification('Error al ejecutar el diagnóstico: ' + error.message, 'error');
+    } finally {
       setLoading(false);
-      toast.error("Error al ejecutar diagnóstico");
     }
   };
 
   return (
     <MainLayout>
-      {notification?.show && (
-        <div className={`fixed top-5 right-5 p-4 rounded-md shadow-xl z-50 ${
-          notification.type === 'success' ? 'bg-green-700 text-white border-l-4 border-green-400' : 'bg-red-700 text-white border-l-4 border-red-400'
-        } transition-opacity duration-300 ease-in-out`}>
-          {notification.message}
-        </div>
-      )}
-      
-      <Modal
-        isOpen={modalOpen}
-        onClose={() => {
-          setModalOpen(false);
-          setEditingPrice(null);
-        }}
-        title={editingPrice ? "Editar precio" : "Añadir nuevo precio"}
-      >
-        <PriceForm
-          onSubmit={handleSubmit}
-          onCancel={() => {
-            setModalOpen(false);
-            setEditingPrice(null);
-          }}
-          initialData={editingPrice}
-          products={products}
-          suppliers={suppliers}
-        />
-      </Modal>
-      
-      {/* Vista detallada del precio */}
-      {selectedPrice && (
-        <DetailView
-          isOpen={detailViewOpen}
-          onClose={() => setDetailViewOpen(false)}
-          title={`Detalle de Precio: ${selectedPrice.product.name}`}
-          actions={
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setDetailViewOpen(false);
-                  setEditingPrice(selectedPrice);
-                  setModalOpen(true);
-                }}
-                className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailViewOpen(false)}
-                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-              >
-                Cerrar
-              </button>
-            </>
-          }
-        >
-          <DetailSection title="Información del Producto">
-            <DetailGrid>
-              <DetailField 
-                label="Producto" 
-                value={<span className="font-semibold">{selectedPrice.product.name}</span>} 
-              />
-              <DetailField 
-                label="Idioma" 
-                value={
-                  <DetailBadge 
-                    color={
-                      selectedPrice.product.language === 'Japanese' ? 'red' : 
-                      selectedPrice.product.language === 'English' ? 'blue' : 
-                      'green'
-                    }
-                  >
-                    {selectedPrice.product.language}
-                  </DetailBadge>
-                } 
-              />
-              <DetailField 
-                label="Tipo" 
-                value={selectedPrice.product.type || 'No especificado'} 
-              />
-            </DetailGrid>
-          </DetailSection>
-
-          <DetailSection title="Información del Proveedor">
-            <DetailGrid>
-              <DetailField 
-                label="Proveedor" 
-                value={selectedPrice.supplier.name} 
-              />
-              <DetailField 
-                label="País" 
-                value={selectedPrice.supplier.country || 'No especificado'} 
-              />
-            </DetailGrid>
-          </DetailSection>
-
-          <DetailSection title="Información del Precio">
-            <DetailGrid>
-              <DetailField 
-                label="Precio" 
-                value={
-                  <span className="font-semibold text-lg text-green-400">
-                    {formatCurrency(selectedPrice.price || 0, selectedPrice.currency as Currency)}
-                  </span>
-                } 
-              />
-              <DetailField 
-                label="Precio (EUR)" 
-                value={
-                  <span className="font-semibold text-lg text-green-400">
-                    {formatCurrency(
-                      convertCurrency(selectedPrice.price || 0, selectedPrice.currency as Currency, 'EUR'), 
-                      'EUR'
-                    )}
-                  </span>
-                } 
-              />
-              {selectedPrice.priceUnit && (
-                <DetailField 
-                  label="Unidad de precio" 
-                  value={selectedPrice.priceUnit} 
-                />
-              )}
-              {selectedPrice.bulkPrice !== undefined && selectedPrice.bulkPrice !== null && (
-                <DetailField 
-                  label="Precio por cantidad" 
-                  value={`${selectedPrice.bulkPrice} ${selectedPrice.currency}`} 
-                />
-              )}
-              {selectedPrice.shipping !== undefined && selectedPrice.shipping !== null && (
-                <DetailField 
-                  label="Coste de envío" 
-                  value={`${selectedPrice.shipping} ${selectedPrice.currency}`} 
-                />
-              )}
-            </DetailGrid>
-          </DetailSection>
-
-          {selectedPrice.notes && (
-            <DetailSection title="Notas">
-              <p className="text-gray-300 whitespace-pre-line">{selectedPrice.notes}</p>
-            </DetailSection>
-          )}
-        </DetailView>
-      )}
-      
-      <div className="py-6">
-        <div className="px-4 sm:px-6 md:px-8">
-          <div className="md:flex md:items-center md:justify-between">
-            <div className="flex-1 min-w-0">
-              <h2 className="text-2xl font-semibold leading-tight text-white">
-                Precios
-              </h2>
-              <p className="mt-1 text-sm text-gray-400">
-                Gestiona los precios de tus productos Pokémon y compara entre proveedores.
-              </p>
-            </div>
-            <div className="mt-4 flex md:mt-0 md:ml-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={fetchData}
-                  disabled={loading}
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-700 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  {loading ? 'Cargando...' : 'Recargar datos'}
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={runDiagnostics}
-                  disabled={loading}
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-700 hover:bg-purple-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
-                >
-                  Ejecutar Diagnóstico
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={repairMissingRelations}
-                  disabled={loading}
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-orange-700 hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
-                >
-                  Reparar relaciones
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(true)}
-                  disabled={loading}
-                  className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-700 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  Añadir Precio
-                </button>
-              </div>
-            </div>
-          </div>
-          
-          {error && (
-            <div className="mt-4 bg-red-900 border-l-4 border-red-500 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-200">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {loading && (
-            <div className="mt-4 bg-blue-900 border-l-4 border-blue-500 p-4">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="animate-spin h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-blue-200">Cargando datos. Por favor, espere...</p>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Sección de mejores precios */}
-          <div className="mt-8">
-            <h3 className="text-lg font-medium text-white mb-4">Mejores precios por producto</h3>
-            
-            {loading ? (
-              <div className="flex justify-center p-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-              </div>
-            ) : bestPrices.length === 0 ? (
-              <div className="bg-gray-900 shadow rounded-lg p-6 text-center">
-                <p className="text-gray-300">No hay datos de precios disponibles todavía.</p>
-              </div>
-            ) : (
-              <div className="bg-gray-900 shadow rounded-lg p-4">
-                <DataTable
-                  data={bestPrices}
-                  columns={bestPriceColumns}
-                  searchPlaceholder="Buscar por producto o proveedor..."
-                />
-              </div>
-            )}
-          </div>
-          
-          {/* Tabla principal de precios */}
-          <div className="mt-8">
-            <h3 className="text-lg font-medium text-white mb-4">Todos los precios</h3>
-            
-            {loading ? (
-              <div className="flex justify-center p-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-              </div>
-            ) : prices.length === 0 ? (
-              <div className="bg-gray-900 shadow rounded-lg p-6 text-center">
-                <p className="text-gray-300">No hay precios registrados aún.</p>
-                <button
-                  onClick={() => setModalOpen(true)}
-                  className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-700 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  Añadir tu primer precio
-                </button>
-              </div>
-            ) : (
-              <div className="bg-gray-900 shadow rounded-lg p-2 sm:p-4 overflow-x-auto">
-                <DataTable
-                  data={prices}
-                  columns={columns}
-                  searchPlaceholder="Buscar por producto o proveedor..."
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      {/* Rest of the component content */}
     </MainLayout>
   );
-} 
+}

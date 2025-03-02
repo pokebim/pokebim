@@ -13,6 +13,7 @@ import {
   deleteProduct 
 } from '@/lib/productService';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailImage } from '@/components/ui/DetailView';
+import ProductImage from '@/components/ui/ProductImage';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -180,6 +181,14 @@ export default function ProductsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProducts.map(product => (
           <div key={product.id} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+            {/* Imagen del producto usando el componente ProductImage */}
+            <div className="w-full flex justify-center p-4">
+              <ProductImage 
+                imageUrl={product.imageUrl} 
+                productName={product.name}
+                size="large"
+              />
+            </div>
             <div className="p-4">
               <div className="flex justify-between items-start">
                 <h3 className="text-lg font-semibold text-white">{product.name}</h3>
@@ -277,6 +286,17 @@ export default function ProductsPage() {
           }
         >
           <DetailSection title="Información General">
+            {/* Mostrar imagen del producto */}
+            {selectedProduct.imageUrl && (
+              <div className="mb-6 flex justify-center">
+                <ProductImage 
+                  imageUrl={selectedProduct.imageUrl} 
+                  productName={selectedProduct.name}
+                  size="large"
+                  className="border-2 border-gray-700"
+                />
+              </div>
+            )}
             <DetailGrid>
               <DetailField label="Nombre" value={selectedProduct.name || 'Sin nombre'} />
               <DetailField 
