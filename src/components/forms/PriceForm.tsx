@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { convertCurrency, formatCurrency, type Currency } from '@/lib/currencyConverter';
-import Select from 'react-select';
+import Select, { SingleValue, ActionMeta } from 'react-select';
 
 interface Price {
   id?: string;
@@ -25,6 +25,11 @@ interface Supplier {
   id: string;
   name: string;
   shippingCost?: number;
+}
+
+interface SelectOption {
+  value: string;
+  label: string;
 }
 
 interface PriceFormProps {
@@ -168,9 +173,9 @@ export default function PriceForm({
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleReactSelectChange = (selectedOption: any, { name }: any) => {
-    if (name) {
-      setFormData(prev => ({ ...prev, [name]: selectedOption.value }));
+  const handleReactSelectChange = (selectedOption: SingleValue<SelectOption>, actionMeta: ActionMeta<SelectOption>) => {
+    if (actionMeta.name) {
+      setFormData(prev => ({ ...prev, [actionMeta.name]: selectedOption?.value || '' }));
     }
   };
 
@@ -282,7 +287,7 @@ export default function PriceForm({
             name="productId"
             options={productOptions}
             value={productOptions.find(option => option.value === formData.productId)}
-            onChange={(option) => handleReactSelectChange(option, { name: 'productId' })}
+            onChange={(option, actionMeta) => handleReactSelectChange(option, actionMeta)}
             placeholder="Selecciona un producto"
             isDisabled={loadingProducts}
             isLoading={loadingProducts}
@@ -300,7 +305,7 @@ export default function PriceForm({
             name="supplierId"
             options={supplierOptions}
             value={supplierOptions.find(option => option.value === formData.supplierId)}
-            onChange={(option) => handleReactSelectChange(option, { name: 'supplierId' })}
+            onChange={(option, actionMeta) => handleReactSelectChange(option, actionMeta)}
             placeholder="Selecciona un proveedor"
             isDisabled={loadingSuppliers}
             isLoading={loadingSuppliers}
