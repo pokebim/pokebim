@@ -22,6 +22,20 @@ interface ProductFormProps {
   suppliers?: Supplier[];
 }
 
+// Función para validar URLs de imágenes
+const validateImageUrl = async (url: string): Promise<boolean> => {
+  if (!url) return false;
+  
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    const contentType = response.headers.get('content-type');
+    return response.ok && contentType?.startsWith('image/');
+  } catch (error) {
+    console.error('Error validating image URL:', error);
+    return false;
+  }
+};
+
 export default function ProductForm({ onSubmit, onCancel, initialData, suppliers = [] }: ProductFormProps) {
   const [formData, setFormData] = useState<Product>({
     name: '',
@@ -36,6 +50,8 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
   const [error, setError] = useState('');
   const [loadingSuppliers, setLoadingSuppliers] = useState(false);
   const [suppliersList, setSuppliersList] = useState<Supplier[]>(suppliers);
+  const [isValidatingImage, setIsValidatingImage] = useState(false);
+  const [imageError, setImageError] = useState('');
 
   useEffect(() => {
     if (initialData) {
@@ -78,6 +94,25 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Validar URL de imagen cuando cambia
+  const handleImageUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const url = e.target.value;
+    setFormData(prev => ({ ...prev, imageUrl: url }));
+    
+    if (url) {
+      setIsValidatingImage(true);
+      setImageError('');
+      
+      const isValid = await validateImageUrl(url);
+      
+      if (!isValid) {
+        setImageError('La URL proporcionada no es una imagen válida');
+      }
+      
+      setIsValidatingImage(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -91,26 +126,17 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
       }
     }
     
-    let validatedImageUrl = formData.imageUrl;
-    
-    if (!validatedImageUrl || validatedImageUrl.trim() === '') {
-      validatedImageUrl = `https://via.placeholder.com/400x250?text=${encodeURIComponent(formData.name || 'Product Image')}`;
-    } else {
-      if (!validatedImageUrl.startsWith('http://') && !validatedImageUrl.startsWith('https://')) {
-        validatedImageUrl = 'https://' + validatedImageUrl;
-      }
-      
-      try {
-        new URL(validatedImageUrl);
-      } catch (e) {
-        console.error('Invalid URL even after adding protocol:', e);
-        validatedImageUrl = `https://via.placeholder.com/400x250?text=${encodeURIComponent(formData.name || 'Product Image')}`;
+    if (formData.imageUrl) {
+      const isValid = await validateImageUrl(formData.imageUrl);
+      if (!isValid) {
+        setImageError('La URL proporcionada no es una imagen válida');
+        return;
       }
     }
     
     const submissionData = {
       ...formData,
-      imageUrl: validatedImageUrl,
+      imageUrl: formData.imageUrl || 'https://via.placeholder.com/400x250?text=Product+Image',
       supplierId: formData.supplierId || 'default-supplier'
     };
     
@@ -212,22 +238,26 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
         </select>
       </div>
       
-      <div>
-        <label htmlFor="imageUrl" className="block text-sm font-bold text-white">
-          URL de Imagen (opcional)
+      <div className="space-y-2">
+        <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-700">
+          URL de la imagen
         </label>
         <input
           type="text"
           id="imageUrl"
           name="imageUrl"
           value={formData.imageUrl}
-          onChange={handleChange}
-          placeholder="https://ejemplo.com/imagen.jpg"
-          className="mt-1 block w-full rounded-md border border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 text-white bg-gray-800 px-3 py-2"
+          onChange={handleImageUrlChange}
+          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
+            imageError ? 'border-red-500' : ''
+          }`}
         />
-        <p className="mt-1 text-sm text-gray-400">
-          Deja en blanco para usar una imagen generada automáticamente
-        </p>
+        {isValidatingImage && (
+          <p className="text-sm text-gray-500">Validando URL de imagen...</p>
+        )}
+        {imageError && (
+          <p className="text-sm text-red-500">{imageError}</p>
+        )}
       </div>
       
       <div>

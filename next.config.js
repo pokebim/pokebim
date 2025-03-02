@@ -7,7 +7,8 @@ const nextConfig = {
       'picsum.photos',
       'images.unsplash.com',
       'firebasestorage.googleapis.com',
-      'source.unsplash.com'
+      'source.unsplash.com',
+      'flashstore.es'
     ]
   },
   reactStrictMode: true,
