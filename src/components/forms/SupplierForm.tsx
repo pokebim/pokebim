@@ -8,6 +8,7 @@ interface Supplier {
   origin?: string;
   region?: string;
   notes?: string;
+  shippingCost?: number;
 }
 
 interface SupplierFormProps {
@@ -27,7 +28,8 @@ export default function SupplierForm({ onSubmit, onCancel, initialData }: Suppli
     contactName: '',
     origin: '',
     region: 'asian',
-    notes: ''
+    notes: '',
+    shippingCost: 0
   };
   
   // Initialize with default values - this ensures no undefined values
@@ -216,6 +218,22 @@ export default function SupplierForm({ onSubmit, onCancel, initialData }: Suppli
           name="country"
           value={formData.country || ''}
           onChange={handleChange}
+          className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder-gray-400 text-white"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="shippingCost" className="block text-sm font-bold text-white">
+          Precio de envío aproximado (EUR)
+        </label>
+        <input
+          type="number"
+          id="shippingCost"
+          name="shippingCost"
+          value={formData.shippingCost || 0}
+          onChange={handleChange}
+          min="0"
+          step="0.01"
           className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder-gray-400 text-white"
         />
       </div>

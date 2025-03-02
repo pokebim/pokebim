@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { convertCurrency, formatCurrency, type Currency } from '@/lib/currencyConverter';
+import Select from 'react-select';
 
 interface Price {
   id?: string;
@@ -11,16 +12,19 @@ interface Price {
   notes?: string;
   productId?: string;
   supplierId?: string;
+  boxesPerPack?: number | null;
 }
 
 interface Product {
   id: string;
   name: string;
+  language?: string;
 }
 
 interface Supplier {
   id: string;
   name: string;
+  shippingCost?: number;
 }
 
 interface PriceFormProps {
@@ -47,6 +51,7 @@ export default function PriceForm({
     notes: '',
     productId: '',
     supplierId: '',
+    boxesPerPack: null
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,6 +61,7 @@ export default function PriceForm({
   const [productsList, setProductsList] = useState<Product[]>(products);
   const [suppliersList, setSuppliersList] = useState<Supplier[]>(suppliers);
   const [priceInEUR, setPriceInEUR] = useState<string>('€0.00');
+  const [unitPrice, setUnitPrice] = useState<string>('');
 
   useEffect(() => {
     if (initialData) {
@@ -68,7 +74,8 @@ export default function PriceForm({
         shipping: initialData.shipping != null ? parseFloat(initialData.shipping.toString()) : null,
         notes: initialData.notes || '',
         productId: initialData.productId || '',
-        supplierId: initialData.supplierId || ''
+        supplierId: initialData.supplierId || '',
+        boxesPerPack: initialData.boxesPerPack != null ? parseFloat(initialData.boxesPerPack.toString()) : null
       };
       setFormData(safeInitialData);
     }
@@ -82,7 +89,8 @@ export default function PriceForm({
         const storedProducts = JSON.parse(localStorage.getItem('products') || '[]');
         const formattedProducts = storedProducts.map((product: any) => ({
           id: product.id,
-          name: product.name
+          name: product.name,
+          language: product.language
         }));
         setProductsList(formattedProducts);
       } catch (err) {
@@ -102,7 +110,8 @@ export default function PriceForm({
         const storedSuppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
         const formattedSuppliers = storedSuppliers.map((supplier: any) => ({
           id: supplier.id,
-          name: supplier.name
+          name: supplier.name,
+          shippingCost: supplier.shippingCost
         }));
         setSuppliersList(formattedSuppliers);
       } catch (err) {
@@ -139,9 +148,30 @@ export default function PriceForm({
     }
   }, [formData.price, formData.currency]);
 
+  // Calcular precio unitario cuando es Pack y se ingresa la cantidad de cajas
+  useEffect(() => {
+    if (formData.priceUnit === 'Per Pack' && formData.boxesPerPack && formData.boxesPerPack > 0 && formData.price) {
+      const pricePerBox = formData.price / formData.boxesPerPack;
+      const formatted = new Intl.NumberFormat('es-ES', {
+        style: 'currency',
+        currency: formData.currency as string,
+        minimumFractionDigits: 2
+      }).format(pricePerBox);
+      setUnitPrice(formatted);
+    } else {
+      setUnitPrice('');
+    }
+  }, [formData.price, formData.boxesPerPack, formData.priceUnit, formData.currency]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleReactSelectChange = (selectedOption: any, { name }: any) => {
+    if (name) {
+      setFormData(prev => ({ ...prev, [name]: selectedOption.value }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -158,6 +188,7 @@ export default function PriceForm({
         price: formData.price !== undefined ? parseFloat(formData.price.toString()) : 0,
         bulkPrice: formData.bulkPrice ? parseFloat(formData.bulkPrice.toString()) : null,
         shipping: formData.shipping ? parseFloat(formData.shipping.toString()) : null,
+        boxesPerPack: formData.boxesPerPack ? parseFloat(formData.boxesPerPack.toString()) : null
       };
       
       onSubmit(dataToSubmit);
@@ -168,6 +199,70 @@ export default function PriceForm({
       setIsSubmitting(false);
     }
   };
+
+  // Estilos para react-select
+  const customSelectStyles = {
+    control: (base: any) => ({
+      ...base,
+      background: '#1f2937',
+      borderColor: '#374151',
+      boxShadow: 'none',
+      '&:hover': {
+        borderColor: '#22c55e'
+      }
+    }),
+    menu: (base: any) => ({
+      ...base,
+      background: '#1f2937',
+      borderRadius: '0.375rem',
+      marginTop: '0.25rem',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
+    }),
+    option: (base: any, state: any) => ({
+      ...base,
+      backgroundColor: state.isSelected ? '#22c55e' : state.isFocused ? '#374151' : '#1f2937',
+      '&:hover': {
+        backgroundColor: '#374151'
+      }
+    }),
+    singleValue: (base: any) => ({
+      ...base,
+      color: 'white'
+    }),
+    input: (base: any) => ({
+      ...base,
+      color: 'white'
+    }),
+    placeholder: (base: any) => ({
+      ...base,
+      color: '#9ca3af'
+    }),
+    dropdownIndicator: (base: any) => ({
+      ...base,
+      color: '#d1d5db',
+      '&:hover': {
+        color: 'white'
+      }
+    }),
+    clearIndicator: (base: any) => ({
+      ...base,
+      color: '#d1d5db',
+      '&:hover': {
+        color: 'white'
+      }
+    })
+  };
+
+  // Opciones para los selects
+  const productOptions = productsList.map(product => ({
+    value: product.id,
+    label: product.language ? `${product.name} (${product.language})` : product.name
+  }));
+
+  const supplierOptions = suppliersList.map(supplier => ({
+    value: supplier.id,
+    label: supplier.name
+  }));
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -182,54 +277,36 @@ export default function PriceForm({
           <label htmlFor="productId" className="block text-sm font-bold text-white">
             Producto
           </label>
-          <select
+          <Select
             id="productId"
             name="productId"
-            value={formData.productId}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
-            disabled={loadingProducts}
-          >
-            <option value="" className="text-gray-400">Selecciona un producto (opcional)</option>
-            {loadingProducts ? (
-              <option value="" className="text-gray-400">Cargando productos...</option>
-            ) : productsList.length === 0 ? (
-              <option value="" className="text-gray-400">No hay productos disponibles</option>
-            ) : (
-              productsList.map(product => (
-                <option key={product.id} value={product.id} className="text-white">
-                  {product.name}
-                </option>
-              ))
-            )}
-          </select>
+            options={productOptions}
+            value={productOptions.find(option => option.value === formData.productId)}
+            onChange={(option) => handleReactSelectChange(option, { name: 'productId' })}
+            placeholder="Selecciona un producto"
+            isDisabled={loadingProducts}
+            isLoading={loadingProducts}
+            styles={customSelectStyles}
+            className="mt-1"
+          />
         </div>
 
         <div>
           <label htmlFor="supplierId" className="block text-sm font-bold text-white">
             Proveedor
           </label>
-          <select
+          <Select
             id="supplierId"
             name="supplierId"
-            value={formData.supplierId}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
-            disabled={loadingSuppliers}
-          >
-            <option value="" className="text-gray-400">Selecciona un proveedor (opcional)</option>
-            {loadingSuppliers ? (
-              <option value="" className="text-gray-400">Cargando proveedores...</option>
-            ) : suppliersList.length === 0 ? (
-              <option value="" className="text-gray-400">No hay proveedores disponibles</option>
-            ) : (
-              suppliersList.map(supplier => (
-                <option key={supplier.id} value={supplier.id} className="text-white">
-                  {supplier.name}
-                </option>
-              ))
-            )}
-          </select>
+            options={supplierOptions}
+            value={supplierOptions.find(option => option.value === formData.supplierId)}
+            onChange={(option) => handleReactSelectChange(option, { name: 'supplierId' })}
+            placeholder="Selecciona un proveedor"
+            isDisabled={loadingSuppliers}
+            isLoading={loadingSuppliers}
+            styles={customSelectStyles}
+            className="mt-1"
+          />
         </div>
       </div>
 
@@ -291,6 +368,35 @@ export default function PriceForm({
           </select>
         </div>
       </div>
+
+      {/* Campo para cajas por pack, solo visible cuando la unidad es Pack */}
+      {formData.priceUnit === 'Per Pack' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="boxesPerPack" className="block text-sm font-bold text-white">
+              Cantidad de cajas por pack
+            </label>
+            <div className="mt-1 flex rounded-md shadow-sm">
+              <input
+                type="number"
+                id="boxesPerPack"
+                name="boxesPerPack"
+                value={formData.boxesPerPack || ''}
+                onChange={handleChange}
+                min="1"
+                step="1"
+                className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+              />
+            </div>
+          </div>
+          
+          {unitPrice && (
+            <div className="flex items-center">
+              <span className="text-white font-medium">Precio unitario por caja: {unitPrice}</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>

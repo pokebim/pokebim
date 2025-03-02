@@ -187,6 +187,8 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
           <option value="Japanese">Japonés</option>
           <option value="English">Inglés</option>
           <option value="Spanish">Español</option>
+          <option value="Chinese">Chino</option>
+          <option value="Korean">Coreano</option>
         </select>
       </div>
       
