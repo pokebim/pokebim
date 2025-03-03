@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 interface Product {
   id?: string;
@@ -7,19 +8,12 @@ interface Product {
   type?: string;
   imageUrl?: string;
   description?: string;
-  supplierId?: string;
-}
-
-interface Supplier {
-  id: string;
-  name: string;
 }
 
 interface ProductFormProps {
   onSubmit: (data: Product) => void;
   onCancel: () => void;
   initialData?: Product;
-  suppliers?: Supplier[];
 }
 
 // Función para validar URLs de imágenes
@@ -36,58 +30,29 @@ const validateImageUrl = async (url: string): Promise<boolean> => {
   }
 };
 
-export default function ProductForm({ onSubmit, onCancel, initialData, suppliers = [] }: ProductFormProps) {
+export default function ProductForm({ onSubmit, onCancel, initialData }: ProductFormProps) {
   const [formData, setFormData] = useState<Product>({
     name: '',
     language: 'Japanese',
     type: 'Booster Box',
     imageUrl: 'https://via.placeholder.com/400x250?text=Product+Image',
     description: '',
-    supplierId: '',
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
-  const [suppliersList, setSuppliersList] = useState<Supplier[]>(suppliers);
   const [isValidatingImage, setIsValidatingImage] = useState(false);
   const [imageError, setImageError] = useState('');
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string>('');
 
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
-    }
-  }, [initialData]);
-  
-  useEffect(() => {
-    if (suppliers.length > 0 && suppliersList.length === 0) {
-      setSuppliersList(suppliers);
-    } 
-    else if (suppliers.length === 0 && suppliersList.length === 0) {
-      setLoadingSuppliers(true);
-      try {
-        const storedSuppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-        
-        const formattedSuppliers = storedSuppliers.map((supplier: any) => ({
-          id: supplier.id,
-          name: supplier.name
-        }));
-        
-        setSuppliersList(formattedSuppliers);
-      } catch (err) {
-        console.error('Error al cargar proveedores:', err);
-        setError('No se pudieron cargar los proveedores. Por favor, inténtalo de nuevo.');
-      } finally {
-        setLoadingSuppliers(false);
+      if (initialData.imageUrl) {
+        setImagePreviewUrl(initialData.imageUrl);
       }
     }
-  }, []);
-  
-  useEffect(() => {
-    if (suppliersList.length > 0 && !formData.supplierId && !initialData) {
-      setFormData(prev => ({ ...prev, supplierId: suppliersList[0].id }));
-    }
-  }, [suppliersList, formData.supplierId, initialData]);
+  }, [initialData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -102,14 +67,21 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
     if (url) {
       setIsValidatingImage(true);
       setImageError('');
+      setImagePreviewUrl(url); // Mostrar la imagen inmediatamente como vista previa
       
-      const isValid = await validateImageUrl(url);
-      
-      if (!isValid) {
-        setImageError('La URL proporcionada no es una imagen válida');
+      try {
+        const isValid = await validateImageUrl(url);
+        
+        if (!isValid) {
+          setImageError('La URL proporcionada no es una imagen válida');
+        }
+      } catch (error) {
+        setImageError('Error al validar la URL de la imagen');
+      } finally {
+        setIsValidatingImage(false);
       }
-      
-      setIsValidatingImage(false);
+    } else {
+      setImagePreviewUrl('');
     }
   };
 
@@ -118,26 +90,9 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
     setIsSubmitting(true);
     setError('');
     
-    if (!formData.supplierId) {
-      if (suppliersList.length > 0) {
-        setFormData(prev => ({ ...prev, supplierId: suppliersList[0].id }));
-      } else {
-        setFormData(prev => ({ ...prev, supplierId: 'default-supplier' }));
-      }
-    }
-    
-    if (formData.imageUrl) {
-      const isValid = await validateImageUrl(formData.imageUrl);
-      if (!isValid) {
-        setImageError('La URL proporcionada no es una imagen válida');
-        return;
-      }
-    }
-    
     const submissionData = {
       ...formData,
-      imageUrl: formData.imageUrl || 'https://via.placeholder.com/400x250?text=Product+Image',
-      supplierId: formData.supplierId || 'default-supplier'
+      imageUrl: formData.imageUrl || 'https://via.placeholder.com/400x250?text=Product+Image'
     };
     
     try {
@@ -170,33 +125,6 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
           onChange={handleChange}
           className="mt-1 block w-full rounded-md border border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 text-white bg-gray-800 px-3 py-2"
         />
-      </div>
-      
-      <div>
-        <label htmlFor="supplierId" className="block text-sm font-bold text-white">
-          Proveedor
-        </label>
-        <select
-          id="supplierId"
-          name="supplierId"
-          value={formData.supplierId}
-          onChange={handleChange}
-          className="mt-1 block w-full rounded-md border border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 text-white bg-gray-800 px-3 py-2"
-          disabled={loadingSuppliers}
-        >
-          <option value="">Seleccionar proveedor (opcional)</option>
-          {loadingSuppliers ? (
-            <option>Cargando proveedores...</option>
-          ) : suppliersList.length === 0 ? (
-            <option value="">No hay proveedores disponibles</option>
-          ) : (
-            suppliersList.map(supplier => (
-              <option key={supplier.id} value={supplier.id}>
-                {supplier.name}
-              </option>
-            ))
-          )}
-        </select>
       </div>
       
       <div>
@@ -239,7 +167,7 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
       </div>
       
       <div className="space-y-2">
-        <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-700">
+        <label htmlFor="imageUrl" className="block text-sm font-bold text-white">
           URL de la imagen
         </label>
         <input
@@ -248,15 +176,34 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
           name="imageUrl"
           value={formData.imageUrl}
           onChange={handleImageUrlChange}
-          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
+          className={`mt-1 block w-full rounded-md border border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 text-white bg-gray-800 px-3 py-2 ${
             imageError ? 'border-red-500' : ''
           }`}
+          placeholder="Introduce la URL de la imagen"
         />
         {isValidatingImage && (
-          <p className="text-sm text-gray-500">Validando URL de imagen...</p>
+          <p className="text-sm text-gray-400">Validando URL de imagen...</p>
         )}
         {imageError && (
           <p className="text-sm text-red-500">{imageError}</p>
+        )}
+
+        {/* Vista previa de la imagen */}
+        {imagePreviewUrl && (
+          <div className="mt-4">
+            <p className="block text-sm font-bold text-white mb-2">Vista previa:</p>
+            <div className="relative w-full h-64 rounded-md overflow-hidden border border-gray-700">
+              <Image 
+                src={imagePreviewUrl}
+                alt="Vista previa"
+                fill
+                className="object-contain"
+                onError={() => {
+                  setImageError('No se pudo cargar la imagen. Comprueba la URL.');
+                }}
+              />
+            </div>
+          </div>
         )}
       </div>
       

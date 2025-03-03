@@ -172,7 +172,8 @@ export default function ProductsPage() {
     const filteredProducts = products.filter(product => 
       product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.language?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.type?.toLowerCase().includes(searchTerm.toLowerCase())
+      product.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     if (filteredProducts.length === 0) return <div className="text-center py-8">No se encontraron productos con el término de búsqueda.</div>;
@@ -180,24 +181,28 @@ export default function ProductsPage() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProducts.map(product => (
-          <div key={product.id} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+          <div key={product.id} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden flex flex-col">
             {/* Imagen del producto usando el componente ProductImage */}
-            <div className="w-full flex justify-center p-4">
+            <div className="relative w-full h-48 overflow-hidden">
               <ProductImage 
                 imageUrl={product.imageUrl} 
                 productName={product.name}
                 size="large"
+                className="w-full h-full"
               />
             </div>
-            <div className="p-4">
-              <div className="flex justify-between items-start">
+            <div className="p-4 flex-grow flex flex-col">
+              <div className="flex justify-between items-start mb-2">
                 <h3 className="text-lg font-semibold text-white">{product.name}</h3>
                 <span className="px-2 py-1 bg-blue-900 text-blue-200 text-xs rounded-full">
                   {product.language || 'Sin idioma'}
                 </span>
               </div>
-              <div className="mt-2 text-gray-400 text-sm">
+              <div className="mt-2 text-gray-400 text-sm flex-grow">
                 <p>Tipo: {product.type || 'No especificado'}</p>
+                {product.description && (
+                  <p className="mt-2 line-clamp-2">{product.description}</p>
+                )}
               </div>
               <div className="mt-4 flex justify-between items-center">
                 <div className="space-x-2">
@@ -322,14 +327,17 @@ export default function ProductsPage() {
             </DetailGrid>
           </DetailSection>
 
+          {selectedProduct.description && (
+            <DetailSection title="Descripción">
+              <p className="text-gray-300 whitespace-pre-line">{selectedProduct.description}</p>
+            </DetailSection>
+          )}
+
           {selectedProduct.notes && (
             <DetailSection title="Notas">
               <p className="text-gray-300 whitespace-pre-line">{selectedProduct.notes}</p>
             </DetailSection>
           )}
-
-          {/* Sección para precios relacionados si estuvieran disponibles */}
-          {/* Esta sección puede expandirse en futuras implementaciones */}
         </DetailView>
       )}
       

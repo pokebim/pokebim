@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface ProductImageProps {
   imageUrl?: string;
@@ -19,6 +19,7 @@ export default function ProductImage({
   className = ''
 }: ProductImageProps) {
   const [error, setError] = useState(false);
+  const [imageSrc, setImageSrc] = useState<string>('');
   
   // Determinar dimensiones basadas en el tamaño
   const dimensions = {
@@ -28,12 +29,19 @@ export default function ProductImage({
   }[size];
   
   // URL de fallback si no hay imagen disponible o hay error
-  const fallbackUrl = `https://via.placeholder.com/100x100?text=${encodeURIComponent(productName)}`;
+  const fallbackUrl = `https://via.placeholder.com/400x400?text=${encodeURIComponent(productName)}`;
+  
+  useEffect(() => {
+    // Actualizar la imagen source cuando cambia la URL o hay un error
+    setImageSrc(!imageUrl || error ? fallbackUrl : imageUrl);
+  }, [imageUrl, error, fallbackUrl]);
   
   // Resetear el error si cambia la URL
-  const handleNewImage = () => {
-    if (error) setError(false);
-  };
+  useEffect(() => {
+    if (imageUrl && error) {
+      setError(false);
+    }
+  }, [imageUrl]);
   
   return (
     <div 
@@ -44,13 +52,13 @@ export default function ProductImage({
       }}
     >
       <Image 
-        src={!imageUrl || error ? fallbackUrl : imageUrl} 
+        src={imageSrc} 
         alt={productName}
         fill
         sizes={`${dimensions.width}rem`}
-        className="transition-all hover:scale-110 duration-300 object-cover"
+        className="transition-all duration-300 object-contain"
         onError={() => setError(true)}
-        onLoadingComplete={handleNewImage}
+        priority={size === 'large'}
       />
     </div>
   );

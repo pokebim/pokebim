@@ -16,7 +16,8 @@ export interface Product {
   id?: string;
   name?: string;
   language?: string;
-  supplierId?: string;
+  imageUrl?: string;
+  description?: string;
   notes?: string;
   type?: string;  // Tipo de producto para facilitar clasificación
 }
@@ -53,6 +54,8 @@ export const getAllProducts = async (): Promise<Product[]> => {
             description: data.description || '',
             language: data.language || 'es',
             type: data.type || 'regular', // Asegurar que siempre tenga un tipo
+            imageUrl: data.imageUrl || `https://via.placeholder.com/400x400?text=${encodeURIComponent(data.name || 'Producto')}`,
+            notes: data.notes || ''
           };
           result.push(product);
         } catch (itemError) {
