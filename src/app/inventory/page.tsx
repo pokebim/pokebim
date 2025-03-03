@@ -6,6 +6,7 @@ import Modal from '@/components/ui/Modal';
 import { formatCurrency, type Currency } from '@/lib/currencyConverter';
 import DataTable from '@/components/ui/DataTable';
 import { createColumnHelper } from '@tanstack/react-table';
+import Select2 from '@/components/ui/Select2';
 import { 
   InventoryItem,
   getAllInventoryItems,
@@ -30,6 +31,8 @@ interface EnrichedInventoryItem extends InventoryItem {
     language: string;
     type?: string;
   };
+  owner?: string;
+  purchasedBy?: string;
 }
 
 export default function InventoryPage() {
@@ -70,32 +73,30 @@ export default function InventoryPage() {
 
   const fetchInventory = async () => {
     try {
-      // Obtener inventario desde Firebase
-      const firebaseInventory = await getAllInventoryItems();
-      console.log('FIREBASE: Loaded inventory items:', firebaseInventory);
+      const inventoryData = await getAllInventoryItems();
       
-      // Enriquecer los ítems con información de productos
-      const enrichedItems = firebaseInventory.map(item => {
+      // Enriquecer los datos con información del producto
+      const enrichedInventory: EnrichedInventoryItem[] = inventoryData.map(item => {
         const product = products.find(p => p.id === item.productId);
         
         return {
           ...item,
           product: product ? {
-            name: product.name || 'Producto desconocido',
-            language: product.language || 'N/A',
+            name: product.name,
+            language: product.language,
             type: product.type
-          } : {
-            name: 'Producto desconocido',
-            language: 'N/A',
-            type: 'N/A'
-          }
+          } : undefined,
+          owner: item.owner || 'No especificado',
+          purchasedBy: item.purchasedBy || 'No especificado'
         };
       });
       
-      setInventoryItems(enrichedItems);
-    } catch (err) {
-      console.error('Error fetching inventory:', err);
-      setError('No se pudo cargar el inventario. Por favor, inténtalo de nuevo más tarde.');
+      setInventoryItems(enrichedInventory);
+    } catch (error) {
+      console.error('Error al cargar inventario:', error);
+      setError('Error al cargar los datos de inventario');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -123,65 +124,86 @@ export default function InventoryPage() {
   };
 
   const handleSubmit = async (formData: any) => {
-    setLoading(true);
     try {
-      if (editingItem && editingItem.id) {
-        // Actualizar ítem existente en Firebase
-        await updateInventoryItem(editingItem.id, formData);
-        console.log(`FIREBASE: Updated inventory item ${editingItem.id}`);
+      if (editingItem) {
+        // Actualizar elemento existente
+        await updateInventoryItem(editingItem.id, {
+          productId: formData.productId,
+          quantity: formData.quantity,
+          location: formData.location,
+          condition: formData.condition,
+          purchaseDate: formData.purchaseDate,
+          purchasePrice: formData.purchasePrice,
+          purchaseCurrency: formData.purchaseCurrency,
+          notes: formData.notes,
+          owner: formData.owner,
+          purchasedBy: formData.purchasedBy
+        });
         
-        // Actualizar estado local
-        setInventoryItems(prev => prev.map(item => {
-          if (item.id === editingItem.id) {
-            const product = products.find(p => p.id === formData.productId);
-            return {
-              ...item,
-              ...formData,
-              product: product ? {
-                name: product.name || 'Producto desconocido',
-                language: product.language || 'N/A',
-                type: product.type
-              } : item.product
-            };
-          }
-          return item;
-        }));
+        setInventoryItems(prev => 
+          prev.map(item => 
+            item.id === editingItem.id 
+              ? {
+                  ...item,
+                  productId: formData.productId,
+                  quantity: formData.quantity,
+                  location: formData.location,
+                  condition: formData.condition,
+                  purchaseDate: formData.purchaseDate,
+                  purchasePrice: formData.purchasePrice,
+                  purchaseCurrency: formData.purchaseCurrency,
+                  notes: formData.notes,
+                  owner: formData.owner,
+                  purchasedBy: formData.purchasedBy,
+                  product: products.find(p => p.id === formData.productId) 
+                    ? {
+                        name: products.find(p => p.id === formData.productId)!.name,
+                        language: products.find(p => p.id === formData.productId)!.language,
+                        type: products.find(p => p.id === formData.productId)!.type
+                      } 
+                    : item.product
+                }
+              : item
+          )
+        );
         
-        showNotification('Ítem actualizado correctamente');
+        showNotification('Elemento de inventario actualizado con éxito');
       } else {
-        // Crear nuevo ítem en Firebase
-        const newId = await addInventoryItem(formData);
-        console.log(`FIREBASE: Added new inventory item with ID ${newId}`);
+        // Añadir nuevo elemento
+        const newItem = await addInventoryItem({
+          productId: formData.productId,
+          quantity: formData.quantity,
+          location: formData.location,
+          condition: formData.condition,
+          purchaseDate: formData.purchaseDate,
+          purchasePrice: formData.purchasePrice,
+          purchaseCurrency: formData.purchaseCurrency,
+          notes: formData.notes,
+          owner: formData.owner,
+          purchasedBy: formData.purchasedBy
+        });
         
-        // Actualizar estado local
         const product = products.find(p => p.id === formData.productId);
-        const newItem = {
-          ...formData,
-          id: newId,
+        
+        setInventoryItems(prev => [...prev, {
+          ...newItem,
           product: product ? {
-            name: product.name || 'Producto desconocido',
-            language: product.language || 'N/A',
+            name: product.name,
+            language: product.language,
             type: product.type
-          } : {
-            name: 'Producto desconocido',
-            language: 'N/A',
-            type: 'N/A'
-          }
-        };
+          } : undefined,
+          owner: formData.owner || 'No especificado',
+          purchasedBy: formData.purchasedBy || 'No especificado'
+        }]);
         
-        setInventoryItems(prev => [...prev, newItem]);
-        
-        showNotification('Ítem añadido correctamente');
+        showNotification('Elemento de inventario añadido con éxito');
       }
       
-      // Cerrar modal y limpiar estado de edición
       setModalOpen(false);
       setEditingItem(null);
-      setLoading(false);
-    } catch (err) {
-      console.error('Error guardando ítem:', err);
-      showNotification('Error al guardar el ítem', 'error');
-      setLoading(false);
+    } catch (error) {
+      console.error('Error al guardar elemento de inventario:', error);
+      showNotification('Error al guardar elemento de inventario', 'error');
     }
   };
 
@@ -279,6 +301,14 @@ export default function InventoryPage() {
       header: 'Notas',
       cell: info => <span className="text-gray-300 max-w-xs truncate">{info.getValue() || '-'}</span>
     }),
+    columnHelper.accessor('owner', {
+      header: 'Propietario',
+      cell: info => info.getValue() || 'No especificado'
+    }),
+    columnHelper.accessor('purchasedBy', {
+      header: 'Comprado por',
+      cell: info => info.getValue() || 'No especificado'
+    }),
     columnHelper.accessor('id', {
       header: 'Acciones',
       cell: info => (
@@ -310,7 +340,9 @@ export default function InventoryPage() {
       purchaseDate: initialData?.purchaseDate || '',
       purchasePrice: initialData?.purchasePrice || '',
       purchaseCurrency: initialData?.purchaseCurrency || 'EUR',
-      notes: initialData?.notes || ''
+      notes: initialData?.notes || '',
+      owner: initialData?.owner || '',
+      purchasedBy: initialData?.purchasedBy || ''
     });
 
     const handleChange = (e) => {
@@ -323,10 +355,25 @@ export default function InventoryPage() {
       }));
     };
 
+    const handleSelectChange = (name, value) => {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    };
+
     const handleSubmit = (e) => {
       e.preventDefault();
       onSubmit(formData);
     };
+
+    // Convertir productos a formato de opciones para Select2
+    const productOptions = products.map(product => ({
+      value: product.id,
+      label: product.name,
+      details: product.language,
+      imageUrl: product.imageUrl
+    }));
 
     return (
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -334,21 +381,48 @@ export default function InventoryPage() {
           <label htmlFor="productId" className="block text-sm font-bold text-white mb-2">
             Producto
           </label>
-          <select
+          <Select2
             id="productId"
             name="productId"
+            options={productOptions}
             value={formData.productId}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-700 bg-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-white"
+            onChange={(value) => handleSelectChange('productId', value)}
+            placeholder="Selecciona un producto"
             required
-          >
-            <option value="">Selecciona un producto</option>
-            {products.map(product => (
-              <option key={product.id} value={product.id}>
-                {product.name} ({product.language})
-              </option>
-            ))}
-          </select>
+            className="w-full"
+          />
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="owner" className="block text-sm font-bold text-white mb-2">
+              Propietario
+            </label>
+            <input
+              type="text"
+              id="owner"
+              name="owner"
+              value={formData.owner}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-700 bg-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-white"
+              placeholder="¿Quién tiene el producto?"
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="purchasedBy" className="block text-sm font-bold text-white mb-2">
+              Comprado por
+            </label>
+            <input
+              type="text"
+              id="purchasedBy"
+              name="purchasedBy"
+              value={formData.purchasedBy}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-700 bg-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-white"
+              placeholder="¿Quién compró el producto?"
+            />
+          </div>
         </div>
         
         <div>
@@ -468,17 +542,17 @@ export default function InventoryPage() {
           />
         </div>
         
-        <div className="flex justify-end space-x-3 pt-4">
+        <div className="flex justify-end space-x-3">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-700 rounded-md bg-gray-800 text-white hover:bg-gray-700"
+            className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600"
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-500"
           >
             {initialData ? 'Actualizar' : 'Añadir'}
           </button>

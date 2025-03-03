@@ -651,11 +651,11 @@ export default function PricesContent() {
       )}
       
       {/* Filtros */}
-      <div className="bg-white p-4 rounded-md shadow-md mb-6">
-        <h2 className="text-lg font-semibold mb-4">Filtros</h2>
+      <div className="bg-gray-800 p-4 rounded-md shadow-md mb-6 border border-gray-700">
+        <h2 className="text-lg font-semibold mb-4 text-white">Filtros</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label htmlFor="productName" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="productName" className="block text-sm font-medium text-gray-300 mb-1">
               Nombre del producto
             </label>
             <input
@@ -664,13 +664,13 @@ export default function PricesContent() {
               name="productName"
               value={filters.productName}
               onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-700 bg-gray-900 rounded-md text-white"
               placeholder="Buscar por nombre..."
             />
           </div>
           
           <div>
-            <label htmlFor="productLanguage" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="productLanguage" className="block text-sm font-medium text-gray-300 mb-1">
               Idioma
             </label>
             <select
@@ -678,7 +678,7 @@ export default function PricesContent() {
               name="productLanguage"
               value={filters.productLanguage}
               onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-700 bg-gray-900 rounded-md text-white"
             >
               <option value="">Todos</option>
               {uniqueLanguages.map(language => (
@@ -688,7 +688,7 @@ export default function PricesContent() {
           </div>
           
           <div>
-            <label htmlFor="productType" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="productType" className="block text-sm font-medium text-gray-300 mb-1">
               Tipo
             </label>
             <select
@@ -696,7 +696,7 @@ export default function PricesContent() {
               name="productType"
               value={filters.productType}
               onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-700 bg-gray-900 rounded-md text-white"
             >
               <option value="">Todos</option>
               {uniqueTypes.map(type => (
@@ -706,7 +706,7 @@ export default function PricesContent() {
           </div>
           
           <div>
-            <label htmlFor="supplierName" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="supplierName" className="block text-sm font-medium text-gray-300 mb-1">
               Nombre del proveedor
             </label>
             <input
@@ -715,13 +715,13 @@ export default function PricesContent() {
               name="supplierName"
               value={filters.supplierName}
               onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-700 bg-gray-900 rounded-md text-white"
               placeholder="Buscar por proveedor..."
             />
           </div>
           
           <div>
-            <label htmlFor="supplierCountry" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="supplierCountry" className="block text-sm font-medium text-gray-300 mb-1">
               País
             </label>
             <select
@@ -729,7 +729,7 @@ export default function PricesContent() {
               name="supplierCountry"
               value={filters.supplierCountry}
               onChange={handleFilterChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="w-full px-3 py-2 border border-gray-700 bg-gray-900 rounded-md text-white"
             >
               <option value="">Todos</option>
               {uniqueCountries.map(country => (
@@ -740,7 +740,7 @@ export default function PricesContent() {
           
           <div className="flex space-x-2">
             <div className="flex-1">
-              <label htmlFor="minPrice" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="minPrice" className="block text-sm font-medium text-gray-300 mb-1">
                 Precio mínimo
               </label>
               <input
@@ -749,12 +749,12 @@ export default function PricesContent() {
                 name="minPrice"
                 value={filters.minPrice}
                 onChange={handleFilterChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-700 bg-gray-900 rounded-md text-white"
                 placeholder="Min..."
               />
             </div>
             <div className="flex-1">
-              <label htmlFor="maxPrice" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="maxPrice" className="block text-sm font-medium text-gray-300 mb-1">
                 Precio máximo
               </label>
               <input
@@ -763,7 +763,7 @@ export default function PricesContent() {
                 name="maxPrice"
                 value={filters.maxPrice}
                 onChange={handleFilterChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                className="w-full px-3 py-2 border border-gray-700 bg-gray-900 rounded-md text-white"
                 placeholder="Max..."
               />
             </div>
