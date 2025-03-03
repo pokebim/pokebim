@@ -1,8 +1,5 @@
-const webpack = require('webpack');
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  /* config options here */
   images: {
     domains: [
       'via.placeholder.com',
@@ -29,31 +26,8 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  webpack: (config) => {
-    // Proporcionar fallbacks para módulos de Node.js
-    config.resolve.fallback = {
-      ...config.resolve.fallback,
-      fs: false,
-      net: false,
-      tls: false,
-      dns: false,
-      child_process: false,
-      http2: false,
-      crypto: false,
-      stream: false,
-      os: false,
-      path: false,
-      zlib: false,
-      './error': false,
-      './transport': false,
-      '@firebase/webchannel-wrapper/bloom-blob': false
-    };
-
-    // Asegurar que los módulos de browser sean priorizados
-    config.resolve.mainFields = ['browser', 'module', 'main'];
-    
-    return config;
-  },
+  // Configuración especial de transpilación para excluir problemas con firebase y dependencias
+  transpilePackages: ['firebase', '@firebase/firestore', '@grpc/grpc-js', '@grpc/proto-loader', 'long'],
 };
 
 module.exports = nextConfig; 

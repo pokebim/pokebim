@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { collection, getDocs, getDoc, doc, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, getDoc, doc, addDoc, updateDoc, deleteDoc, query, orderBy, Timestamp } from 'firebase/firestore/lite';
 
 export interface CompanyExpense {
   id?: string;
