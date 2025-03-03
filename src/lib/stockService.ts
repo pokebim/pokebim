@@ -37,6 +37,10 @@ export interface StockItem {
   totalProfit?: number;
   tiktokPrice?: number;
   storePrice?: number;
+  // Nuevos campos
+  hasArrived?: boolean;  // ¿Ha llegado?
+  isPaid?: boolean;      // ¿Pagado?
+  paidBy?: string;       // Pagado por
 }
 
 // Referencia a la colección de stock en Firestore
@@ -134,6 +138,47 @@ export async function getStockItemsByProduct(product: string): Promise<StockItem
     } as StockItem));
   } catch (error) {
     console.error(`Error al obtener ítems de stock por producto ${product}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Marca un ítem de stock como recibido (llegado)
+ * @param id ID del ítem
+ * @param hasArrived Estado de llegada
+ */
+export async function updateStockItemArrivalStatus(id: string, hasArrived: boolean): Promise<void> {
+  try {
+    const stockDocRef = doc(db, "stock", id);
+    await updateDoc(stockDocRef, { hasArrived });
+  } catch (error) {
+    console.error(`Error al actualizar estado de llegada del ítem ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Actualiza el estado de pago de un ítem de stock
+ * @param id ID del ítem
+ * @param isPaid Estado de pago
+ * @param paidBy Persona que realizó el pago (opcional)
+ */
+export async function updateStockItemPaymentStatus(
+  id: string, 
+  isPaid: boolean, 
+  paidBy?: string
+): Promise<void> {
+  try {
+    const stockDocRef = doc(db, "stock", id);
+    const updateData: {isPaid: boolean, paidBy?: string} = { isPaid };
+    
+    if (paidBy) {
+      updateData.paidBy = paidBy;
+    }
+    
+    await updateDoc(stockDocRef, updateData);
+  } catch (error) {
+    console.error(`Error al actualizar estado de pago del ítem ${id}:`, error);
     throw error;
   }
 } 

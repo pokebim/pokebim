@@ -27,6 +27,9 @@ interface Stock {
   totalProfit?: number;
   tiktokPrice?: number;
   storePrice?: number;
+  hasArrived?: boolean;
+  isPaid?: boolean;
+  paidBy?: string;
 }
 
 interface StockFormProps {
@@ -55,7 +58,10 @@ export default function StockForm({ onSubmit, onCancel, initialData }: StockForm
     cardmarketPrice: 0,
     approxSalePrice: 0,
     tiktokPrice: 0,
-    storePrice: 0
+    storePrice: 0,
+    hasArrived: false,
+    isPaid: false,
+    paidBy: ''
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -515,21 +521,69 @@ export default function StockForm({ onSubmit, onCancel, initialData }: StockForm
         </div>
       </div>
       
-      <div className="flex justify-end space-x-3 pt-4">
+      <div className="mt-8 border-t border-gray-700 pt-6">
+        <h3 className="text-lg font-bold text-white mb-4">Estado del Pedido</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="hasArrived"
+              name="hasArrived"
+              checked={formData.hasArrived || false}
+              onChange={(e) => setFormData(prev => ({ ...prev, hasArrived: e.target.checked }))}
+              className="h-5 w-5 text-indigo-600 rounded border-gray-700 focus:ring-indigo-500 bg-gray-800"
+            />
+            <label htmlFor="hasArrived" className="ml-2 block text-sm font-medium text-white">
+              ¿Ha llegado?
+            </label>
+          </div>
+          
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              id="isPaid"
+              name="isPaid"
+              checked={formData.isPaid || false}
+              onChange={(e) => setFormData(prev => ({ ...prev, isPaid: e.target.checked }))}
+              className="h-5 w-5 text-indigo-600 rounded border-gray-700 focus:ring-indigo-500 bg-gray-800"
+            />
+            <label htmlFor="isPaid" className="ml-2 block text-sm font-medium text-white">
+              ¿Pagado?
+            </label>
+          </div>
+          
+          <div>
+            <label htmlFor="paidBy" className="block text-sm font-medium text-white">
+              Pagado por
+            </label>
+            <input
+              type="text"
+              id="paidBy"
+              name="paidBy"
+              value={formData.paidBy || ''}
+              onChange={handleChange}
+              className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+              placeholder="Nombre de la persona"
+            />
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex justify-end space-x-3 mt-6">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md border border-gray-700 bg-gray-800 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700"
-          disabled={isSubmitting}
+          className="px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-600"
         >
           Cancelar
         </button>
         <button
           type="submit"
-          className="rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-600 disabled:opacity-50"
           disabled={isSubmitting}
+          className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-600 disabled:bg-gray-500 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? 'Guardando...' : initialData ? 'Actualizar' : 'Guardar'}
+          {isSubmitting ? 'Guardando...' : 'Guardar Cambios'}
         </button>
       </div>
     </form>

@@ -12,7 +12,9 @@ import {
   getAllStockItems,
   addStockItem,
   updateStockItem,
-  deleteStockItem
+  deleteStockItem,
+  updateStockItemArrivalStatus,
+  updateStockItemPaymentStatus
 } from '@/lib/stockService';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
 
@@ -154,6 +156,45 @@ export default function StockPage() {
     };
   }, [stockItems]);
 
+  // Funciones para actualizar estados de pedido
+  const handleArrivalStatusChange = async (itemId: string, hasArrived: boolean) => {
+    try {
+      await updateStockItemArrivalStatus(itemId, hasArrived);
+      
+      // Actualizar el estado local
+      setStockItems(prev => prev.map(item => {
+        if (item.id === itemId) {
+          return { ...item, hasArrived };
+        }
+        return item;
+      }));
+      
+      showNotification(`Estado de llegada actualizado`);
+    } catch (err) {
+      console.error('Error al actualizar estado de llegada:', err);
+      showNotification('Error al actualizar estado de llegada', 'error');
+    }
+  };
+  
+  const handlePaymentStatusChange = async (itemId: string, isPaid: boolean, paidBy?: string) => {
+    try {
+      await updateStockItemPaymentStatus(itemId, isPaid, paidBy);
+      
+      // Actualizar el estado local
+      setStockItems(prev => prev.map(item => {
+        if (item.id === itemId) {
+          return { ...item, isPaid, paidBy: paidBy || item.paidBy };
+        }
+        return item;
+      }));
+      
+      showNotification(`Estado de pago actualizado`);
+    } catch (err) {
+      console.error('Error al actualizar estado de pago:', err);
+      showNotification('Error al actualizar estado de pago', 'error');
+    }
+  };
+
   // Preparar columnas para la tabla
   const columnHelper = createColumnHelper<StockItem>();
   
@@ -233,6 +274,70 @@ export default function StockPage() {
         );
       }
     }),
+    columnHelper.accessor('hasArrived', {
+      header: '¿Ha llegado?',
+      cell: info => {
+        const hasArrived = info.getValue();
+        const stockItem = info.row.original;
+        
+        return (
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={hasArrived || false}
+              onChange={() => handleArrivalStatusChange(stockItem.id!, !hasArrived)}
+              className="h-5 w-5 text-indigo-600 border-gray-700 rounded focus:ring-indigo-500"
+            />
+          </div>
+        );
+      }
+    }),
+    columnHelper.accessor('isPaid', {
+      header: '¿Pagado?',
+      cell: info => {
+        const isPaid = info.getValue();
+        const stockItem = info.row.original;
+        
+        return (
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              checked={isPaid || false}
+              onChange={() => handlePaymentStatusChange(stockItem.id!, !isPaid, stockItem.paidBy)}
+              className="h-5 w-5 text-indigo-600 border-gray-700 rounded focus:ring-indigo-500"
+            />
+          </div>
+        );
+      }
+    }),
+    columnHelper.accessor('paidBy', {
+      header: 'Pagado por',
+      cell: info => {
+        const paidBy = info.getValue();
+        const stockItem = info.row.original;
+        
+        if (!stockItem.isPaid) return <span className="text-gray-400">-</span>;
+        
+        return (
+          <div className="flex items-center">
+            <span className="text-white">{paidBy || '-'}</span>
+            {stockItem.isPaid && !paidBy && (
+              <button
+                onClick={() => {
+                  const name = prompt('¿Quién ha pagado este pedido?');
+                  if (name) {
+                    handlePaymentStatusChange(stockItem.id!, true, name);
+                  }
+                }}
+                className="ml-2 text-xs bg-blue-700 hover:bg-blue-600 text-white px-2 py-1 rounded"
+              >
+                Añadir
+              </button>
+            )}
+          </div>
+        );
+      }
+    }),
     columnHelper.accessor('id', {
       header: 'Acciones',
       cell: ({ row, getValue }) => (
@@ -258,7 +363,7 @@ export default function StockPage() {
         </div>
       ),
     })
-  ], []);
+  ], [stockItems]);
 
   // Nueva función para ver detalles
   const handleViewDetail = (stock: StockItem) => {
@@ -296,177 +401,227 @@ export default function StockPage() {
       
       {/* Vista detallada del stock */}
       {selectedStock && (
-        <DetailView
-          isOpen={detailViewOpen}
-          onClose={() => setDetailViewOpen(false)}
-          title={`Detalle de Stock: ${selectedStock.product || 'Producto'}`}
-          actions={
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setDetailViewOpen(false);
-                  setEditingItem(selectedStock);
-                  setModalOpen(true);
-                }}
-                className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailViewOpen(false)}
-                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-              >
-                Cerrar
-              </button>
-            </>
-          }
-        >
-          <DetailSection title="Información del Producto">
-            <DetailGrid>
-              <DetailField 
-                label="Producto" 
-                value={selectedStock.product || 'Producto desconocido'} 
-              />
-              <DetailField 
-                label="Idioma" 
-                value={
-                  <DetailBadge 
-                    color={
-                      selectedStock.language === 'Japanese' ? 'red' : 
-                      selectedStock.language === 'English' ? 'blue' : 
-                      'green'
-                    }
-                  >
-                    {selectedStock.language || 'No especificado'}
-                  </DetailBadge>
-                } 
-              />
-            </DetailGrid>
-          </DetailSection>
-
-          <DetailSection title="Información de Stock">
-            <DetailGrid>
-              <DetailField 
-                label="Cantidad" 
-                value={selectedStock.quantity} 
-              />
-              <DetailField 
-                label="Precio Unitario" 
-                value={formatCurrency(selectedStock.unitPrice, 'EUR')} 
-              />
-              <DetailField 
-                label="Precio Total" 
-                value={
-                  <span className="font-semibold text-lg text-green-400">
-                    {formatCurrency(selectedStock.totalPrice, 'EUR')}
-                  </span>
-                } 
-              />
-              <DetailField 
-                label="Estado de Pago" 
-                value={selectedStock.isPaid ? 'Pagado' : 'Pendiente de pago'} 
-              />
-              <DetailField 
-                label="Fecha de Llegada" 
-                value={selectedStock.arrivalDate ? new Date(selectedStock.arrivalDate).toLocaleDateString() : 'No especificado'} 
-              />
-              <DetailField 
-                label="IVA Incluido" 
-                value={selectedStock.vatIncluded ? 'Sí' : 'No'} 
-              />
-            </DetailGrid>
-          </DetailSection>
-
-          {/* Sección de distribución */}
-          <DetailSection title="Distribución">
-            <DetailGrid>
-              <DetailField 
-                label="Cantidad en Tienda" 
-                value={selectedStock.storeQuantity || 0} 
-              />
-              <DetailField 
-                label="Cantidad de Inversión" 
-                value={selectedStock.investmentQuantity || 0} 
-              />
-              <DetailField 
-                label="En Reserva para Tienda" 
-                value={selectedStock.holdStore || 0} 
-              />
-            </DetailGrid>
-          </DetailSection>
-
-          {/* Sección de precios de venta */}
-          <DetailSection title="Precios de Venta">
-            <DetailGrid>
-              {selectedStock.wallapopPrice && (
+        <Modal isOpen={detailViewOpen} onClose={() => setDetailViewOpen(false)}>
+          <DetailView 
+            title={`Detalle del Pedido: ${selectedStock.product || 'Sin nombre'}`}
+            onClose={() => setDetailViewOpen(false)}
+            onEdit={() => {
+              setDetailViewOpen(false);
+              handleEdit(selectedStock);
+            }}
+          >
+            <DetailSection title="Información General">
+              <DetailGrid>
+                <DetailField label="Producto" value={selectedStock.product || '-'} />
+                <DetailField label="Idioma" value={selectedStock.language || '-'} />
                 <DetailField 
-                  label="Precio Wallapop" 
-                  value={formatCurrency(selectedStock.wallapopPrice, 'EUR')} 
+                  label="Proveedor" 
+                  value={selectedStock.supplier || '-'} 
                 />
-              )}
-              {selectedStock.amazonPrice && (
                 <DetailField 
-                  label="Precio Amazon" 
-                  value={formatCurrency(selectedStock.amazonPrice, 'EUR')} 
+                  label="Cantidad" 
+                  value={`${selectedStock.quantity || 0}`} 
                 />
-              )}
-              {selectedStock.cardmarketPrice && (
+              </DetailGrid>
+            </DetailSection>
+            
+            <DetailSection title="Estado del Pedido">
+              <DetailGrid>
                 <DetailField 
-                  label="Precio Cardmarket" 
-                  value={formatCurrency(selectedStock.cardmarketPrice, 'EUR')} 
-                />
-              )}
-              {selectedStock.tikTokPrice && (
-                <DetailField 
-                  label="Precio TikTok" 
-                  value={formatCurrency(selectedStock.tikTokPrice, 'EUR')} 
-                />
-              )}
-              {selectedStock.storePrice && (
-                <DetailField 
-                  label="Precio en Tienda" 
-                  value={formatCurrency(selectedStock.storePrice, 'EUR')} 
-                />
-              )}
-              {selectedStock.approxSellingPrice && (
-                <DetailField 
-                  label="Precio Aprox. de Venta" 
-                  value={formatCurrency(selectedStock.approxSellingPrice, 'EUR')} 
-                />
-              )}
-            </DetailGrid>
-          </DetailSection>
-
-          {/* Sección de rentabilidad */}
-          <DetailSection title="Análisis de Rentabilidad">
-            <DetailGrid>
-              {selectedStock.profitPerUnit && (
-                <DetailField 
-                  label="Beneficio por Unidad" 
-                  value={formatCurrency(selectedStock.profitPerUnit, 'EUR')} 
-                />
-              )}
-              {selectedStock.profitPercentage && (
-                <DetailField 
-                  label="Porcentaje de Beneficio" 
-                  value={`${selectedStock.profitPercentage.toFixed(2)}%`} 
-                />
-              )}
-              {selectedStock.totalProfit && (
-                <DetailField 
-                  label="Beneficio Total" 
+                  label="¿Ha llegado?" 
                   value={
-                    <span className="font-semibold text-green-400">
-                      {formatCurrency(selectedStock.totalProfit, 'EUR')}
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedStock.hasArrived || false}
+                        onChange={() => {
+                          handleArrivalStatusChange(selectedStock.id!, !selectedStock.hasArrived);
+                          setSelectedStock(prev => prev ? {
+                            ...prev,
+                            hasArrived: !prev.hasArrived
+                          } : null);
+                        }}
+                        className="h-5 w-5 text-indigo-600 border-gray-700 rounded focus:ring-indigo-500"
+                      />
+                      <span className="ml-2">{selectedStock.hasArrived ? 'Sí' : 'No'}</span>
+                    </div>
+                  } 
+                />
+                <DetailField 
+                  label="¿Pagado?" 
+                  value={
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedStock.isPaid || false}
+                        onChange={() => {
+                          handlePaymentStatusChange(selectedStock.id!, !selectedStock.isPaid, selectedStock.paidBy);
+                          setSelectedStock(prev => prev ? {
+                            ...prev,
+                            isPaid: !prev.isPaid
+                          } : null);
+                        }}
+                        className="h-5 w-5 text-indigo-600 border-gray-700 rounded focus:ring-indigo-500"
+                      />
+                      <span className="ml-2">{selectedStock.isPaid ? 'Sí' : 'No'}</span>
+                    </div>
+                  } 
+                />
+                <DetailField 
+                  label="Pagado por" 
+                  value={
+                    selectedStock.isPaid ? (
+                      <div className="flex items-center">
+                        <span>{selectedStock.paidBy || '-'}</span>
+                        {!selectedStock.paidBy && (
+                          <button
+                            onClick={() => {
+                              const name = prompt('¿Quién ha pagado este pedido?');
+                              if (name) {
+                                handlePaymentStatusChange(selectedStock.id!, true, name);
+                                setSelectedStock(prev => prev ? {
+                                  ...prev,
+                                  paidBy: name
+                                } : null);
+                              }
+                            }}
+                            className="ml-2 text-xs bg-blue-700 hover:bg-blue-600 text-white px-2 py-1 rounded"
+                          >
+                            Añadir
+                          </button>
+                        )}
+                      </div>
+                    ) : '-'
+                  } 
+                />
+                <DetailField 
+                  label="Fecha de Llegada" 
+                  value={selectedStock.arrivalDate || '-'} 
+                />
+              </DetailGrid>
+            </DetailSection>
+
+            <DetailSection title="Información de Precios">
+              <DetailGrid>
+                {selectedStock.wallapopPrice && (
+                  <DetailField 
+                    label="Precio Wallapop" 
+                    value={formatCurrency(selectedStock.wallapopPrice, 'EUR')} 
+                  />
+                )}
+                {selectedStock.amazonPrice && (
+                  <DetailField 
+                    label="Precio Amazon" 
+                    value={formatCurrency(selectedStock.amazonPrice, 'EUR')} 
+                  />
+                )}
+                {selectedStock.cardmarketPrice && (
+                  <DetailField 
+                    label="Precio Cardmarket" 
+                    value={formatCurrency(selectedStock.cardmarketPrice, 'EUR')} 
+                  />
+                )}
+                {selectedStock.tikTokPrice && (
+                  <DetailField 
+                    label="Precio TikTok" 
+                    value={formatCurrency(selectedStock.tikTokPrice, 'EUR')} 
+                  />
+                )}
+                {selectedStock.storePrice && (
+                  <DetailField 
+                    label="Precio en Tienda" 
+                    value={formatCurrency(selectedStock.storePrice, 'EUR')} 
+                  />
+                )}
+                {selectedStock.approxSellingPrice && (
+                  <DetailField 
+                    label="Precio Aprox. de Venta" 
+                    value={formatCurrency(selectedStock.approxSellingPrice, 'EUR')} 
+                  />
+                )}
+              </DetailGrid>
+            </DetailSection>
+
+            <DetailSection title="Información de Stock">
+              <DetailGrid>
+                <DetailField 
+                  label="Cantidad" 
+                  value={selectedStock.quantity} 
+                />
+                <DetailField 
+                  label="Precio Unitario" 
+                  value={formatCurrency(selectedStock.unitPrice, 'EUR')} 
+                />
+                <DetailField 
+                  label="Precio Total" 
+                  value={
+                    <span className="font-semibold text-lg text-green-400">
+                      {formatCurrency(selectedStock.totalPrice, 'EUR')}
                     </span>
                   } 
                 />
-              )}
-            </DetailGrid>
-          </DetailSection>
-        </DetailView>
+                <DetailField 
+                  label="Estado de Pago" 
+                  value={selectedStock.isPaid ? 'Pagado' : 'Pendiente de pago'} 
+                />
+                <DetailField 
+                  label="Fecha de Llegada" 
+                  value={selectedStock.arrivalDate ? new Date(selectedStock.arrivalDate).toLocaleDateString() : 'No especificado'} 
+                />
+                <DetailField 
+                  label="IVA Incluido" 
+                  value={selectedStock.vatIncluded ? 'Sí' : 'No'} 
+                />
+              </DetailGrid>
+            </DetailSection>
+
+            {/* Sección de distribución */}
+            <DetailSection title="Distribución">
+              <DetailGrid>
+                <DetailField 
+                  label="Cantidad en Tienda" 
+                  value={selectedStock.storeQuantity || 0} 
+                />
+                <DetailField 
+                  label="Cantidad de Inversión" 
+                  value={selectedStock.investmentQuantity || 0} 
+                />
+                <DetailField 
+                  label="En Reserva para Tienda" 
+                  value={selectedStock.holdStore || 0} 
+                />
+              </DetailGrid>
+            </DetailSection>
+
+            {/* Sección de rentabilidad */}
+            <DetailSection title="Análisis de Rentabilidad">
+              <DetailGrid>
+                {selectedStock.profitPerUnit && (
+                  <DetailField 
+                    label="Beneficio por Unidad" 
+                    value={formatCurrency(selectedStock.profitPerUnit, 'EUR')} 
+                  />
+                )}
+                {selectedStock.profitPercentage && (
+                  <DetailField 
+                    label="Porcentaje de Beneficio" 
+                    value={`${selectedStock.profitPercentage.toFixed(2)}%`} 
+                  />
+                )}
+                {selectedStock.totalProfit && (
+                  <DetailField 
+                    label="Beneficio Total" 
+                    value={
+                      <span className="font-semibold text-green-400">
+                        {formatCurrency(selectedStock.totalProfit, 'EUR')}
+                      </span>
+                    } 
+                  />
+                )}
+              </DetailGrid>
+            </DetailSection>
+          </DetailView>
+        </Modal>
       )}
       
       <div className="py-6">
@@ -474,7 +629,7 @@ export default function StockPage() {
           <div className="md:flex md:items-center md:justify-between">
             <div className="flex-1 min-w-0">
               <h2 className="text-2xl font-semibold leading-tight text-white">
-                Stock
+                Pedidos
               </h2>
               <p className="mt-1 text-sm text-gray-400">
                 Gestiona el stock de tus productos Pokémon.

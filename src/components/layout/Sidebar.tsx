@@ -70,7 +70,17 @@ const icons = {
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
-  )
+  ),
+  missingProducts: (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M6.5 3a.5.5 0 01.5.5V9h9a.5.5 0 010 1h-9v5.5a.5.5 0 01-1 0V10H1a.5.5 0 010-1h5V3.5a.5.5 0 01.5-.5z" clipRule="evenodd" />
+    </svg>
+  ),
+  materials: (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+    </svg>
+  ),
 };
 
 const menuItems = [
@@ -78,7 +88,9 @@ const menuItems = [
   { name: 'Proveedores', path: '/suppliers', icon: icons.suppliers },
   { name: 'Productos', path: '/products', icon: icons.products },
   { name: 'Precios', path: '/prices', icon: icons.prices },
-  { name: 'Stock', path: '/stock', icon: icons.stock },
+  { name: 'Pedidos', path: '/stock', icon: icons.stock },
+  { name: 'Productos que nos faltan', path: '/missingProducts', icon: icons.missingProducts },
+  { name: 'Material', path: '/materials', icon: icons.materials },
   { name: 'Inventario', path: '/inventory', icon: icons.inventory },
   { name: 'Tareas', path: '/tasks', icon: icons.tasks },
   { name: 'Gastos Empresa', path: '/expenses', icon: icons.expenses },
