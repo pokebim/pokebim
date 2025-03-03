@@ -33,6 +33,7 @@ import Image from 'next/image';
 import ProductImage from '@/components/ui/ProductImage';
 import ImageModal from '@/components/ui/ImageModal';
 import { flexRender } from '@tanstack/react-table';
+import DefaultProductImage from '@/components/ui/DefaultProductImage';
 
 interface EnrichedPrice extends Price {
   product: {
@@ -89,6 +90,9 @@ export default function PricesContent() {
 
   // Estado para la imagen modal
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  
+  // Estado para las pestañas
+  const [activeTab, setActiveTab] = useState<'allPrices' | 'bestPrices'>('allPrices');
 
   // Estados para filtros
   const [filters, setFilters] = useState({
@@ -195,11 +199,54 @@ export default function PricesContent() {
     });
   }, [prices, filters]);
 
-  // Filtrar precios para obtener el más bajo por producto
-  const bestPricesByProduct = useMemo(() => {
+  // Filtrar precios para obtener el más bajo por producto, ahora aplicando los mismos filtros
+  const filteredBestPricesByProduct = useMemo(() => {
     const productMap = new Map<string, BestPriceProduct>();
     
-    prices.forEach(price => {
+    // Primero filtramos los precios según los filtros aplicados
+    const filteredPricesForBest = prices.filter(price => {
+      // Filtro por nombre de producto
+      if (filters.productName && 
+          !price.product?.name.toLowerCase().includes(filters.productName.toLowerCase())) {
+        return false;
+      }
+      
+      // Filtro por idioma
+      if (filters.productLanguage && price.product?.language !== filters.productLanguage) {
+        return false;
+      }
+      
+      // Filtro por tipo
+      if (filters.productType && price.product?.type !== filters.productType) {
+        return false;
+      }
+      
+      // Filtro por nombre de proveedor
+      if (filters.supplierName && 
+          !price.supplier?.name.toLowerCase().includes(filters.supplierName.toLowerCase())) {
+        return false;
+      }
+      
+      // Filtro por país del proveedor
+      if (filters.supplierCountry && price.supplier?.country !== filters.supplierCountry) {
+        return false;
+      }
+      
+      // Filtro por precio mínimo
+      if (filters.minPrice && price.price < Number(filters.minPrice)) {
+        return false;
+      }
+      
+      // Filtro por precio máximo
+      if (filters.maxPrice && price.price > Number(filters.maxPrice)) {
+        return false;
+      }
+      
+      return true;
+    });
+    
+    // Luego obtenemos el mejor precio para cada producto
+    filteredPricesForBest.forEach(price => {
       const productId = price.productId;
       const priceInEUR = convertCurrency(price.price, price.currency, 'EUR');
       
@@ -222,7 +269,7 @@ export default function PricesContent() {
     });
     
     return Array.from(productMap.values());
-  }, [prices]);
+  }, [prices, filters]);
   
   // Función para obtener datos
   useEffect(() => {
@@ -445,16 +492,23 @@ export default function PricesContent() {
       header: 'Imagen',
       cell: info => {
         const imageUrl = info.row.original.product?.imageUrl;
-        return imageUrl ? (
+        return (
           <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
                onClick={() => imageUrl && handleImageClick(imageUrl)}>
-            <ProductImage 
-              src={imageUrl} 
-              alt={info.row.original.product?.name || 'Producto'} 
-              className="rounded-md object-contain max-h-10 max-w-10" 
-            />
+            {imageUrl ? (
+              <ProductImage 
+                src={imageUrl} 
+                alt={info.row.original.product?.name || 'Producto'} 
+                className="rounded-md object-contain max-h-10 max-w-10" 
+              />
+            ) : (
+              <DefaultProductImage 
+                productName={info.row.original.product?.name || 'Producto'}
+                className="w-10 h-10"
+              />
+            )}
           </div>
-        ) : null;
+        );
       }
     }),
     columnHelper.accessor('product.name', {
@@ -598,16 +652,23 @@ export default function PricesContent() {
       header: 'Imagen',
       cell: info => {
         const imageUrl = (info.row.original as unknown as BestPriceProduct).productImageUrl;
-        return imageUrl ? (
+        return (
           <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
                onClick={() => imageUrl && handleImageClick(imageUrl)}>
-            <ProductImage 
-              src={imageUrl} 
-              alt={(info.row.original as unknown as BestPriceProduct).productName} 
-              className="rounded-md object-contain max-h-10 max-w-10" 
-            />
+            {imageUrl ? (
+              <ProductImage 
+                src={imageUrl} 
+                alt={(info.row.original as unknown as BestPriceProduct).productName} 
+                className="rounded-md object-contain max-h-10 max-w-10" 
+              />
+            ) : (
+              <DefaultProductImage 
+                productName={(info.row.original as unknown as BestPriceProduct).productName}
+                className="w-10 h-10"
+              />
+            )}
           </div>
-        ) : null;
+        );
       }
     }),
     {
@@ -637,6 +698,33 @@ export default function PricesContent() {
         `${formatCurrency(row.supplierShippingCost, row.bestPriceCurrency)}`,
     },
   ];
+
+  // Modificar las columnas para la tabla de todos los precios para incluir imágenes por defecto
+  const columnsWithDefaultImage = [...columns];
+  columnsWithDefaultImage[0] = columnHelper.display({
+    id: 'image',
+    header: 'Imagen',
+    cell: info => {
+      const imageUrl = info.row.original.product?.imageUrl;
+      return (
+        <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
+             onClick={() => imageUrl && handleImageClick(imageUrl)}>
+          {imageUrl ? (
+            <ProductImage 
+              src={imageUrl} 
+              alt={info.row.original.product?.name || 'Producto'} 
+              className="rounded-md object-contain max-h-10 max-w-10" 
+            />
+          ) : (
+            <DefaultProductImage 
+              productName={info.row.original.product?.name || 'Producto'}
+              className="w-10 h-10"
+            />
+          )}
+        </div>
+      );
+    }
+  });
 
   // Renderizar
   return (
@@ -784,28 +872,34 @@ export default function PricesContent() {
         </button>
       </div>
       
-      {/* Tabla de mejores precios por producto */}
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">Mejores Precios por Producto</h2>
-        {loading ? (
-          <div className="flex justify-center items-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-          </div>
-        ) : error ? (
-          <div className="bg-red-100 text-red-800 p-4 rounded-md">
-            {error}
-          </div>
-        ) : (
-          <DataTable
-            data={bestPricesByProduct}
-            columns={bestPricesColumns as any}
-          />
-        )}
+      {/* Pestañas para alternar entre tablas */}
+      <div className="mb-6">
+        <div className="flex border-b border-gray-700">
+          <button
+            className={`py-2 px-4 font-medium rounded-t-lg ${
+              activeTab === 'allPrices' 
+                ? 'bg-gray-700 text-white border-t border-r border-l border-gray-600' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+            onClick={() => setActiveTab('allPrices')}
+          >
+            Todos los Precios
+          </button>
+          <button
+            className={`py-2 px-4 font-medium rounded-t-lg ${
+              activeTab === 'bestPrices' 
+                ? 'bg-gray-700 text-white border-t border-r border-l border-gray-600' 
+                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+            }`}
+            onClick={() => setActiveTab('bestPrices')}
+          >
+            Mejores Precios por Producto
+          </button>
+        </div>
       </div>
       
-      {/* Tabla de todos los precios */}
-      <div>
-        <h2 className="text-xl font-semibold mb-4">Todos los Precios</h2>
+      {/* Contenido de las pestañas */}
+      <div className="bg-gray-800 border border-gray-700 rounded-md p-4">
         {loading ? (
           <div className="flex justify-center items-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -815,10 +909,27 @@ export default function PricesContent() {
             {error}
           </div>
         ) : (
-          <DataTable
-            data={filteredPrices}
-            columns={columns}
-          />
+          <>
+            {/* Tabla de todos los precios */}
+            {activeTab === 'allPrices' && (
+              <div>
+                <DataTable
+                  data={filteredPrices}
+                  columns={columnsWithDefaultImage}
+                />
+              </div>
+            )}
+            
+            {/* Tabla de mejores precios por producto */}
+            {activeTab === 'bestPrices' && (
+              <div>
+                <DataTable
+                  data={filteredBestPricesByProduct}
+                  columns={bestPricesColumns as any}
+                />
+              </div>
+            )}
+          </>
         )}
       </div>
       
@@ -851,7 +962,7 @@ export default function PricesContent() {
           onClose={() => setDetailViewOpen(false)}
           title={`Detalles del Precio: ${selectedPrice.product.name}`}
         >
-          {selectedPrice.product.imageUrl && (
+          {selectedPrice.product.imageUrl ? (
             <div className="mb-6 flex justify-center">
               <div className="w-48 h-48 relative cursor-pointer"
                    onClick={() => handleImageClick(selectedPrice.product.imageUrl!)}>
@@ -859,6 +970,15 @@ export default function PricesContent() {
                   src={selectedPrice.product.imageUrl}
                   alt={selectedPrice.product.name}
                   size="large"
+                  className="rounded-lg"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="mb-6 flex justify-center">
+              <div className="w-48 h-48 relative">
+                <DefaultProductImage
+                  productName={selectedPrice.product.name}
                   className="rounded-lg"
                 />
               </div>
