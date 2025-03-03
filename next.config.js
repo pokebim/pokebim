@@ -25,36 +25,6 @@ const nextConfig = {
     // !! ADVERTENCIA !!
     // Ignorando los errores de ESLint para evitar problemas en el build
     ignoreDuringBuilds: true,
-  },
-  
-  // Configuración de webpack para manejar Firebase
-  webpack: (config, { isServer }) => {
-    // Configuración específica para @grpc y otras dependencias nativas
-    config.externals = [...(config.externals || []), '@grpc/grpc-js'];
-
-    // Resolver problemas con módulos específicos
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        path: false,
-        child_process: false,
-        net: false,
-        tls: false,
-        dns: false,
-        os: false,
-        http2: false,
-        util: false,
-        url: false,
-        zlib: false,
-        http: false,
-        https: false,
-        stream: false,
-        crypto: false,
-      };
-    }
-    
-    return config;
   }
 };
 

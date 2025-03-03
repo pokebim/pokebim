@@ -11,7 +11,7 @@ import {
   orderBy, 
   serverTimestamp,
   writeBatch
-} from "firebase/firestore/lite";
+} from "firebase/firestore";
 import { db } from "./firebase";
 
 // Interfaz para los grupos de enlaces

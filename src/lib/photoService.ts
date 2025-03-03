@@ -10,7 +10,7 @@ import {
   where,
   orderBy,
   serverTimestamp
-} from "firebase/firestore/lite";
+} from "firebase/firestore";
 import { 
   getStorage, 
   ref, 

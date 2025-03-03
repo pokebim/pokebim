@@ -7,7 +7,7 @@ import {
   deleteDoc,
   query,
   where
-} from "firebase/firestore/lite";
+} from "firebase/firestore";
 import { db } from "./firebase";
 
 // Interfaz para el ítem de inventario

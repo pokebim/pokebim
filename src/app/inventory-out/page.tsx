@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, Timestamp } from 'firebase/firestore/lite';
+import { collection, getDocs, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import MainLayout from '@/components/layout/MainLayout';
 import { format } from 'date-fns';

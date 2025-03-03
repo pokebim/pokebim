@@ -11,7 +11,7 @@ import {
   orderBy,
   Timestamp,
   serverTimestamp
-} from "firebase/firestore/lite";
+} from "firebase/firestore";
 import { db } from "./firebase";
 
 // Interfaz para los posts de la wiki

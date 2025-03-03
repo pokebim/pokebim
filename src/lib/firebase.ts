@@ -1,8 +1,8 @@
 'use client';
 
-// Archivo optimizado para Vercel
+// Archivo restaurado a una versión básica
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore/lite'; // Usamos la versión lite para mayor compatibilidad
+import { getFirestore } from 'firebase/firestore';
 
 // Configuración de Firebase
 const firebaseConfig = {
