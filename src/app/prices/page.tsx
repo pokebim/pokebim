@@ -66,6 +66,7 @@ interface BestPriceProduct {
   bestPriceInEUR: number;
   supplierName: string;
   supplierCountry: string;
+  supplierShippingCost: number;
 }
 
 export default function PricesPage() {
@@ -88,6 +89,148 @@ export default function PricesPage() {
 
   // Estado para la imagen modal
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+  // Estados para filtros
+  const [filters, setFilters] = useState({
+    productName: '',
+    productLanguage: '',
+    productType: '',
+    supplierName: '',
+    supplierCountry: '',
+    minPrice: '',
+    maxPrice: ''
+  });
+  
+  // Obtener valores únicos para los filtros
+  const uniqueLanguages = useMemo(() => {
+    const languages = new Set<string>();
+    prices.forEach(price => {
+      if (price.product?.language) {
+        languages.add(price.product.language);
+      }
+    });
+    return Array.from(languages).sort();
+  }, [prices]);
+  
+  const uniqueTypes = useMemo(() => {
+    const types = new Set<string>();
+    prices.forEach(price => {
+      if (price.product?.type) {
+        types.add(price.product.type);
+      }
+    });
+    return Array.from(types).sort();
+  }, [prices]);
+  
+  const uniqueSuppliers = useMemo(() => {
+    const suppliers = new Set<string>();
+    prices.forEach(price => {
+      if (price.supplier?.name) {
+        suppliers.add(price.supplier.name);
+      }
+    });
+    return Array.from(suppliers).sort();
+  }, [prices]);
+  
+  const uniqueCountries = useMemo(() => {
+    const countries = new Set<string>();
+    prices.forEach(price => {
+      if (price.supplier?.country) {
+        countries.add(price.supplier.country);
+      }
+    });
+    return Array.from(countries).sort();
+  }, [prices]);
+  
+  // Función para manejar cambios en los filtros
+  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({ ...prev, [name]: value }));
+  };
+  
+  // Aplicar filtros a los precios
+  const filteredPrices = useMemo(() => {
+    return prices.filter(price => {
+      // Filtro por nombre de producto
+      if (filters.productName && !price.product.name.toLowerCase().includes(filters.productName.toLowerCase())) {
+        return false;
+      }
+      
+      // Filtro por idioma
+      if (filters.productLanguage && price.product.language !== filters.productLanguage) {
+        return false;
+      }
+      
+      // Filtro por tipo de producto
+      if (filters.productType && price.product.type !== filters.productType) {
+        return false;
+      }
+      
+      // Filtro por proveedor
+      if (filters.supplierName && price.supplier.name !== filters.supplierName) {
+        return false;
+      }
+      
+      // Filtro por país del proveedor
+      if (filters.supplierCountry && price.supplier.country !== filters.supplierCountry) {
+        return false;
+      }
+      
+      // Filtro por precio mínimo
+      if (filters.minPrice && price.price < parseFloat(filters.minPrice)) {
+        return false;
+      }
+      
+      // Filtro por precio máximo
+      if (filters.maxPrice && price.price > parseFloat(filters.maxPrice)) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [prices, filters]);
+  
+  // Filtrar también los mejores precios
+  const filteredBestPrices = useMemo(() => {
+    return bestPrices.filter(price => {
+      // Filtro por nombre de producto
+      if (filters.productName && !price.productName.toLowerCase().includes(filters.productName.toLowerCase())) {
+        return false;
+      }
+      
+      // Filtro por idioma
+      if (filters.productLanguage && price.productLanguage !== filters.productLanguage) {
+        return false;
+      }
+      
+      // Filtro por tipo de producto
+      if (filters.productType && price.productType !== filters.productType) {
+        return false;
+      }
+      
+      // Filtro por proveedor
+      if (filters.supplierName && price.supplierName !== filters.supplierName) {
+        return false;
+      }
+      
+      // Filtro por país del proveedor
+      if (filters.supplierCountry && price.supplierCountry !== filters.supplierCountry) {
+        return false;
+      }
+      
+      // Filtro por precio mínimo
+      if (filters.minPrice && price.bestPrice < parseFloat(filters.minPrice)) {
+        return false;
+      }
+      
+      // Filtro por precio máximo
+      if (filters.maxPrice && price.bestPrice > parseFloat(filters.maxPrice)) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [bestPrices, filters]);
 
   useEffect(() => {
     fetchData();
@@ -598,7 +741,8 @@ export default function PricesPage() {
           bestPriceCurrency: bestOption.price.currency as Currency,
           bestPriceInEUR: bestOption.priceInEUR,
           supplierName: bestOption.price.supplier.name,
-          supplierCountry: bestOption.price.supplier.country
+          supplierCountry: bestOption.price.supplier.country,
+          supplierShippingCost: bestOption.price.supplier.shippingCost || 0
         });
       }
     });
@@ -696,53 +840,44 @@ export default function PricesPage() {
       },
       size: 150,
     }),
-    columnHelper.accessor(row => ({ price: row.price, currency: row.currency }), {
-      id: 'priceEUR',
-      header: 'Precio (EUR)',
+    columnHelper.accessor(row => {
+      const pricePerUnit = row.priceUnit === 'Per Pack' && row.boxesPerPack ? row.price / row.boxesPerPack : null;
+      return { 
+        price: pricePerUnit, 
+        currency: row.currency,
+        unit: row.priceUnit,
+        boxesPerPack: row.boxesPerPack
+      };
+    }, {
+      id: 'unitPrice',
+      header: 'Precio Unitario',
       cell: info => {
-        const { price, currency } = info.getValue();
-        const row = info.row.original;
-        const priceInEUR = convertCurrency(price || 0, currency as Currency, 'EUR');
+        const { price, currency, unit, boxesPerPack } = info.getValue();
         
-        return (
-          <PriceInlineEdit
-            id={row.id}
-            price={priceInEUR}
-            currency="EUR"
-            directUpdate={false}
-            onUpdate={(newPriceEUR) => {
-              // Convertir el precio de EUR a la moneda original
-              const newOriginalPrice = convertCurrency(newPriceEUR, 'EUR', currency as Currency);
-              
-              // Actualizar en Firebase
-              updatePrice(row.id, { price: newOriginalPrice }).then(() => {
-                // Actualizar el estado local con el mismo enfoque inmutable
-                setPrices(prev => {
-                  // Crear un mapa para búsqueda rápida por ID
-                  const priceMap = new Map(prev.map(p => [p.id, p]));
-                  
-                  // Actualizar solo el precio en el mapa
-                  if (priceMap.has(row.id)) {
-                    const updatedPrice = priceMap.get(row.id);
-                    priceMap.set(row.id, { ...updatedPrice, price: newOriginalPrice });
-                  }
-                  
-                  // Convertir el mapa de vuelta a un array
-                  return Array.from(priceMap.values());
-                });
-              }).catch(error => {
-                console.error('Error al actualizar el precio:', error);
-                toast.error('Error al actualizar el precio');
-              });
-            }}
-          />
-        );
+        if (unit === 'Per Pack' && boxesPerPack && price) {
+          return (
+            <span className="text-green-400">
+              {formatCurrency(price, currency)} / caja
+              <div className="text-xs text-gray-400">({boxesPerPack} cajas por pack)</div>
+            </span>
+          );
+        }
+        
+        return <span className="text-gray-500">-</span>;
       },
       size: 150,
     }),
-    columnHelper.accessor('notes', {
-      header: 'Notas',
-      cell: info => <span className="text-gray-300 max-w-xs truncate">{info.getValue() || '-'}</span>
+    columnHelper.accessor('supplier.shippingCost', {
+      header: 'Envío',
+      cell: info => {
+        const shippingCost = info.getValue();
+        if (shippingCost) {
+          // Asumimos que el coste de envío está en la moneda del proveedor (EUR en este caso)
+          return <span className="text-amber-400">{formatCurrency(shippingCost, 'EUR')}</span>;
+        }
+        return <span className="text-gray-500">-</span>;
+      },
+      size: 100,
     }),
     columnHelper.accessor('id', {
       header: 'Acciones',
@@ -842,7 +977,19 @@ export default function PricesPage() {
       header: 'País',
       cell: info => info.getValue(),
       size: 100,
-    })
+    }),
+    // Añadir columna de envío también en tabla de mejores precios
+    bestPriceColumnHelper.accessor('supplierShippingCost', {
+      header: 'Envío',
+      cell: info => {
+        const shippingCost = info.getValue();
+        if (shippingCost) {
+          return <span className="text-amber-400">{formatCurrency(shippingCost, 'EUR')}</span>;
+        }
+        return <span className="text-gray-500">-</span>;
+      },
+      size: 100,
+    }),
   ], []);
 
   // Modificar la función repairMissingRelations para un mejor manejo
@@ -1072,6 +1219,136 @@ export default function PricesPage() {
             </div>
           </div>
           
+          {/* Panel de filtros */}
+          <div className="bg-gray-800 p-4 rounded-lg mb-6">
+            <h2 className="text-lg font-semibold text-white mb-2">Filtros</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div>
+                <label htmlFor="productName" className="block text-sm font-medium text-gray-300">Nombre de producto</label>
+                <input
+                  type="text"
+                  id="productName"
+                  name="productName"
+                  value={filters.productName}
+                  onChange={handleFilterChange}
+                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                  placeholder="Buscar producto..."
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="productLanguage" className="block text-sm font-medium text-gray-300">Idioma</label>
+                <select
+                  id="productLanguage"
+                  name="productLanguage"
+                  value={filters.productLanguage}
+                  onChange={handleFilterChange}
+                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                >
+                  <option value="">Todos los idiomas</option>
+                  {uniqueLanguages.map(language => (
+                    <option key={language} value={language}>{language}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="productType" className="block text-sm font-medium text-gray-300">Tipo</label>
+                <select
+                  id="productType"
+                  name="productType"
+                  value={filters.productType}
+                  onChange={handleFilterChange}
+                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                >
+                  <option value="">Todos los tipos</option>
+                  {uniqueTypes.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="supplierName" className="block text-sm font-medium text-gray-300">Proveedor</label>
+                <select
+                  id="supplierName"
+                  name="supplierName"
+                  value={filters.supplierName}
+                  onChange={handleFilterChange}
+                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                >
+                  <option value="">Todos los proveedores</option>
+                  {uniqueSuppliers.map(supplier => (
+                    <option key={supplier} value={supplier}>{supplier}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="supplierCountry" className="block text-sm font-medium text-gray-300">País</label>
+                <select
+                  id="supplierCountry"
+                  name="supplierCountry"
+                  value={filters.supplierCountry}
+                  onChange={handleFilterChange}
+                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                >
+                  <option value="">Todos los países</option>
+                  {uniqueCountries.map(country => (
+                    <option key={country} value={country}>{country}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label htmlFor="minPrice" className="block text-sm font-medium text-gray-300">Precio mínimo</label>
+                <input
+                  type="number"
+                  id="minPrice"
+                  name="minPrice"
+                  value={filters.minPrice}
+                  onChange={handleFilterChange}
+                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                  placeholder="Mínimo"
+                  min="0"
+                  step="any"
+                />
+              </div>
+              
+              <div>
+                <label htmlFor="maxPrice" className="block text-sm font-medium text-gray-300">Precio máximo</label>
+                <input
+                  type="number"
+                  id="maxPrice"
+                  name="maxPrice"
+                  value={filters.maxPrice}
+                  onChange={handleFilterChange}
+                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                  placeholder="Máximo"
+                  min="0"
+                  step="any"
+                />
+              </div>
+              
+              <div className="flex items-end">
+                <button
+                  onClick={() => setFilters({
+                    productName: '',
+                    productLanguage: '',
+                    productType: '',
+                    supplierName: '',
+                    supplierCountry: '',
+                    minPrice: '',
+                    maxPrice: ''
+                  })}
+                  className="w-full h-9 px-3 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors duration-150"
+                >
+                  Limpiar filtros
+                </button>
+              </div>
+            </div>
+          </div>
+          
           {error && (
             <div className="mb-6 bg-red-900 p-4 rounded-md border border-red-700 text-white">
               <p>{error}</p>
@@ -1086,10 +1363,10 @@ export default function PricesPage() {
             <>
               <div className="mb-12">
                 <h2 className="text-xl font-semibold mb-4 text-gray-200">Mejores precios por producto</h2>
-                {bestPrices.length > 0 ? (
+                {filteredBestPrices.length > 0 ? (
                   <div className="bg-gray-800 rounded-lg overflow-hidden">
                     <DataTable
-                      data={bestPrices}
+                      data={filteredBestPrices}
                       columns={bestPriceColumns}
                     />
                   </div>
@@ -1099,10 +1376,10 @@ export default function PricesPage() {
               </div>
               
               <h2 className="text-xl font-semibold mb-4 text-gray-200">Lista completa de precios</h2>
-              {prices.length > 0 ? (
+              {filteredPrices.length > 0 ? (
                 <div className="bg-gray-800 rounded-lg overflow-hidden">
                   <DataTable
-                    data={prices}
+                    data={filteredPrices}
                     columns={columns}
                   />
                 </div>

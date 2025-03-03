@@ -26,13 +26,13 @@ export default function ProductImage({
   
   // Determinar dimensiones basadas en el tamaño
   const dimensions = {
-    small: { width: 80, height: 60 },
-    medium: { width: 120, height: 90 },
-    large: { width: 240, height: 180 }
+    small: { width: 60, height: 45 },
+    medium: { width: 80, height: 60 },
+    large: { width: 160, height: 120 }
   }[size];
   
   // URL de fallback si no hay imagen disponible o hay error
-  const fallbackUrl = `https://via.placeholder.com/200x200?text=${encodeURIComponent(productName)}`;
+  const fallbackUrl = `https://via.placeholder.com/120x90?text=${encodeURIComponent(productName)}`;
   
   // Limpiar la URL (eliminar parámetros de consulta que pueden causar problemas)
   const cleanImageUrl = (url: string) => {

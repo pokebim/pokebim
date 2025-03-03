@@ -188,50 +188,50 @@ export default function ProductsPage() {
     if (filteredProducts.length === 0) return <div className="text-center py-8">No se encontraron productos con el término de búsqueda.</div>;
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {filteredProducts.map(product => (
-          <div key={product.id} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden flex flex-col">
+          <div key={product.id} className="bg-gray-800 rounded-md shadow overflow-hidden flex flex-col border border-gray-700 hover:border-gray-500 transition-colors">
             {/* Contenedor de imagen con ratio fijo */}
-            <div className="pt-[65%] relative bg-gray-900">
+            <div className="pt-[60%] relative bg-gray-900">
               <ProductImage 
                 imageUrl={product.imageUrl} 
                 productName={product.name}
-                size="large"
+                size="small"
                 className="absolute inset-0"
                 onClick={() => product.imageUrl && handleImageClick(product.imageUrl)}
               />
             </div>
-            <div className="p-4 flex-grow flex flex-col">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="text-lg font-semibold text-white">{product.name}</h3>
-                <span className="px-2 py-1 bg-blue-900 text-blue-200 text-xs rounded-full">
+            <div className="p-2 flex-grow flex flex-col">
+              <div className="flex justify-between items-start gap-1">
+                <h3 className="text-sm font-medium text-white line-clamp-1">{product.name}</h3>
+                <span className="px-1.5 py-0.5 bg-blue-900 text-blue-200 text-xs rounded-full whitespace-nowrap">
                   {product.language || 'Sin idioma'}
                 </span>
               </div>
-              <div className="mt-2 text-gray-400 text-sm flex-grow">
+              <div className="mt-1 text-gray-400 text-xs flex-grow">
                 <p>Tipo: {product.type || 'No especificado'}</p>
                 {product.description && (
-                  <p className="mt-2 line-clamp-2">{product.description}</p>
+                  <p className="line-clamp-1">{product.description}</p>
                 )}
               </div>
-              <div className="mt-4 flex justify-between items-center">
-                <div className="space-x-2">
+              <div className="mt-2 flex justify-between items-center">
+                <div className="flex space-x-1">
                   <button 
                     onClick={() => handleViewDetail(product)} 
-                    className="px-3 py-1 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600 transition-colors"
+                    className="px-1.5 py-1 bg-indigo-700 text-white text-xs rounded hover:bg-indigo-600 transition-colors"
                   >
                     Ver
                   </button>
                   <button 
                     onClick={() => handleEdit(product)} 
-                    className="px-3 py-1 bg-blue-700 text-white text-sm rounded hover:bg-blue-600 transition-colors"
+                    className="px-1.5 py-1 bg-green-700 text-white text-xs rounded hover:bg-green-600 transition-colors"
                   >
                     Editar
                   </button>
                 </div>
                 <button 
-                  onClick={() => product.id && handleDelete(product.id)} 
-                  className="px-3 py-1 bg-red-700 text-white text-sm rounded hover:bg-red-600 transition-colors"
+                  onClick={() => handleDelete(product.id)} 
+                  className="px-1.5 py-1 bg-red-700 text-white text-xs rounded hover:bg-red-600 transition-colors"
                 >
                   Eliminar
                 </button>
