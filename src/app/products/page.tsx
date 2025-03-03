@@ -41,21 +41,26 @@ export default function ProductsPage() {
       
       // Validate image URLs in stored products
       const validatedProducts = firebaseProducts.map((product: Product) => {
-        // Check if the URL is valid
-        if (product.imageUrl) {
-          try {
-            new URL(product.imageUrl);
-            return product;
-          } catch (e) {
-            // If invalid URL, return product without imageUrl
-            console.warn('Invalid image URL for product:', product.name);
-            return {
-              ...product,
-              imageUrl: ''
-            };
-          }
+        // If imageUrl is missing or empty, generate a placeholder
+        if (!product.imageUrl || product.imageUrl.trim() === '') {
+          return {
+            ...product,
+            imageUrl: `https://via.placeholder.com/400x250?text=${encodeURIComponent(product.name || 'Product')}`
+          };
         }
-        return product;
+        
+        // Check if the URL is valid
+        try {
+          new URL(product.imageUrl);
+          return product;
+        } catch (e) {
+          // If invalid, replace with a placeholder
+          console.warn('Fixed invalid image URL for product:', product.name);
+          return {
+            ...product,
+            imageUrl: `https://via.placeholder.com/400x250?text=${encodeURIComponent(product.name || 'Product')}`
+          };
+        }
       });
       
       // Establecer los productos validados en el estado
@@ -177,12 +182,11 @@ export default function ProductsPage() {
         {filteredProducts.map(product => (
           <div key={product.id} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden">
             {/* Imagen del producto usando el componente ProductImage */}
-            <div className="mb-4">
-              <ProductImage
-                imageUrl={product.imageUrl}
+            <div className="w-full flex justify-center p-4">
+              <ProductImage 
+                imageUrl={product.imageUrl} 
                 productName={product.name}
-                size="tiny"
-                className="mx-auto"
+                size="large"
               />
             </div>
             <div className="p-4">
@@ -283,14 +287,16 @@ export default function ProductsPage() {
         >
           <DetailSection title="Información General">
             {/* Mostrar imagen del producto */}
-            <div className="mb-6">
-              <ProductImage
-                imageUrl={selectedProduct.imageUrl}
-                productName={selectedProduct.name}
-                size="large"
-                className="mx-auto"
-              />
-            </div>
+            {selectedProduct.imageUrl && (
+              <div className="mb-6 flex justify-center">
+                <ProductImage 
+                  imageUrl={selectedProduct.imageUrl} 
+                  productName={selectedProduct.name}
+                  size="large"
+                  className="border-2 border-gray-700"
+                />
+              </div>
+            )}
             <DetailGrid>
               <DetailField label="Nombre" value={selectedProduct.name || 'Sin nombre'} />
               <DetailField 

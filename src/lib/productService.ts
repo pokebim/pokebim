@@ -18,8 +18,6 @@ export interface Product {
   supplierId?: string;
   notes?: string;
   type?: string;  // Tipo de producto para facilitar clasificación
-  imageUrl?: string;
-  description?: string;
 }
 
 // Obtener todos los productos
@@ -53,9 +51,7 @@ export const getAllProducts = async (): Promise<Product[]> => {
             name: data.name || 'Sin nombre',
             description: data.description || '',
             language: data.language || 'es',
-            type: data.type || 'regular',
-            imageUrl: data.imageUrl || '',
-            supplierId: data.supplierId || ''
+            type: data.type || 'regular', // Asegurar que siempre tenga un tipo
           };
           result.push(product);
         } catch (itemError) {

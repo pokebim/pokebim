@@ -32,7 +32,6 @@ import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, Detail
 import PriceInlineEdit from '@/components/ui/PriceInlineEdit';
 import Image from 'next/image';
 import ProductImage from '@/components/ui/ProductImage';
-import DefaultProductImage from '@/components/ui/DefaultProductImage';
 
 interface EnrichedPrice extends Price {
   product: {
@@ -213,7 +212,7 @@ export default function PricesPage() {
             name: product?.name || 'Producto desconocido',
             language: product?.language || 'N/A',
             type: product?.type || 'N/A',
-            imageUrl: product?.imageUrl || ''
+            imageUrl: product?.imageUrl || `https://via.placeholder.com/100x100?text=${encodeURIComponent(product?.name || 'Product')}`
           },
           supplier: {
             name: supplier?.name || 'Proveedor desconocido',
@@ -596,8 +595,7 @@ export default function PricesPage() {
         <ProductImage 
           imageUrl={info.getValue()} 
           productName={info.row.original.product.name}
-          size="tiny"
-          className="mx-auto"
+          size="small"
         />
       )
     }),
@@ -741,14 +739,12 @@ export default function PricesPage() {
   const bestPriceColumns = useMemo(() => [
     bestPriceColumnHelper.accessor('productImageUrl', {
       header: 'Imagen',
-      cell: ({ row }) => (
-        <div className="w-[100px] h-[100px]">
-          <ProductImage
-            imageUrl={row.original.productImageUrl}
-            productName={row.original.productName}
-            className="rounded-lg"
-          />
-        </div>
+      cell: info => (
+        <ProductImage 
+          imageUrl={info.getValue()} 
+          productName={info.row.original.productName}
+          size="small"
+        />
       )
     }),
     bestPriceColumnHelper.accessor('productName', {

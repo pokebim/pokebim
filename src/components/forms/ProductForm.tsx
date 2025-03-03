@@ -1,7 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
-import { uploadFile } from '@/lib/storageService';
-import Image from 'next/image';
-import DefaultProductImage from '@/components/ui/DefaultProductImage';
+import { useState, useEffect } from 'react';
 
 interface Product {
   id?: string;
@@ -25,25 +22,14 @@ interface ProductFormProps {
   suppliers?: Supplier[];
 }
 
-interface ProductFormData extends Product {
-  imageFile?: File | null;
-}
-
 // Función para validar URLs de imágenes
 const validateImageUrl = async (url: string): Promise<boolean> => {
   if (!url) return false;
   
   try {
-    // Verificar si es una URL válida
-    new URL(url);
-    
-    // Intentar cargar la imagen para verificar que es válida
-    return new Promise((resolve) => {
-      const img = document.createElement('img');
-      img.onload = () => resolve(true);
-      img.onerror = () => resolve(false);
-      img.src = url;
-    });
+    const response = await fetch(url, { method: 'HEAD' });
+    const contentType = response.headers.get('content-type');
+    return response.ok && contentType?.startsWith('image/');
   } catch (error) {
     console.error('Error validating image URL:', error);
     return false;
@@ -51,14 +37,13 @@ const validateImageUrl = async (url: string): Promise<boolean> => {
 };
 
 export default function ProductForm({ onSubmit, onCancel, initialData, suppliers = [] }: ProductFormProps) {
-  const [formData, setFormData] = useState<ProductFormData>({
+  const [formData, setFormData] = useState<Product>({
     name: '',
     language: 'Japanese',
     type: 'Booster Box',
-    imageUrl: '',
+    imageUrl: 'https://via.placeholder.com/400x250?text=Product+Image',
     description: '',
     supplierId: '',
-    imageFile: null
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,17 +52,10 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
   const [suppliersList, setSuppliersList] = useState<Supplier[]>(suppliers);
   const [isValidatingImage, setIsValidatingImage] = useState(false);
   const [imageError, setImageError] = useState('');
-  const [imageInputType, setImageInputType] = useState<'url' | 'file'>('url');
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [imagePreview, setImagePreview] = useState<string>('');
 
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
-      if (initialData.imageUrl) {
-        setImageInputType('url');
-        setImagePreview(initialData.imageUrl);
-      }
     }
   }, [initialData]);
   
@@ -120,51 +98,18 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
   const handleImageUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
     setFormData(prev => ({ ...prev, imageUrl: url }));
-    setImagePreview(url); // Mostrar vista previa inmediatamente
     
     if (url) {
       setIsValidatingImage(true);
       setImageError('');
       
-      try {
-        // Verificar si es una URL válida
-        new URL(url);
-        setImageError('');
-      } catch (error) {
-        setImageError('La URL proporcionada no es válida');
-        setIsValidatingImage(false);
-        return;
+      const isValid = await validateImageUrl(url);
+      
+      if (!isValid) {
+        setImageError('La URL proporcionada no es una imagen válida');
       }
       
       setIsValidatingImage(false);
-    } else {
-      setImagePreview('');
-      setImageError('');
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFormData(prev => ({ ...prev, imageFile: file, imageUrl: '' }));
-      setImageError('');
-      
-      // Crear preview de la imagen
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleImageTypeChange = (type: 'url' | 'file') => {
-    setImageInputType(type);
-    setImageError('');
-    setFormData(prev => ({ ...prev, imageUrl: '', imageFile: null }));
-    setImagePreview('');
-    if (type === 'file' && fileInputRef.current) {
-      fileInputRef.current.value = '';
     }
   };
 
@@ -173,48 +118,33 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
     setIsSubmitting(true);
     setError('');
     
-    try {
-      let finalImageUrl = formData.imageUrl;
-
-      // Si hay un archivo de imagen, subirlo usando el servicio de almacenamiento
-      if (formData.imageFile) {
-        try {
-          const filePath = `product-images/${Date.now()}-${formData.imageFile.name}`;
-          console.log('Subiendo archivo:', filePath);
-          finalImageUrl = await uploadFile(formData.imageFile, filePath);
-          console.log('URL de imagen obtenida:', finalImageUrl);
-        } catch (uploadError) {
-          console.error('Error al subir la imagen:', uploadError);
-          setError('Error al subir la imagen. Por favor, inténtalo de nuevo.');
-          setIsSubmitting(false);
-          return;
-        }
-      } else if (formData.imageUrl) {
-        // Validar URL si se proporcionó una
-        try {
-          // Solo verificar si es una URL válida
-          new URL(formData.imageUrl);
-        } catch (validationError) {
-          console.error('Error al validar URL:', validationError);
-          setImageError('La URL proporcionada no es válida');
-          setIsSubmitting(false);
-          return;
-        }
+    if (!formData.supplierId) {
+      if (suppliersList.length > 0) {
+        setFormData(prev => ({ ...prev, supplierId: suppliersList[0].id }));
+      } else {
+        setFormData(prev => ({ ...prev, supplierId: 'default-supplier' }));
       }
-
-      const submissionData = {
-        ...formData,
-        imageUrl: finalImageUrl || '',  // Si no hay imagen, dejar vacío
-        supplierId: formData.supplierId || 'default-supplier'
-      };
-      
-      delete submissionData.imageFile; // Eliminar el campo imageFile antes de enviar
-      
-      console.log('Enviando datos:', submissionData);
-      await onSubmit(submissionData);
+    }
+    
+    if (formData.imageUrl) {
+      const isValid = await validateImageUrl(formData.imageUrl);
+      if (!isValid) {
+        setImageError('La URL proporcionada no es una imagen válida');
+        return;
+      }
+    }
+    
+    const submissionData = {
+      ...formData,
+      imageUrl: formData.imageUrl || 'https://via.placeholder.com/400x250?text=Product+Image',
+      supplierId: formData.supplierId || 'default-supplier'
+    };
+    
+    try {
+      onSubmit(submissionData);
     } catch (err) {
-      console.error('Error al enviar formulario:', err);
       setError('Ocurrió un error al guardar el producto. Por favor, inténtalo de nuevo.');
+      console.error('Error al enviar formulario:', err);
     } finally {
       setIsSubmitting(false);
     }
@@ -308,95 +238,25 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
         </select>
       </div>
       
-      <div className="space-y-4">
-        <label className="block text-sm font-bold text-white">
-          Imagen del producto
+      <div className="space-y-2">
+        <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-700">
+          URL de la imagen
         </label>
-        
-        <div className="flex space-x-4 mb-4">
-          <button
-            type="button"
-            onClick={() => handleImageTypeChange('url')}
-            className={`px-4 py-2 rounded-md ${
-              imageInputType === 'url'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-700 text-gray-300'
-            }`}
-          >
-            URL de imagen
-          </button>
-          <button
-            type="button"
-            onClick={() => handleImageTypeChange('file')}
-            className={`px-4 py-2 rounded-md ${
-              imageInputType === 'file'
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-700 text-gray-300'
-            }`}
-          >
-            Subir archivo
-          </button>
-        </div>
-
-        {imageInputType === 'url' ? (
-          <div className="space-y-2">
-            <input
-              type="text"
-              id="imageUrl"
-              name="imageUrl"
-              value={formData.imageUrl}
-              onChange={handleImageUrlChange}
-              placeholder="https://ejemplo.com/imagen.jpg"
-              className={`mt-1 block w-full rounded-md border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 bg-gray-800 text-white px-3 py-2 ${
-                imageError ? 'border-red-500' : ''
-              }`}
-            />
-            {isValidatingImage && (
-              <p className="text-sm text-gray-400">Validando URL de imagen...</p>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept="image/*"
-              onChange={handleFileChange}
-              className="block w-full text-sm text-gray-300
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-md file:border-0
-                file:text-sm file:font-semibold
-                file:bg-green-600 file:text-white
-                hover:file:bg-green-700"
-            />
-          </div>
+        <input
+          type="text"
+          id="imageUrl"
+          name="imageUrl"
+          value={formData.imageUrl}
+          onChange={handleImageUrlChange}
+          className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm ${
+            imageError ? 'border-red-500' : ''
+          }`}
+        />
+        {isValidatingImage && (
+          <p className="text-sm text-gray-500">Validando URL de imagen...</p>
         )}
-
         {imageError && (
           <p className="text-sm text-red-500">{imageError}</p>
-        )}
-
-        {(imagePreview || formData.imageUrl) ? (
-          <div className="mt-4">
-            <p className="text-sm font-medium text-white mb-2">Vista previa:</p>
-            <div className="relative w-48 h-48 rounded-lg overflow-hidden">
-              <Image
-                src={imagePreview || formData.imageUrl}
-                alt="Preview"
-                fill
-                className="object-cover"
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="mt-4">
-            <p className="text-sm font-medium text-white mb-2">Vista previa:</p>
-            <div className="w-48 h-48">
-              <DefaultProductImage 
-                productName={formData.name || 'Nuevo Producto'} 
-              />
-            </div>
-          </div>
         )}
       </div>
       

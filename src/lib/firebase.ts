@@ -3,7 +3,6 @@
 // Archivo restaurado a una versión básica
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
 
 // Configuración de Firebase
 const firebaseConfig = {
@@ -24,7 +23,5 @@ if (!getApps().length) {
   app = getApps()[0];
 }
 
-// Exportar las instancias
-export { app };
-export const db = getFirestore(app);
-export const storage = getStorage(app); 
+// Exportar la instancia de Firestore
+export const db = getFirestore(app); 

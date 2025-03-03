@@ -13,5 +13,10 @@
       "VERCEL_FORCE_NO_BUILD_CACHE": "1"
     }
   },
-  "installCommand": "npm install"
+  "functions": {
+    "src/app/api/**/*": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
 } 
