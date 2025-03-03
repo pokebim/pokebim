@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import MainLayout from '@/components/layout/MainLayout';
 import Modal from '@/components/ui/Modal';
@@ -36,6 +36,36 @@ import ProductImage from '@/components/ui/ProductImage';
 import ImageModal from '@/components/ui/ImageModal';
 import { flexRender } from '@tanstack/react-table';
 
+// Resolver el problema de inicialización utilizando un componente intermedio
+// Esta técnica evita las referencias circulares y problemas de inicialización
+const LazyPricesPage = () => {
+  // Este componente es solo un envoltorio para cargar el contenido real
+  return (
+    <MainLayout>
+      <div className="p-8">
+        <Suspense fallback={
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="inline-block h-16 w-16 animate-spin rounded-full border-t-4 border-indigo-500 border-solid"></div>
+              <p className="mt-4 text-xl text-white">Cargando...</p>
+            </div>
+          </div>
+        }>
+          <ActualPricesContent />
+        </Suspense>
+      </div>
+    </MainLayout>
+  );
+};
+
+// Exportamos el componente envoltorio, no el componente principal
+// Esto rompe la dependencia circular que causa el error de 'et'
+export default dynamic(() => Promise.resolve(LazyPricesPage), {
+  ssr: false
+});
+
+// El resto del código permanece igual, pero dentro de un componente separado
+// Definimos aquí todas las interfaces y el componente real
 interface EnrichedPrice extends Price {
   product: {
     name: string;
@@ -73,8 +103,9 @@ interface BestPriceProduct {
 // Verificar si estamos en el cliente
 const isClient = typeof window !== 'undefined';
 
-// Componente que se cargará solo en el cliente
-const PricesContent = () => {
+// Este es el componente real con toda la lógica
+// Lo definimos después de LazyPricesPage para evitar problemas de inicialización
+function ActualPricesContent() {
   const [prices, setPrices] = useState<EnrichedPrice[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -860,7 +891,7 @@ const PricesContent = () => {
         const { price, currency, unit, boxesPerPack } = info.getValue();
         
         if (unit === 'Per Pack' && boxesPerPack && price) {
-          return (
+        return (
             <span className="text-green-400">
               {formatCurrency(price, currency)} / caja
               <div className="text-xs text-gray-400">({boxesPerPack} cajas por pack)</div>
@@ -1395,17 +1426,4 @@ const PricesContent = () => {
       </div>
     </MainLayout>
   );
-};
-
-// Exportar el componente con carga dinámica para evitar problemas de SSR
-export default dynamic(() => Promise.resolve(PricesContent), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900">
-      <div className="text-center">
-        <div className="inline-block h-16 w-16 animate-spin rounded-full border-t-4 border-indigo-500 border-solid"></div>
-        <p className="mt-4 text-xl text-white">Cargando...</p>
-      </div>
-    </div>
-  ),
-});
+}

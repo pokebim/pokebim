@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import Image from 'next/image';
 import { formatCurrency } from '@/lib/currencyConverter';
@@ -15,12 +15,42 @@ import {
 } from '@/lib/productService';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailImage } from '@/components/ui/DetailView';
 import ProductImage from '@/components/ui/ProductImage';
+import MainLayout from '@/components/layout/MainLayout';
 
 // Verificar si estamos en el cliente
 const isClient = typeof window !== 'undefined';
 
-// El componente real con toda la funcionalidad
-const ProductsContent = () => {
+// Resolver el problema de inicialización utilizando un componente intermedio
+// Esta técnica evita las referencias circulares y problemas de inicialización
+const LazyProductsPage = () => {
+  // Este componente es solo un envoltorio para cargar el contenido real
+  return (
+    <MainLayout>
+      <div className="p-8">
+        <Suspense fallback={
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="inline-block h-16 w-16 animate-spin rounded-full border-t-4 border-indigo-500 border-solid"></div>
+              <p className="mt-4 text-xl text-white">Cargando...</p>
+            </div>
+          </div>
+        }>
+          <ActualProductsContent />
+        </Suspense>
+      </div>
+    </MainLayout>
+  );
+};
+
+// Exportamos el componente envoltorio, no el componente principal
+// Esto rompe la dependencia circular que causa el error de 'et'
+export default dynamic(() => Promise.resolve(LazyProductsPage), {
+  ssr: false
+});
+
+// El componente real con toda la lógica
+// Lo definimos después de LazyProductsPage para evitar problemas de inicialización
+function ActualProductsContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -444,17 +474,4 @@ const ProductsContent = () => {
       </div>
     </>
   );
-};
-
-// Exportar el componente con carga dinámica para evitar problemas de SSR
-export default dynamic(() => Promise.resolve(ProductsContent), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900">
-      <div className="text-center">
-        <div className="inline-block h-16 w-16 animate-spin rounded-full border-t-4 border-indigo-500 border-solid"></div>
-        <p className="mt-4 text-xl text-white">Cargando...</p>
-      </div>
-    </div>
-  ),
-}); 
+} 
