@@ -1,3 +1,5 @@
+const webpack = require('webpack');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   /* config options here */
@@ -27,7 +29,7 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
@@ -35,6 +37,21 @@ const nextConfig = {
       tls: false,
       // Optionally, add other fallbacks if needed
     };
+
+    // Prefer browser specific modules
+    config.resolve.mainFields = ['browser', 'module', 'main'];
+
+    // Ignore specific modules in @grpc/grpc-js that are not needed in browser environments
+    config.plugins.push(new webpack.IgnorePlugin({
+      resourceRegExp: /^\.\/error$/,
+      contextRegExp: /@grpc\/grpc-js/
+    }));
+
+    config.plugins.push(new webpack.IgnorePlugin({
+      resourceRegExp: /^\.\/transport$/,
+      contextRegExp: /@grpc\/grpc-js/
+    }));
+
     return config;
   },
 };
