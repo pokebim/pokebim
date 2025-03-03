@@ -440,23 +440,26 @@ export default function PricesContent() {
   const columnHelper = createColumnHelper<EnrichedPrice>();
   
   const columns = [
+    columnHelper.display({
+      id: 'image',
+      header: 'Imagen',
+      cell: info => {
+        const imageUrl = info.row.original.product?.imageUrl;
+        return imageUrl ? (
+          <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
+               onClick={() => imageUrl && handleImageClick(imageUrl)}>
+            <ProductImage 
+              src={imageUrl} 
+              alt={info.row.original.product?.name || 'Producto'} 
+              className="rounded-md object-contain max-h-10 max-w-10" 
+            />
+          </div>
+        ) : null;
+      }
+    }),
     columnHelper.accessor('product.name', {
       header: 'Producto',
-      cell: info => (
-        <div className="flex items-center space-x-2">
-          {info.row.original.product?.imageUrl && (
-            <div className="w-10 h-10 relative cursor-pointer" 
-                 onClick={() => info.row.original.product?.imageUrl && handleImageClick(info.row.original.product.imageUrl)}>
-              <ProductImage 
-                src={info.row.original.product.imageUrl} 
-                alt={info.row.original.product.name} 
-                className="rounded-md" 
-              />
-            </div>
-          )}
-          <span className="font-medium">{info.getValue()}</span>
-        </div>
-      )
+      cell: info => <span className="font-medium">{info.getValue()}</span>
     }),
     columnHelper.accessor('product.language', {
       header: 'Idioma',
@@ -498,13 +501,27 @@ export default function PricesContent() {
         );
       }
     }),
+    columnHelper.display({
+      id: 'priceInEUR',
+      header: 'Precio (EUR)',
+      cell: info => {
+        const price = info.row.original;
+        const priceInEUR = convertCurrency(price.price, price.currency, 'EUR');
+        return formatCurrency(priceInEUR, 'EUR');
+      }
+    }),
     columnHelper.accessor('currency', {
       header: 'Moneda',
       cell: info => info.getValue()
     }),
-    columnHelper.accessor('shippingCost', {
-      header: 'Envío',
-      cell: info => `${formatCurrency(info.getValue() || 0, info.row.original.currency)}`
+    columnHelper.display({
+      id: 'shippingCostEUR',
+      header: 'Envío (EUR)',
+      cell: info => {
+        const price = info.row.original;
+        const shippingInEUR = convertCurrency(price.shippingCost || 0, price.currency, 'EUR');
+        return formatCurrency(shippingInEUR, 'EUR');
+      }
     }),
     columnHelper.accessor('inStock', {
       header: 'Stock',
@@ -550,12 +567,12 @@ export default function PricesContent() {
       cell: info => {
         const imageUrl = (info.row.original as unknown as BestPriceProduct).productImageUrl;
         return imageUrl ? (
-          <div className="w-10 h-10 relative cursor-pointer" 
+          <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
                onClick={() => imageUrl && handleImageClick(imageUrl)}>
             <ProductImage 
               src={imageUrl} 
               alt={(info.row.original as unknown as BestPriceProduct).productName} 
-              className="rounded-md" 
+              className="rounded-md object-contain max-h-10 max-w-10" 
             />
           </div>
         ) : null;
@@ -809,6 +826,7 @@ export default function PricesContent() {
                 <ProductImage
                   src={selectedPrice.product.imageUrl}
                   alt={selectedPrice.product.name}
+                  size="large"
                   className="rounded-lg"
                 />
               </div>

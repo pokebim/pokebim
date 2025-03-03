@@ -194,8 +194,8 @@ export default function ProductsContent() {
             {/* Contenedor de imagen con ratio fijo */}
             <div className="pt-[60%] relative bg-gray-900">
               <ProductImage 
-                imageUrl={product.imageUrl} 
-                productName={product.name}
+                src={product.imageUrl} 
+                alt={product.name}
                 size="small"
                 className="absolute inset-0"
                 onClick={() => product.imageUrl && handleImageClick(product.imageUrl)}
@@ -336,8 +336,8 @@ export default function ProductsContent() {
                   onClick={() => handleImageClick(selectedProduct.imageUrl || '')}
                 >
                   <ProductImage 
-                    imageUrl={selectedProduct.imageUrl} 
-                    productName={selectedProduct.name}
+                    src={selectedProduct.imageUrl} 
+                    alt={selectedProduct.name}
                     size="large"
                     className="border-2 border-gray-700"
                   />

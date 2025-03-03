@@ -15,7 +15,6 @@ import {
 } from '@/lib/productService';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailImage } from '@/components/ui/DetailView';
 import ProductImage from '@/components/ui/ProductImage';
-import MainLayout from '@/components/layout/MainLayout';
 
 // Definir un componente de carga simple
 function LoadingSpinner() {
@@ -30,7 +29,6 @@ function LoadingSpinner() {
 }
 
 // Extraer el contenido actual a un archivo separado
-// Crear productsContent.tsx en la siguiente fase
 const DynamicProductsContent = dynamic(() => 
   // Importar desde el mismo directorio pero en un módulo separado
   import('./productsContent').then(mod => mod.default),
@@ -56,10 +54,8 @@ export default function ProductsPage() {
   }
   
   return (
-    <MainLayout>
-      <Suspense fallback={<LoadingSpinner />}>
-        <DynamicProductsContent />
-      </Suspense>
-    </MainLayout>
+    <Suspense fallback={<LoadingSpinner />}>
+      <DynamicProductsContent />
+    </Suspense>
   );
 } 

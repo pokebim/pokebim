@@ -2,8 +2,8 @@ import Image from 'next/image';
 import { useState, useEffect } from 'react';
 
 interface ProductImageProps {
-  imageUrl?: string;
-  productName?: string;
+  src?: string;
+  alt?: string;
   size?: 'small' | 'medium' | 'large';
   className?: string;
   onClick?: () => void;
@@ -14,8 +14,8 @@ interface ProductImageProps {
  * con soporte para diferentes tamaños y fallback para imágenes no disponibles
  */
 export default function ProductImage({ 
-  imageUrl, 
-  productName = 'Product', 
+  src, 
+  alt = 'Product', 
   size = 'small',
   className = '',
   onClick
@@ -26,43 +26,26 @@ export default function ProductImage({
   
   // Determinar dimensiones basadas en el tamaño
   const dimensions = {
-    small: { width: 60, height: 45 },
-    medium: { width: 80, height: 60 },
-    large: { width: 160, height: 120 }
+    small: { width: 60, height: 60 },
+    medium: { width: 100, height: 100 },
+    large: { width: 160, height: 160 }
   }[size];
   
   // URL de fallback si no hay imagen disponible o hay error
-  const fallbackUrl = `https://via.placeholder.com/120x90?text=${encodeURIComponent(productName)}`;
-  
-  // Limpiar la URL (eliminar parámetros de consulta que pueden causar problemas)
-  const cleanImageUrl = (url: string) => {
-    if (!url) return null;
-    
-    try {
-      // Conservar solo la parte base de la URL para evitar problemas con parámetros
-      const urlObj = new URL(url);
-      // Mantenemos los parámetros ya que son importantes para algunas CDNs
-      return url;
-    } catch (e) {
-      console.error('URL inválida:', url);
-      return null;
-    }
-  };
+  const fallbackUrl = `https://via.placeholder.com/100x100?text=${encodeURIComponent(alt)}`;
   
   useEffect(() => {
-    // Si hay una URL de imagen, limpiarla
-    const cleanedUrl = imageUrl ? cleanImageUrl(imageUrl) : null;
     // Actualizar la imagen source cuando cambia la URL o hay un error
-    setImageSrc(!cleanedUrl || error ? fallbackUrl : cleanedUrl);
+    setImageSrc(!src || error ? fallbackUrl : src);
     setIsLoading(true);
-  }, [imageUrl, error, fallbackUrl]);
+  }, [src, error, fallbackUrl]);
   
   // Resetear el error si cambia la URL
   useEffect(() => {
-    if (imageUrl && error) {
+    if (src && error) {
       setError(false);
     }
-  }, [imageUrl, error]);
+  }, [src, error]);
   
   const handleImageLoad = () => {
     setIsLoading(false);
@@ -72,33 +55,30 @@ export default function ProductImage({
   
   return (
     <div 
-      className={`relative overflow-hidden rounded-md ${className} ${cursorStyle}`}
+      className={`relative flex items-center justify-center overflow-hidden rounded-md ${className} ${cursorStyle}`}
       style={{ 
         width: dimensions.width,
         height: dimensions.height,
-        minHeight: size === 'small' ? '60px' : (size === 'medium' ? '90px' : '180px'),
-        background: '#1f2937'
+        background: '#f3f4f6'
       }}
       onClick={onClick}
-      title={onClick ? "Haz clic para ampliar" : productName}
+      title={onClick ? "Haz clic para ampliar" : alt}
     >
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-          <div className="animate-pulse h-6 w-6 rounded-full bg-gray-600"></div>
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-200">
+          <div className="animate-pulse h-6 w-6 rounded-full bg-gray-400"></div>
         </div>
       )}
       
       {imageSrc && (
-        <Image 
+        <img 
           src={imageSrc} 
-          alt={productName}
-          fill
-          sizes={`(max-width: 768px) 100vw, ${dimensions.width}px`}
-          className={`transition-all duration-300 object-contain ${onClick ? 'hover:scale-105' : ''} ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          alt={alt}
+          width={dimensions.width}
+          height={dimensions.height}
+          className={`max-w-full max-h-full object-contain transition-all duration-300 ${onClick ? 'hover:scale-105' : ''} ${isLoading ? 'opacity-0' : 'opacity-100'}`}
           onError={() => setError(true)}
           onLoad={handleImageLoad}
-          priority={size === 'large'}
-          unoptimized
         />
       )}
     </div>
