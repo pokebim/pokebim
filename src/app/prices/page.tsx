@@ -69,7 +69,16 @@ interface BestPriceProduct {
   supplierShippingCost: number;
 }
 
+// Verificar si estamos en el cliente
+const isClient = typeof window !== 'undefined';
+
 export default function PricesPage() {
+  // Solo renderizamos el contenido si estamos en el cliente
+  if (!isClient) {
+    return <div>Cargando...</div>;
+  }
+  
+  // Aquí comienza el componente normal
   const [prices, setPrices] = useState<EnrichedPrice[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);

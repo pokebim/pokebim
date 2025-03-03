@@ -15,7 +15,15 @@ import {
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailImage } from '@/components/ui/DetailView';
 import ProductImage from '@/components/ui/ProductImage';
 
+// Verificar si estamos en el cliente
+const isClient = typeof window !== 'undefined';
+
 export default function ProductsPage() {
+  // Solo renderizamos el contenido si estamos en el cliente
+  if (!isClient) {
+    return <div>Cargando...</div>;
+  }
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
