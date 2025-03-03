@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import Modal from './Modal';
+import DefaultProductImage from './DefaultProductImage';
 
 interface DetailViewProps {
   isOpen: boolean;
@@ -113,20 +114,19 @@ export function DetailImage({ src, alt, caption }: { src: string; alt: string; c
     <figure className="relative">
       <div className="overflow-hidden rounded-lg bg-gray-800 shadow-md">
         {src ? (
-          <img 
-            src={src} 
-            alt={alt}
-            className="w-full h-auto object-contain max-h-80"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = '/placeholder-image.png';
-              (e.target as HTMLImageElement).alt = 'Imagen no disponible';
-            }}
-          />
+          <div className="relative w-full h-80">
+            <img 
+              src={src} 
+              alt={alt}
+              className="w-full h-full object-contain"
+              onError={() => {
+                // El error se maneja con el fallback visual
+              }}
+            />
+          </div>
         ) : (
-          <div className="w-full h-48 flex items-center justify-center bg-gray-800 text-gray-500">
-            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
+          <div className="w-full h-80">
+            <DefaultProductImage productName={alt} />
           </div>
         )}
       </div>

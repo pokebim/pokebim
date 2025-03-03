@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @theme {
   --font-sans: var(--font-geist-sans);
@@ -73,7 +75,7 @@ option {
   background: #444444;
 }
 
-/* Dropdown menu for task actions - fixing hover behavior */
+/* Dropdown menu for task actions */
 .dropdown .dropdown-menu {
   display: none;
   width: 150px;

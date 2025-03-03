@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '@/firebase/config';
+import { uploadFile } from '@/lib/storageService';
 import Image from 'next/image';
+import DefaultProductImage from '@/components/ui/DefaultProductImage';
 
 interface Product {
   id?: string;
@@ -34,9 +34,16 @@ const validateImageUrl = async (url: string): Promise<boolean> => {
   if (!url) return false;
   
   try {
-    const response = await fetch(url, { method: 'HEAD' });
-    const contentType = response.headers.get('content-type');
-    return response.ok && contentType?.startsWith('image/');
+    // Verificar si es una URL válida
+    new URL(url);
+    
+    // Intentar cargar la imagen para verificar que es válida
+    return new Promise((resolve) => {
+      const img = document.createElement('img');
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
   } catch (error) {
     console.error('Error validating image URL:', error);
     return false;
@@ -113,18 +120,26 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
   const handleImageUrlChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const url = e.target.value;
     setFormData(prev => ({ ...prev, imageUrl: url }));
+    setImagePreview(url); // Mostrar vista previa inmediatamente
     
     if (url) {
       setIsValidatingImage(true);
       setImageError('');
       
-      const isValid = await validateImageUrl(url);
-      
-      if (!isValid) {
-        setImageError('La URL proporcionada no es una imagen válida');
+      try {
+        // Verificar si es una URL válida
+        new URL(url);
+        setImageError('');
+      } catch (error) {
+        setImageError('La URL proporcionada no es válida');
+        setIsValidatingImage(false);
+        return;
       }
       
       setIsValidatingImage(false);
+    } else {
+      setImagePreview('');
+      setImageError('');
     }
   };
 
@@ -161,16 +176,27 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
     try {
       let finalImageUrl = formData.imageUrl;
 
-      // Si hay un archivo de imagen, subirlo a Firebase Storage
+      // Si hay un archivo de imagen, subirlo usando el servicio de almacenamiento
       if (formData.imageFile) {
-        const fileRef = ref(storage, `product-images/${Date.now()}-${formData.imageFile.name}`);
-        await uploadBytes(fileRef, formData.imageFile);
-        finalImageUrl = await getDownloadURL(fileRef);
+        try {
+          const filePath = `product-images/${Date.now()}-${formData.imageFile.name}`;
+          console.log('Subiendo archivo:', filePath);
+          finalImageUrl = await uploadFile(formData.imageFile, filePath);
+          console.log('URL de imagen obtenida:', finalImageUrl);
+        } catch (uploadError) {
+          console.error('Error al subir la imagen:', uploadError);
+          setError('Error al subir la imagen. Por favor, inténtalo de nuevo.');
+          setIsSubmitting(false);
+          return;
+        }
       } else if (formData.imageUrl) {
         // Validar URL si se proporcionó una
-        const isValid = await validateImageUrl(formData.imageUrl);
-        if (!isValid) {
-          setImageError('La URL proporcionada no es una imagen válida');
+        try {
+          // Solo verificar si es una URL válida
+          new URL(formData.imageUrl);
+        } catch (validationError) {
+          console.error('Error al validar URL:', validationError);
+          setImageError('La URL proporcionada no es válida');
           setIsSubmitting(false);
           return;
         }
@@ -178,15 +204,17 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
 
       const submissionData = {
         ...formData,
-        imageUrl: finalImageUrl || 'https://via.placeholder.com/400x250?text=Product+Image',
+        imageUrl: finalImageUrl || '',  // Si no hay imagen, dejar vacío
         supplierId: formData.supplierId || 'default-supplier'
       };
       
       delete submissionData.imageFile; // Eliminar el campo imageFile antes de enviar
-      onSubmit(submissionData);
+      
+      console.log('Enviando datos:', submissionData);
+      await onSubmit(submissionData);
     } catch (err) {
-      setError('Ocurrió un error al guardar el producto. Por favor, inténtalo de nuevo.');
       console.error('Error al enviar formulario:', err);
+      setError('Ocurrió un error al guardar el producto. Por favor, inténtalo de nuevo.');
     } finally {
       setIsSubmitting(false);
     }
@@ -348,15 +376,24 @@ export default function ProductForm({ onSubmit, onCancel, initialData, suppliers
           <p className="text-sm text-red-500">{imageError}</p>
         )}
 
-        {(imagePreview || formData.imageUrl) && (
+        {(imagePreview || formData.imageUrl) ? (
           <div className="mt-4">
             <p className="text-sm font-medium text-white mb-2">Vista previa:</p>
             <div className="relative w-48 h-48 rounded-lg overflow-hidden">
               <Image
-                src={imagePreview || formData.imageUrl || 'https://via.placeholder.com/400x250?text=Preview'}
+                src={imagePreview || formData.imageUrl}
                 alt="Preview"
                 fill
                 className="object-cover"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4">
+            <p className="text-sm font-medium text-white mb-2">Vista previa:</p>
+            <div className="w-48 h-48">
+              <DefaultProductImage 
+                productName={formData.name || 'Nuevo Producto'} 
               />
             </div>
           </div>

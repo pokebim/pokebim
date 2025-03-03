@@ -41,26 +41,21 @@ export default function ProductsPage() {
       
       // Validate image URLs in stored products
       const validatedProducts = firebaseProducts.map((product: Product) => {
-        // If imageUrl is missing or empty, generate a placeholder
-        if (!product.imageUrl || product.imageUrl.trim() === '') {
-          return {
-            ...product,
-            imageUrl: `https://via.placeholder.com/400x250?text=${encodeURIComponent(product.name || 'Product')}`
-          };
-        }
-        
         // Check if the URL is valid
-        try {
-          new URL(product.imageUrl);
-          return product;
-        } catch (e) {
-          // If invalid, replace with a placeholder
-          console.warn('Fixed invalid image URL for product:', product.name);
-          return {
-            ...product,
-            imageUrl: `https://via.placeholder.com/400x250?text=${encodeURIComponent(product.name || 'Product')}`
-          };
+        if (product.imageUrl) {
+          try {
+            new URL(product.imageUrl);
+            return product;
+          } catch (e) {
+            // If invalid URL, return product without imageUrl
+            console.warn('Invalid image URL for product:', product.name);
+            return {
+              ...product,
+              imageUrl: ''
+            };
+          }
         }
+        return product;
       });
       
       // Establecer los productos validados en el estado

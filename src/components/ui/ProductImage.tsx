@@ -1,12 +1,22 @@
-import Image from 'next/image';
 import { useState } from 'react';
+import Image from 'next/image';
+import ImageModal from './ImageModal';
+import DefaultProductImage from './DefaultProductImage';
 
 interface ProductImageProps {
-  imageUrl?: string;
-  productName?: string;
+  imageUrl: string;
+  productName: string;
   size?: 'tiny' | 'small' | 'medium' | 'large';
   className?: string;
+  clickable?: boolean;
 }
+
+const sizes = {
+  tiny: { width: 150, height: 150 },
+  small: { width: 200, height: 200 },
+  medium: { width: 300, height: 300 },
+  large: { width: 400, height: 400 },
+};
 
 /**
  * Componente reutilizable para mostrar imágenes de productos
@@ -14,45 +24,52 @@ interface ProductImageProps {
  */
 export default function ProductImage({ 
   imageUrl, 
-  productName = 'Product', 
-  size = 'small',
-  className = ''
+  productName, 
+  size = 'medium',
+  className = '',
+  clickable = true
 }: ProductImageProps) {
-  const [error, setError] = useState(false);
-  
-  // Determinar dimensiones basadas en el tamaño
-  const dimensions = {
-    tiny: { width: 8, height: 8 },     // 32px preview
-    small: { width: 12, height: 12 },   // 48px normal
-    medium: { width: 24, height: 24 },  // 96px medium
-    large: { width: 48, height: 48 }    // 192px large
-  }[size];
-  
-  // URL de fallback si no hay imagen disponible o hay error
-  const fallbackUrl = `https://via.placeholder.com/100x100?text=${encodeURIComponent(productName)}`;
-  
-  // Resetear el error si cambia la URL
-  const handleNewImage = () => {
-    if (error) setError(false);
+  const [showModal, setShowModal] = useState(false);
+  const [imageError, setImageError] = useState(false);
+  const { width, height } = sizes[size];
+
+  const handleClick = () => {
+    if (clickable && !imageError && imageUrl) {
+      setShowModal(true);
+    }
   };
-  
+
+  if (!imageUrl || imageError) {
+    return (
+      <div style={{ width, height }}>
+        <DefaultProductImage productName={productName} className={className} />
+      </div>
+    );
+  }
+
   return (
-    <div 
-      className={`relative overflow-hidden rounded-md ${className}`}
-      style={{ 
-        width: `${dimensions.width}rem`, 
-        height: `${dimensions.height}rem` 
-      }}
-    >
-      <Image 
-        src={!imageUrl || error ? fallbackUrl : imageUrl} 
-        alt={productName}
-        fill
-        sizes={`${dimensions.width}rem`}
-        className="transition-all hover:scale-110 duration-300 object-cover"
-        onError={() => setError(true)}
-        onLoadingComplete={handleNewImage}
+    <>
+      <div 
+        className={`relative ${className} ${clickable ? 'cursor-pointer transition-transform hover:scale-105' : ''}`} 
+        style={{ width, height }}
+        onClick={handleClick}
+      >
+        <Image
+          src={imageUrl}
+          alt={productName || 'Product image'}
+          fill
+          className="object-cover rounded-lg"
+          sizes={`(max-width: 768px) 100vw, ${width}px`}
+          onError={() => setImageError(true)}
+        />
+      </div>
+
+      <ImageModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        imageUrl={imageUrl}
+        altText={productName}
       />
-    </div>
+    </>
   );
 } 
