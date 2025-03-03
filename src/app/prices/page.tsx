@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import MainLayout from '@/components/layout/MainLayout';
 import Modal from '@/components/ui/Modal';
 import PriceForm from '@/components/forms/PriceForm';
@@ -72,13 +73,8 @@ interface BestPriceProduct {
 // Verificar si estamos en el cliente
 const isClient = typeof window !== 'undefined';
 
-export default function PricesPage() {
-  // Solo renderizamos el contenido si estamos en el cliente
-  if (!isClient) {
-    return <div>Cargando...</div>;
-  }
-  
-  // Aquí comienza el componente normal
+// Componente que se cargará solo en el cliente
+const PricesContent = () => {
   const [prices, setPrices] = useState<EnrichedPrice[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -1191,214 +1187,225 @@ export default function PricesPage() {
         />
       )}
       
-      <div className="py-6">
-        <div className="px-4 sm:px-6 md:px-8">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-semibold text-gray-200">Precios</h1>
-            <div className="flex space-x-2">
-              <button
-                onClick={() => {
-                  setEditingPrice(null);
-                  setModalOpen(true);
-                }}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition duration-150 ease-in-out"
+      <div className="container mx-auto p-4 max-w-full">
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl font-semibold text-gray-200">Precios</h1>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => {
+                setEditingPrice(null);
+                setModalOpen(true);
+              }}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition duration-150 ease-in-out"
+            >
+              Añadir precio
+            </button>
+            <button
+              onClick={fetchData}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition duration-150 ease-in-out"
+            >
+              Recargar datos
+            </button>
+            <button
+              onClick={repairMissingRelations}
+              className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition duration-150 ease-in-out"
+              title="Intenta reparar las relaciones entre precios, productos y proveedores"
+            >
+              Reparar
+            </button>
+            <button
+              onClick={runDiagnostics}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition duration-150 ease-in-out"
+              title="Ejecutar diagnóstico de la base de datos"
+            >
+              Diagnóstico
+            </button>
+          </div>
+        </div>
+        
+        {/* Panel de filtros */}
+        <div className="bg-gray-800 p-4 rounded-lg mb-6">
+          <h2 className="text-lg font-semibold text-white mb-2">Filtros</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div>
+              <label htmlFor="productName" className="block text-sm font-medium text-gray-300">Nombre de producto</label>
+              <input
+                type="text"
+                id="productName"
+                name="productName"
+                value={filters.productName}
+                onChange={handleFilterChange}
+                className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                placeholder="Buscar producto..."
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="productLanguage" className="block text-sm font-medium text-gray-300">Idioma</label>
+              <select
+                id="productLanguage"
+                name="productLanguage"
+                value={filters.productLanguage}
+                onChange={handleFilterChange}
+                className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
               >
-                Añadir precio
-              </button>
-              <button
-                onClick={fetchData}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition duration-150 ease-in-out"
+                <option value="">Todos los idiomas</option>
+                {uniqueLanguages.map(language => (
+                  <option key={language} value={language}>{language}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label htmlFor="productType" className="block text-sm font-medium text-gray-300">Tipo</label>
+              <select
+                id="productType"
+                name="productType"
+                value={filters.productType}
+                onChange={handleFilterChange}
+                className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
               >
-                Recargar datos
-              </button>
-              <button
-                onClick={repairMissingRelations}
-                className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition duration-150 ease-in-out"
-                title="Intenta reparar las relaciones entre precios, productos y proveedores"
+                <option value="">Todos los tipos</option>
+                {uniqueTypes.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label htmlFor="supplierName" className="block text-sm font-medium text-gray-300">Proveedor</label>
+              <select
+                id="supplierName"
+                name="supplierName"
+                value={filters.supplierName}
+                onChange={handleFilterChange}
+                className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
               >
-                Reparar
-              </button>
-              <button
-                onClick={runDiagnostics}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition duration-150 ease-in-out"
-                title="Ejecutar diagnóstico de la base de datos"
+                <option value="">Todos los proveedores</option>
+                {uniqueSuppliers.map(supplier => (
+                  <option key={supplier} value={supplier}>{supplier}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label htmlFor="supplierCountry" className="block text-sm font-medium text-gray-300">País</label>
+              <select
+                id="supplierCountry"
+                name="supplierCountry"
+                value={filters.supplierCountry}
+                onChange={handleFilterChange}
+                className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
               >
-                Diagnóstico
+                <option value="">Todos los países</option>
+                {uniqueCountries.map(country => (
+                  <option key={country} value={country}>{country}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label htmlFor="minPrice" className="block text-sm font-medium text-gray-300">Precio mínimo</label>
+              <input
+                type="number"
+                id="minPrice"
+                name="minPrice"
+                value={filters.minPrice}
+                onChange={handleFilterChange}
+                className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                placeholder="Mínimo"
+                min="0"
+                step="any"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="maxPrice" className="block text-sm font-medium text-gray-300">Precio máximo</label>
+              <input
+                type="number"
+                id="maxPrice"
+                name="maxPrice"
+                value={filters.maxPrice}
+                onChange={handleFilterChange}
+                className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
+                placeholder="Máximo"
+                min="0"
+                step="any"
+              />
+            </div>
+            
+            <div className="flex items-end">
+              <button
+                onClick={() => setFilters({
+                  productName: '',
+                  productLanguage: '',
+                  productType: '',
+                  supplierName: '',
+                  supplierCountry: '',
+                  minPrice: '',
+                  maxPrice: ''
+                })}
+                className="w-full h-9 px-3 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors duration-150"
+              >
+                Limpiar filtros
               </button>
             </div>
           </div>
-          
-          {/* Panel de filtros */}
-          <div className="bg-gray-800 p-4 rounded-lg mb-6">
-            <h2 className="text-lg font-semibold text-white mb-2">Filtros</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              <div>
-                <label htmlFor="productName" className="block text-sm font-medium text-gray-300">Nombre de producto</label>
-                <input
-                  type="text"
-                  id="productName"
-                  name="productName"
-                  value={filters.productName}
-                  onChange={handleFilterChange}
-                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                  placeholder="Buscar producto..."
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="productLanguage" className="block text-sm font-medium text-gray-300">Idioma</label>
-                <select
-                  id="productLanguage"
-                  name="productLanguage"
-                  value={filters.productLanguage}
-                  onChange={handleFilterChange}
-                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                >
-                  <option value="">Todos los idiomas</option>
-                  {uniqueLanguages.map(language => (
-                    <option key={language} value={language}>{language}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="productType" className="block text-sm font-medium text-gray-300">Tipo</label>
-                <select
-                  id="productType"
-                  name="productType"
-                  value={filters.productType}
-                  onChange={handleFilterChange}
-                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                >
-                  <option value="">Todos los tipos</option>
-                  {uniqueTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="supplierName" className="block text-sm font-medium text-gray-300">Proveedor</label>
-                <select
-                  id="supplierName"
-                  name="supplierName"
-                  value={filters.supplierName}
-                  onChange={handleFilterChange}
-                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                >
-                  <option value="">Todos los proveedores</option>
-                  {uniqueSuppliers.map(supplier => (
-                    <option key={supplier} value={supplier}>{supplier}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="supplierCountry" className="block text-sm font-medium text-gray-300">País</label>
-                <select
-                  id="supplierCountry"
-                  name="supplierCountry"
-                  value={filters.supplierCountry}
-                  onChange={handleFilterChange}
-                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                >
-                  <option value="">Todos los países</option>
-                  {uniqueCountries.map(country => (
-                    <option key={country} value={country}>{country}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div>
-                <label htmlFor="minPrice" className="block text-sm font-medium text-gray-300">Precio mínimo</label>
-                <input
-                  type="number"
-                  id="minPrice"
-                  name="minPrice"
-                  value={filters.minPrice}
-                  onChange={handleFilterChange}
-                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                  placeholder="Mínimo"
-                  min="0"
-                  step="any"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="maxPrice" className="block text-sm font-medium text-gray-300">Precio máximo</label>
-                <input
-                  type="number"
-                  id="maxPrice"
-                  name="maxPrice"
-                  value={filters.maxPrice}
-                  onChange={handleFilterChange}
-                  className="mt-1 block w-full rounded-md border-gray-700 bg-gray-900 text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm"
-                  placeholder="Máximo"
-                  min="0"
-                  step="any"
-                />
-              </div>
-              
-              <div className="flex items-end">
-                <button
-                  onClick={() => setFilters({
-                    productName: '',
-                    productLanguage: '',
-                    productType: '',
-                    supplierName: '',
-                    supplierCountry: '',
-                    minPrice: '',
-                    maxPrice: ''
-                  })}
-                  className="w-full h-9 px-3 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors duration-150"
-                >
-                  Limpiar filtros
-                </button>
-              </div>
-            </div>
+        </div>
+        
+        {error && (
+          <div className="mb-6 bg-red-900 p-4 rounded-md border border-red-700 text-white">
+            <p>{error}</p>
           </div>
-          
-          {error && (
-            <div className="mb-6 bg-red-900 p-4 rounded-md border border-red-700 text-white">
-              <p>{error}</p>
-            </div>
-          )}
-          
-          {loading ? (
-            <div className="py-12 flex justify-center items-center">
-              <p className="text-lg text-gray-400">Cargando datos...</p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-12">
-                <h2 className="text-xl font-semibold mb-4 text-gray-200">Mejores precios por producto</h2>
-                {filteredBestPrices.length > 0 ? (
-                  <div className="bg-gray-800 rounded-lg overflow-hidden">
-                    <DataTable
-                      data={filteredBestPrices}
-                      columns={bestPriceColumns}
-                    />
-                  </div>
-                ) : (
-                  <p className="text-gray-400">No hay datos disponibles para mostrar los mejores precios.</p>
-                )}
-              </div>
-              
-              <h2 className="text-xl font-semibold mb-4 text-gray-200">Lista completa de precios</h2>
-              {filteredPrices.length > 0 ? (
+        )}
+        
+        {loading ? (
+          <div className="py-12 flex justify-center items-center">
+            <p className="text-lg text-gray-400">Cargando datos...</p>
+          </div>
+        ) : (
+          <>
+            <div className="mb-12">
+              <h2 className="text-xl font-semibold mb-4 text-gray-200">Mejores precios por producto</h2>
+              {filteredBestPrices.length > 0 ? (
                 <div className="bg-gray-800 rounded-lg overflow-hidden">
                   <DataTable
-                    data={filteredPrices}
-                    columns={columns}
+                    data={filteredBestPrices}
+                    columns={bestPriceColumns}
                   />
                 </div>
               ) : (
-                <p className="text-gray-400">No hay precios disponibles. ¡Añade algunos nuevos!</p>
+                <p className="text-gray-400">No hay datos disponibles para mostrar los mejores precios.</p>
               )}
-            </>
-          )}
-        </div>
+            </div>
+            
+            <h2 className="text-xl font-semibold mb-4 text-gray-200">Lista completa de precios</h2>
+            {filteredPrices.length > 0 ? (
+              <div className="bg-gray-800 rounded-lg overflow-hidden">
+                <DataTable
+                  data={filteredPrices}
+                  columns={columns}
+                />
+              </div>
+            ) : (
+              <p className="text-gray-400">No hay precios disponibles. ¡Añade algunos nuevos!</p>
+            )}
+          </>
+        )}
       </div>
     </MainLayout>
   );
-}
+};
+
+// Exportar el componente con carga dinámica para evitar problemas de SSR
+export default dynamic(() => Promise.resolve(PricesContent), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center min-h-screen bg-gray-900">
+      <div className="text-center">
+        <div className="inline-block h-16 w-16 animate-spin rounded-full border-t-4 border-indigo-500 border-solid"></div>
+        <p className="mt-4 text-xl text-white">Cargando...</p>
+      </div>
+    </div>
+  ),
+});
