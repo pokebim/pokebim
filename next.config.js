@@ -29,8 +29,11 @@ const nextConfig = {
   
   // Configuración de webpack para manejar Firebase
   webpack: (config, { isServer }) => {
+    // Configuración específica para @grpc y otras dependencias nativas
+    config.externals = [...(config.externals || []), '@grpc/grpc-js'];
+
+    // Resolver problemas con módulos específicos
     if (!isServer) {
-      // No intentar resolver estos módulos en el lado del cliente
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
@@ -38,6 +41,16 @@ const nextConfig = {
         child_process: false,
         net: false,
         tls: false,
+        dns: false,
+        os: false,
+        http2: false,
+        util: false,
+        url: false,
+        zlib: false,
+        http: false,
+        https: false,
+        stream: false,
+        crypto: false,
       };
     }
     

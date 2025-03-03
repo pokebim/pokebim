@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createPokemonLinksGroup } from '@/scripts/createPokemonLinks';
 
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 // La API route para ejecutar el script
 export async function GET() {
   try {
