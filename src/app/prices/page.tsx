@@ -32,6 +32,8 @@ import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, Detail
 import PriceInlineEdit from '@/components/ui/PriceInlineEdit';
 import Image from 'next/image';
 import ProductImage from '@/components/ui/ProductImage';
+import ImageModal from '@/components/ui/ImageModal';
+import { flexRender } from '@tanstack/react-table';
 
 interface EnrichedPrice extends Price {
   product: {
@@ -83,6 +85,9 @@ export default function PricesPage() {
   // Nuevos estados para la vista detallada
   const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
   const [selectedPrice, setSelectedPrice] = useState<EnrichedPrice | null>(null);
+
+  // Estado para la imagen modal
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     fetchData();
@@ -362,6 +367,28 @@ export default function PricesPage() {
     }
   };
   
+  /**
+   * Obtener el color correspondiente al idioma
+   */
+  const getLanguageColor = (language: string): string => {
+    switch(language?.toLowerCase()) {
+      case 'japanese':
+        return 'red';
+      case 'english':
+        return 'blue';
+      case 'spanish':
+        return 'yellow';
+      case 'french':
+        return 'purple';
+      case 'italian':
+        return 'green';
+      case 'german':
+        return 'orange';
+      default:
+        return 'gray';
+    }
+  };
+  
   // Función para actualizar productos sin tipo
   const updateProductsMissingType = async (productsToUpdate: Product[]) => {
     let updatedCount = 0;
@@ -596,35 +623,44 @@ export default function PricesPage() {
           imageUrl={info.getValue()} 
           productName={info.row.original.product.name}
           size="small"
+          className="max-w-[80px] max-h-[60px]"
+          onClick={() => setSelectedImage(info.getValue() || '')}
         />
-      )
+      ),
+      size: 80,
     }),
     columnHelper.accessor('product.name', {
       header: 'Producto',
-      cell: info => <span className="font-medium text-white">{info.getValue()}</span>
+      cell: info => <span className="font-medium text-white">{info.getValue()}</span>,
+      size: 200,
     }),
     columnHelper.accessor('product.language', {
       header: 'Idioma',
       cell: info => {
         const language = info.getValue();
         return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            language === 'Japanese' ? 'bg-red-900 text-white' : 
-            language === 'English' ? 'bg-blue-900 text-white' : 
-            'bg-green-900 text-white'
-          }`}>
-            {language}
-          </span>
+          <div className="flex items-center gap-2">
+            <div className={`w-4 h-4 rounded-full bg-${getLanguageColor(language)}-500`}></div>
+            <span>{language}</span>
+          </div>
         );
-      }
+      },
+      size: 120,
+    }),
+    columnHelper.accessor('product.type', {
+      header: 'Tipo',
+      cell: info => info.getValue(),
+      size: 100,
     }),
     columnHelper.accessor('supplier.name', {
       header: 'Proveedor',
-      cell: info => <span className="text-gray-300">{info.getValue()}</span>
+      cell: info => info.getValue(),
+      size: 150,
     }),
     columnHelper.accessor('supplier.country', {
       header: 'País',
-      cell: info => <span className="text-gray-300">{info.getValue()}</span>
+      cell: info => info.getValue(),
+      size: 100,
     }),
     columnHelper.accessor(row => ({ price: row.price, currency: row.currency }), {
       id: 'priceFormatted',
@@ -657,7 +693,8 @@ export default function PricesPage() {
             }}
           />
         );
-      }
+      },
+      size: 150,
     }),
     columnHelper.accessor(row => ({ price: row.price, currency: row.currency }), {
       id: 'priceEUR',
@@ -700,7 +737,8 @@ export default function PricesPage() {
             }}
           />
         );
-      }
+      },
+      size: 150,
     }),
     columnHelper.accessor('notes', {
       header: 'Notas',
@@ -744,43 +782,47 @@ export default function PricesPage() {
           imageUrl={info.getValue()} 
           productName={info.row.original.productName}
           size="small"
+          className="max-w-[80px] max-h-[60px]"
+          onClick={() => setSelectedImage(info.getValue() || '')}
         />
-      )
+      ),
+      size: 80,
     }),
     bestPriceColumnHelper.accessor('productName', {
       header: 'Producto',
-      cell: info => <span className="font-medium text-white">{info.getValue()}</span>
+      cell: info => <span className="font-medium text-white">{info.getValue()}</span>,
+      size: 200,
+    }),
+    bestPriceColumnHelper.accessor('productType', {
+      header: 'Tipo',
+      cell: info => info.getValue(),
+      size: 100,
     }),
     bestPriceColumnHelper.accessor('productLanguage', {
       header: 'Idioma',
       cell: info => {
         const language = info.getValue();
         return (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            language === 'Japanese' ? 'bg-red-900 text-white' : 
-            language === 'English' ? 'bg-blue-900 text-white' : 
-            'bg-green-900 text-white'
-          }`}>
-            {language}
-          </span>
+          <div className="flex items-center gap-2">
+            <div className={`w-4 h-4 rounded-full bg-${getLanguageColor(language)}-500`}></div>
+            <span>{language}</span>
+          </div>
         );
-      }
+      },
+      size: 120,
     }),
-    bestPriceColumnHelper.accessor('supplierName', {
-      header: 'Mejor Proveedor',
-      cell: info => <span className="text-gray-300">{info.getValue()}</span>
-    }),
-    bestPriceColumnHelper.accessor(row => ({ price: row.bestPrice, currency: row.bestPriceCurrency }), {
-      id: 'bestPrice',
-      header: 'Mejor Precio',
+    bestPriceColumnHelper.accessor('bestPrice', {
+      header: 'Mejor precio',
       cell: info => {
-        const { price, currency } = info.getValue();
+        const price = info.getValue();
+        const currency = info.row.original.bestPriceCurrency;
         return (
           <span className="text-green-400 font-medium">
             {formatCurrency(price, currency)}
           </span>
         );
-      }
+      },
+      size: 150,
     }),
     bestPriceColumnHelper.accessor('bestPriceInEUR', {
       header: 'Precio (EUR)',
@@ -788,11 +830,18 @@ export default function PricesPage() {
         <span className="text-green-400 font-medium">
           {formatCurrency(info.getValue(), 'EUR')}
         </span>
-      )
+      ),
+      size: 150,
+    }),
+    bestPriceColumnHelper.accessor('supplierName', {
+      header: 'Proveedor',
+      cell: info => info.getValue(),
+      size: 150,
     }),
     bestPriceColumnHelper.accessor('supplierCountry', {
       header: 'País',
-      cell: info => <span className="text-gray-300">{info.getValue()}</span>
+      cell: info => info.getValue(),
+      size: 100,
     })
   ], []);
 
@@ -880,7 +929,190 @@ export default function PricesPage() {
 
   return (
     <MainLayout>
-      {/* Rest of the component content */}
+      {/* Notificación de éxito o error */}
+      {notification && notification.show && (
+        <div className={`fixed top-5 right-5 p-4 rounded-md shadow-xl z-50 ${
+          notification.type === 'success' ? 'bg-green-700 text-white' : 'bg-red-700 text-white'
+        }`}>
+          {notification.message}
+        </div>
+      )}
+      
+      {/* Modal para editar o agregar precios */}
+      <Modal
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingPrice(null);
+        }}
+        title={editingPrice ? "Editar precio" : "Añadir nuevo precio"}
+      >
+        <PriceForm
+          products={products}
+          suppliers={suppliers}
+          initialData={editingPrice}
+          onSubmit={handleSubmit}
+          isLoading={loading}
+        />
+      </Modal>
+      
+      {/* Modal para ver detalles */}
+      <Modal
+        isOpen={detailViewOpen}
+        onClose={() => setDetailViewOpen(false)}
+        title="Detalles del precio"
+      >
+        {selectedPrice && (
+          <DetailView>
+            <DetailSection title="Información del producto">
+              <DetailGrid>
+                <DetailField label="Nombre" value={selectedPrice.product.name} />
+                <DetailField 
+                  label="Idioma" 
+                  value={
+                    <DetailBadge 
+                      text={selectedPrice.product.language}
+                      color={
+                        selectedPrice.product.language === 'Japanese' ? 'red' : 
+                        selectedPrice.product.language === 'English' ? 'blue' : 
+                        'green'
+                      } 
+                    />
+                  } 
+                />
+                <DetailField label="Tipo" value={selectedPrice.product.type} />
+              </DetailGrid>
+              
+              {selectedPrice.product.imageUrl && (
+                <div className="mt-4">
+                  <ProductImage 
+                    imageUrl={selectedPrice.product.imageUrl} 
+                    productName={selectedPrice.product.name}
+                    size="medium"
+                  />
+                </div>
+              )}
+            </DetailSection>
+            
+            <DetailSection title="Información del proveedor">
+              <DetailGrid>
+                <DetailField label="Nombre" value={selectedPrice.supplier.name} />
+                <DetailField label="País" value={selectedPrice.supplier.country} />
+              </DetailGrid>
+            </DetailSection>
+            
+            <DetailSection title="Información del precio">
+              <DetailGrid>
+                <DetailField 
+                  label="Precio" 
+                  value={formatCurrency(selectedPrice.price || 0, selectedPrice.currency as Currency)} 
+                />
+                <DetailField 
+                  label="Precio (EUR)" 
+                  value={formatCurrency(
+                    convertCurrency(selectedPrice.price || 0, selectedPrice.currency as Currency, 'EUR'), 
+                    'EUR'
+                  )} 
+                />
+                <DetailField 
+                  label="Fecha" 
+                  value={selectedPrice.date ? new Date(selectedPrice.date).toLocaleDateString() : 'N/A'} 
+                />
+                <DetailField label="Notas" value={selectedPrice.notes || 'N/A'} />
+              </DetailGrid>
+            </DetailSection>
+          </DetailView>
+        )}
+      </Modal>
+      
+      {/* Modal para ampliar la imagen */}
+      {selectedImage && (
+        <ImageModal
+          isOpen={!!selectedImage}
+          onClose={() => setSelectedImage(null)}
+          imageUrl={selectedImage}
+          altText="Imagen del producto"
+        />
+      )}
+      
+      <div className="py-6">
+        <div className="px-4 sm:px-6 md:px-8">
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-semibold text-gray-200">Precios</h1>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => {
+                  setEditingPrice(null);
+                  setModalOpen(true);
+                }}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition duration-150 ease-in-out"
+              >
+                Añadir precio
+              </button>
+              <button
+                onClick={fetchData}
+                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition duration-150 ease-in-out"
+              >
+                Recargar datos
+              </button>
+              <button
+                onClick={repairMissingRelations}
+                className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition duration-150 ease-in-out"
+                title="Intenta reparar las relaciones entre precios, productos y proveedores"
+              >
+                Reparar
+              </button>
+              <button
+                onClick={runDiagnostics}
+                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition duration-150 ease-in-out"
+                title="Ejecutar diagnóstico de la base de datos"
+              >
+                Diagnóstico
+              </button>
+            </div>
+          </div>
+          
+          {error && (
+            <div className="mb-6 bg-red-900 p-4 rounded-md border border-red-700 text-white">
+              <p>{error}</p>
+            </div>
+          )}
+          
+          {loading ? (
+            <div className="py-12 flex justify-center items-center">
+              <p className="text-lg text-gray-400">Cargando datos...</p>
+            </div>
+          ) : (
+            <>
+              <div className="mb-12">
+                <h2 className="text-xl font-semibold mb-4 text-gray-200">Mejores precios por producto</h2>
+                {bestPrices.length > 0 ? (
+                  <div className="bg-gray-800 rounded-lg overflow-hidden">
+                    <DataTable
+                      data={bestPrices}
+                      columns={bestPriceColumns}
+                    />
+                  </div>
+                ) : (
+                  <p className="text-gray-400">No hay datos disponibles para mostrar los mejores precios.</p>
+                )}
+              </div>
+              
+              <h2 className="text-xl font-semibold mb-4 text-gray-200">Lista completa de precios</h2>
+              {prices.length > 0 ? (
+                <div className="bg-gray-800 rounded-lg overflow-hidden">
+                  <DataTable
+                    data={prices}
+                    columns={columns}
+                  />
+                </div>
+              ) : (
+                <p className="text-gray-400">No hay precios disponibles. ¡Añade algunos nuevos!</p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </MainLayout>
   );
 }
