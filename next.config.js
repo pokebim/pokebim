@@ -29,8 +29,8 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  webpack: (config, { isServer }) => {
-    // No usamos estos módulos en el navegador
+  webpack: (config) => {
+    // Proporcionar fallbacks vacíos para módulos de Node.js
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
@@ -39,26 +39,12 @@ const nextConfig = {
       dns: false,
       child_process: false,
       http2: false,
+      '@firebase/webchannel-wrapper/bloom-blob': false,
     };
 
-    // Preferir módulos específicos del navegador
+    // Asegurar que los módulos de browser sean priorizados
     config.resolve.mainFields = ['browser', 'module', 'main'];
-
-    // Ignorar ciertos módulos específicos que no son necesarios en el navegador
-    config.plugins.push(new webpack.IgnorePlugin({
-      resourceRegExp: /^\.\/(?:transport|http|https|error|webchannel-wrapper|node-fetch|bloom-blob)$/,
-      contextRegExp: /@firebase|@grpc\/grpc-js/
-    }));
-
-    // Usar la versión "web" de Firebase en lugar de la versión "node"
-    if (!isServer) {
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        // Forzar el uso de las versiones web/browser de los paquetes
-        '@firebase/firestore': '@firebase/firestore/dist/index.esm2017.js',
-      };
-    }
-
+    
     return config;
   },
 };

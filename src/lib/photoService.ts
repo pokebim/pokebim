@@ -9,8 +9,10 @@ import {
   query,
   where,
   orderBy,
-  serverTimestamp
-} from "firebase/firestore";
+  serverTimestamp,
+  limit,
+  startAfter
+} from "firebase/firestore/lite";
 import { 
   getStorage, 
   ref, 

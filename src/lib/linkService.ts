@@ -10,8 +10,9 @@ import {
   where, 
   orderBy, 
   serverTimestamp,
-  writeBatch
-} from "firebase/firestore";
+  Timestamp
+} from "firebase/firestore/lite";
+import { writeBatch } from "firebase/firestore";
 import { db } from "./firebase";
 
 // Interfaz para los grupos de enlaces

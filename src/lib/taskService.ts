@@ -7,7 +7,7 @@ import {
   deleteDoc,
   query,
   orderBy
-} from "firebase/firestore";
+} from "firebase/firestore/lite";
 import { db } from "./firebase";
 
 // Interfaz para la tarea
