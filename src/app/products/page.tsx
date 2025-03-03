@@ -27,6 +27,9 @@ export default function ProductsPage() {
   // Nuevos estados para la vista detallada
   const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  // Estado para el modal de imagen ampliada
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string>('');
 
   useEffect(() => {
     fetchProducts();
@@ -163,6 +166,12 @@ export default function ProductsPage() {
     setDetailViewOpen(true);
   };
 
+  // Función para manejar la apertura del modal de imagen
+  const handleImageClick = (imageUrl: string) => {
+    setSelectedImageUrl(imageUrl);
+    setImageModalOpen(true);
+  };
+
   // Modificar la función para renderizar los productos
   const renderProducts = () => {
     if (loading) return <div className="text-center py-8">Cargando productos...</div>;
@@ -182,13 +191,14 @@ export default function ProductsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProducts.map(product => (
           <div key={product.id} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden flex flex-col">
-            {/* Imagen del producto usando el componente ProductImage */}
-            <div className="relative w-full h-48 overflow-hidden">
+            {/* Contenedor de imagen con ratio fijo */}
+            <div className="pt-[65%] relative bg-gray-900">
               <ProductImage 
                 imageUrl={product.imageUrl} 
                 productName={product.name}
                 size="large"
-                className="w-full h-full"
+                className="absolute inset-0"
+                onClick={() => product.imageUrl && handleImageClick(product.imageUrl)}
               />
             </div>
             <div className="p-4 flex-grow flex flex-col">
@@ -261,6 +271,33 @@ export default function ProductsPage() {
         />
       </Modal>
       
+      {/* Modal para imagen ampliada */}
+      <Modal
+        isOpen={imageModalOpen}
+        onClose={() => setImageModalOpen(false)}
+        title="Vista ampliada"
+      >
+        <div className="relative w-full h-[70vh]">
+          {selectedImageUrl && (
+            <Image 
+              src={selectedImageUrl}
+              alt="Imagen ampliada"
+              fill
+              className="object-contain"
+              unoptimized
+            />
+          )}
+        </div>
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={() => setImageModalOpen(false)}
+            className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+          >
+            Cerrar
+          </button>
+        </div>
+      </Modal>
+      
       {/* Vista detallada del producto */}
       {selectedProduct && (
         <DetailView
@@ -294,12 +331,22 @@ export default function ProductsPage() {
             {/* Mostrar imagen del producto */}
             {selectedProduct.imageUrl && (
               <div className="mb-6 flex justify-center">
-                <ProductImage 
-                  imageUrl={selectedProduct.imageUrl} 
-                  productName={selectedProduct.name}
-                  size="large"
-                  className="border-2 border-gray-700"
-                />
+                <div 
+                  className="relative w-full h-80 cursor-pointer hover:opacity-95 transition-opacity"
+                  onClick={() => handleImageClick(selectedProduct.imageUrl || '')}
+                >
+                  <ProductImage 
+                    imageUrl={selectedProduct.imageUrl} 
+                    productName={selectedProduct.name}
+                    size="large"
+                    className="border-2 border-gray-700"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black bg-opacity-30 transition-opacity">
+                    <span className="text-white font-medium px-3 py-1 bg-gray-800 rounded-md">
+                      Click para ampliar
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
             <DetailGrid>
