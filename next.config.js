@@ -25,7 +25,7 @@ const nextConfig = {
   },
 
   // Transpilar los paquetes problemáticos
-  transpilePackages: ['@firebase/firestore', '@firebase/app', '@firebase/auth', '@firebase/storage', '@firebase/functions', '@grpc/grpc-js'],
+  transpilePackages: ['@firebase/firestore', '@firebase/app', '@firebase/auth', '@firebase/storage', '@firebase/functions'],
   
   // Configuración de webpack para manejar módulos de Node
   webpack: (config, { isServer }) => {
@@ -42,8 +42,21 @@ const nextConfig = {
         net: false,
         tls: false,
         dns: false,
-        'call-stream': false,
-        'call-credentials-filter': false
+      };
+      
+      // Excluir completamente los módulos gRPC problemáticos
+      config.externals = [
+        ...(config.externals || []),
+        { '@grpc/grpc-js': 'commonjs @grpc/grpc-js' }
+      ];
+      
+      // Agregar alias para los módulos problemáticos
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        './call-stream': './grpc-mock.js',
+        './call-credentials-filter': './grpc-mock.js',
+        '@grpc/grpc-js/build/src/call-stream': require.resolve('./src/lib/grpc-mock.js'),
+        '@grpc/grpc-js/build/src/call-credentials-filter': require.resolve('./src/lib/grpc-mock.js')
       };
     }
     

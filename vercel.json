@@ -14,9 +14,10 @@
     }
   },
   "functions": {
-    "src/app/api/**/*": {
+    "api/**/*.js": {
       "memory": 1024,
       "maxDuration": 10
     }
-  }
+  },
+  "installCommand": "npm install"
 } 
