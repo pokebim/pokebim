@@ -495,18 +495,11 @@ export default function PricesContent() {
         return (
           <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
                onClick={() => imageUrl && handleImageClick(imageUrl)}>
-            {imageUrl ? (
-              <ProductImage 
-                src={imageUrl} 
-                alt={info.row.original.product?.name || 'Producto'} 
-                className="rounded-md object-contain max-h-10 max-w-10" 
-              />
-            ) : (
-              <DefaultProductImage 
-                productName={info.row.original.product?.name || 'Producto'}
-                className="w-10 h-10"
-              />
-            )}
+            <ProductImage 
+              src={imageUrl} 
+              alt={info.row.original.product?.name || 'Producto'} 
+              className="rounded-md object-contain max-h-10 max-w-10" 
+            />
           </div>
         );
       }
@@ -655,18 +648,11 @@ export default function PricesContent() {
         return (
           <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
                onClick={() => imageUrl && handleImageClick(imageUrl)}>
-            {imageUrl ? (
-              <ProductImage 
-                src={imageUrl} 
-                alt={(info.row.original as unknown as BestPriceProduct).productName} 
-                className="rounded-md object-contain max-h-10 max-w-10" 
-              />
-            ) : (
-              <DefaultProductImage 
-                productName={(info.row.original as unknown as BestPriceProduct).productName}
-                className="w-10 h-10"
-              />
-            )}
+            <ProductImage 
+              src={imageUrl} 
+              alt={(info.row.original as unknown as BestPriceProduct).productName} 
+              className="rounded-md object-contain max-h-10 max-w-10" 
+            />
           </div>
         );
       }
@@ -709,18 +695,11 @@ export default function PricesContent() {
       return (
         <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
              onClick={() => imageUrl && handleImageClick(imageUrl)}>
-          {imageUrl ? (
-            <ProductImage 
-              src={imageUrl} 
-              alt={info.row.original.product?.name || 'Producto'} 
-              className="rounded-md object-contain max-h-10 max-w-10" 
-            />
-          ) : (
-            <DefaultProductImage 
-              productName={info.row.original.product?.name || 'Producto'}
-              className="w-10 h-10"
-            />
-          )}
+          <ProductImage 
+            src={imageUrl} 
+            alt={info.row.original.product?.name || 'Producto'} 
+            className="rounded-md object-contain max-h-10 max-w-10" 
+          />
         </div>
       );
     }
@@ -962,28 +941,17 @@ export default function PricesContent() {
           onClose={() => setDetailViewOpen(false)}
           title={`Detalles del Precio: ${selectedPrice.product.name}`}
         >
-          {selectedPrice.product.imageUrl ? (
-            <div className="mb-6 flex justify-center">
-              <div className="w-48 h-48 relative cursor-pointer"
-                   onClick={() => handleImageClick(selectedPrice.product.imageUrl!)}>
-                <ProductImage
-                  src={selectedPrice.product.imageUrl}
-                  alt={selectedPrice.product.name}
-                  size="large"
-                  className="rounded-lg"
-                />
-              </div>
+          <div className="mb-6 flex justify-center">
+            <div className="w-48 h-48 relative cursor-pointer"
+                 onClick={() => selectedPrice.product.imageUrl && handleImageClick(selectedPrice.product.imageUrl)}>
+              <ProductImage
+                src={selectedPrice.product.imageUrl}
+                alt={selectedPrice.product.name}
+                size="large"
+                className="rounded-lg"
+              />
             </div>
-          ) : (
-            <div className="mb-6 flex justify-center">
-              <div className="w-48 h-48 relative">
-                <DefaultProductImage
-                  productName={selectedPrice.product.name}
-                  className="rounded-lg"
-                />
-              </div>
-            </div>
-          )}
+          </div>
           
           <DetailGrid>
             <DetailSection title="Información del Producto">
