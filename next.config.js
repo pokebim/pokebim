@@ -25,6 +25,23 @@ const nextConfig = {
     // !! ADVERTENCIA !!
     // Ignorando los errores de ESLint para evitar problemas en el build
     ignoreDuringBuilds: true,
+  },
+  
+  // Configuración de webpack para manejar Firebase
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // No intentar resolver estos módulos en el lado del cliente
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        child_process: false,
+        net: false,
+        tls: false,
+      };
+    }
+    
+    return config;
   }
 };
 

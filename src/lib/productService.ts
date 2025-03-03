@@ -7,7 +7,7 @@ import {
   deleteDoc, 
   query, 
   where 
-} from "firebase/firestore";
+} from "firebase/firestore/lite";
 import { db } from "./firebase";
 
 // Interfaz para el producto

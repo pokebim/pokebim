@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { getFirestore, collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore/lite';
 
 // Configurar las opciones de la ruta para que sea compatible con Node.js Runtime
 export const runtime = 'nodejs';
