@@ -56,13 +56,14 @@ export default function ProductImage({
   if (!src || error) {
     return (
       <div 
-        className={`relative ${className} ${cursorStyle}`}
+        className={`relative ${className}`}
         onClick={onClick}
         title={onClick ? "Haz clic para ampliar" : alt}
       >
         <DefaultProductImage 
           productName={alt} 
           className="w-full h-full"
+          showName={false}
         />
       </div>
     );

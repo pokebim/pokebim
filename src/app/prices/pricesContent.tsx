@@ -493,13 +493,15 @@ export default function PricesContent() {
       cell: info => {
         const imageUrl = info.row.original.product?.imageUrl;
         return (
-          <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
+          <div className="relative w-10 h-10 overflow-hidden flex-shrink-0" 
                onClick={() => imageUrl && handleImageClick(imageUrl)}>
-            <ProductImage 
-              src={imageUrl} 
-              alt={info.row.original.product?.name || 'Producto'} 
-              className="rounded-md object-contain max-h-10 max-w-10" 
-            />
+            <div className={`absolute inset-0 flex items-center justify-center ${imageUrl ? 'cursor-pointer' : ''}`}>
+              <ProductImage 
+                src={imageUrl} 
+                alt={info.row.original.product?.name || 'Producto'} 
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
           </div>
         );
       }
@@ -646,13 +648,15 @@ export default function PricesContent() {
       cell: info => {
         const imageUrl = (info.row.original as unknown as BestPriceProduct).productImageUrl;
         return (
-          <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
+          <div className="relative w-10 h-10 overflow-hidden flex-shrink-0" 
                onClick={() => imageUrl && handleImageClick(imageUrl)}>
-            <ProductImage 
-              src={imageUrl} 
-              alt={(info.row.original as unknown as BestPriceProduct).productName} 
-              className="rounded-md object-contain max-h-10 max-w-10" 
-            />
+            <div className={`absolute inset-0 flex items-center justify-center ${imageUrl ? 'cursor-pointer' : ''}`}>
+              <ProductImage 
+                src={imageUrl} 
+                alt={(info.row.original as unknown as BestPriceProduct).productName} 
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
           </div>
         );
       }
@@ -693,13 +697,15 @@ export default function PricesContent() {
     cell: info => {
       const imageUrl = info.row.original.product?.imageUrl;
       return (
-        <div className="w-10 h-10 flex items-center justify-center cursor-pointer" 
+        <div className="relative w-10 h-10 overflow-hidden flex-shrink-0" 
              onClick={() => imageUrl && handleImageClick(imageUrl)}>
-          <ProductImage 
-            src={imageUrl} 
-            alt={info.row.original.product?.name || 'Producto'} 
-            className="rounded-md object-contain max-h-10 max-w-10" 
-          />
+          <div className={`absolute inset-0 flex items-center justify-center ${imageUrl ? 'cursor-pointer' : ''}`}>
+            <ProductImage 
+              src={imageUrl} 
+              alt={info.row.original.product?.name || 'Producto'} 
+              className="max-w-full max-h-full object-contain"
+            />
+          </div>
         </div>
       );
     }
@@ -942,14 +948,15 @@ export default function PricesContent() {
           title={`Detalles del Precio: ${selectedPrice.product.name}`}
         >
           <div className="mb-6 flex justify-center">
-            <div className="w-48 h-48 relative cursor-pointer"
+            <div className="relative w-48 h-48 rounded-lg overflow-hidden" 
                  onClick={() => selectedPrice.product.imageUrl && handleImageClick(selectedPrice.product.imageUrl)}>
-              <ProductImage
-                src={selectedPrice.product.imageUrl}
-                alt={selectedPrice.product.name}
-                size="large"
-                className="rounded-lg"
-              />
+              <div className={`absolute inset-0 flex items-center justify-center ${selectedPrice.product.imageUrl ? 'cursor-pointer' : ''}`}>
+                <ProductImage
+                  src={selectedPrice.product.imageUrl}
+                  alt={selectedPrice.product.name}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
             </div>
           </div>
           
