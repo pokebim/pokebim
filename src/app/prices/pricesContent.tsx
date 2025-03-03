@@ -483,14 +483,19 @@ export default function PricesContent() {
         const price = info.row.original;
         return (
           <PriceInlineEdit 
+            id={price.id}
             price={price.price} 
             currency={price.currency} 
-            onSave={async (newPrice) => {
+            onUpdate={async (newPrice) => {
               try {
+                // Actualizar en Firebase
                 await updatePrice(price.id, { price: newPrice });
+                
+                // Actualizar en el estado local
                 setPrices(prev => 
                   prev.map(p => p.id === price.id ? { ...p, price: newPrice } : p)
                 );
+                
                 showNotification('Precio actualizado correctamente');
               } catch (error) {
                 console.error('Error al actualizar el precio:', error);
@@ -507,7 +512,34 @@ export default function PricesContent() {
       cell: info => {
         const price = info.row.original;
         const priceInEUR = convertCurrency(price.price, price.currency, 'EUR');
-        return formatCurrency(priceInEUR, 'EUR');
+        
+        return (
+          <PriceInlineEdit 
+            id={price.id}
+            price={priceInEUR} 
+            currency={'EUR'} 
+            directUpdate={false}
+            onUpdate={async (newPriceEUR) => {
+              try {
+                // Convertir el nuevo precio en EUR a la moneda original
+                const newOriginalPrice = convertCurrency(newPriceEUR, 'EUR', price.currency);
+                
+                // Actualizar en Firebase
+                await updatePrice(price.id, { price: newOriginalPrice });
+                
+                // Actualizar en el estado local
+                setPrices(prev => 
+                  prev.map(p => p.id === price.id ? { ...p, price: newOriginalPrice } : p)
+                );
+                
+                showNotification('Precio actualizado correctamente');
+              } catch (error) {
+                console.error('Error al actualizar el precio:', error);
+                showNotification('Error al actualizar el precio', 'error');
+              }
+            }}
+          />
+        );
       }
     }),
     columnHelper.accessor('currency', {

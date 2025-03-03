@@ -27,8 +27,8 @@ export default function ProductImage({
   // Determinar dimensiones basadas en el tamaño
   const dimensions = {
     small: { width: 60, height: 60 },
-    medium: { width: 100, height: 100 },
-    large: { width: 160, height: 160 }
+    medium: { width: 120, height: 120 },
+    large: { width: 240, height: 240 }
   }[size];
   
   // URL de fallback si no hay imagen disponible o hay error
@@ -55,12 +55,7 @@ export default function ProductImage({
   
   return (
     <div 
-      className={`relative flex items-center justify-center overflow-hidden rounded-md ${className} ${cursorStyle}`}
-      style={{ 
-        width: dimensions.width,
-        height: dimensions.height,
-        background: '#f3f4f6'
-      }}
+      className={`relative flex items-center justify-center ${className} ${cursorStyle}`}
       onClick={onClick}
       title={onClick ? "Haz clic para ampliar" : alt}
     >
@@ -74,9 +69,7 @@ export default function ProductImage({
         <img 
           src={imageSrc} 
           alt={alt}
-          width={dimensions.width}
-          height={dimensions.height}
-          className={`max-w-full max-h-full object-contain transition-all duration-300 ${onClick ? 'hover:scale-105' : ''} ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+          className={`w-full h-full object-contain transition-all duration-300 ${onClick ? 'hover:scale-105' : ''} ${isLoading ? 'opacity-0' : 'opacity-100'}`}
           onError={() => setError(true)}
           onLoad={handleImageLoad}
         />

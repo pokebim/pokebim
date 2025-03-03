@@ -191,13 +191,13 @@ export default function ProductsContent() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
         {filteredProducts.map(product => (
           <div key={product.id} className="bg-gray-800 rounded-md shadow overflow-hidden flex flex-col border border-gray-700 hover:border-gray-500 transition-colors">
-            {/* Contenedor de imagen con ratio fijo */}
-            <div className="pt-[60%] relative bg-gray-900">
+            {/* Contenedor de imagen con tamaño fijo y mejor aprovechamiento del espacio */}
+            <div className="h-48 flex items-center justify-center bg-gray-900">
               <ProductImage 
                 src={product.imageUrl} 
                 alt={product.name}
-                size="small"
-                className="absolute inset-0"
+                size="medium"
+                className="w-full h-full object-contain p-2"
                 onClick={() => product.imageUrl && handleImageClick(product.imageUrl)}
               />
             </div>
