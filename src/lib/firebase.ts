@@ -1,8 +1,8 @@
 'use client';
 
-// Archivo restaurado a una versión básica
+// Importaciones de firebase simplificadas, explícitamente usando la versión del navegador
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore/lite'; // Usar la versión lite para el navegador
 
 // Configuración de Firebase
 const firebaseConfig = {

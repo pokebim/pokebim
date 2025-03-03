@@ -1,6 +1,6 @@
 // Script para crear un nuevo grupo de enlaces de compra de Pokemon y añadir todos los enlaces
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore/lite';
 import {
   collection,
   addDoc,
@@ -8,7 +8,7 @@ import {
   getDocs,
   query,
   where
-} from 'firebase/firestore';
+} from 'firebase/firestore/lite';
 
 // Configuración de Firebase (copiar de src/lib/firebase.ts)
 const firebaseConfig = {

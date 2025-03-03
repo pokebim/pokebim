@@ -30,27 +30,34 @@ const nextConfig = {
   },
 
   webpack: (config, { isServer }) => {
+    // No usamos estos módulos en el navegador
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
       net: false,
       tls: false,
-      // Optionally, add other fallbacks if needed
+      dns: false,
+      child_process: false,
+      http2: false,
     };
 
-    // Prefer browser specific modules
+    // Preferir módulos específicos del navegador
     config.resolve.mainFields = ['browser', 'module', 'main'];
 
-    // Ignore specific modules in @grpc/grpc-js that are not needed in browser environments
+    // Ignorar ciertos módulos específicos que no son necesarios en el navegador
     config.plugins.push(new webpack.IgnorePlugin({
-      resourceRegExp: /^\.\/error$/,
-      contextRegExp: /@grpc\/grpc-js/
+      resourceRegExp: /^\.\/(?:transport|http|https|error|webchannel-wrapper|node-fetch|bloom-blob)$/,
+      contextRegExp: /@firebase|@grpc\/grpc-js/
     }));
 
-    config.plugins.push(new webpack.IgnorePlugin({
-      resourceRegExp: /^\.\/transport$/,
-      contextRegExp: /@grpc\/grpc-js/
-    }));
+    // Usar la versión "web" de Firebase en lugar de la versión "node"
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        // Forzar el uso de las versiones web/browser de los paquetes
+        '@firebase/firestore': '@firebase/firestore/dist/index.esm2017.js',
+      };
+    }
 
     return config;
   },
