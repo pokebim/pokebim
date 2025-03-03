@@ -1,18 +1,16 @@
 import { 
   collection, 
   addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
   getDocs, 
-  getDoc, 
-  query, 
-  where, 
+  getDoc,
+  doc, 
+  updateDoc, 
+  deleteDoc,
+  query,
+  where,
   orderBy, 
-  serverTimestamp,
-  Timestamp
+  serverTimestamp
 } from "firebase/firestore/lite";
-import { writeBatch } from "firebase/firestore";
 import { db } from "./firebase";
 
 // Interfaz para los grupos de enlaces
@@ -41,23 +39,23 @@ export interface Link {
   updatedAt?: any;
 }
 
-// Referencias a las colecciones en Firestore
-const linkGroupsCollection = collection(db, "linkGroups");
-const linksCollection = collection(db, "links");
-
 /**
  * Obtiene todos los grupos de enlaces ordenados por el campo 'order'
  */
 export async function getAllLinkGroups(): Promise<LinkGroup[]> {
   try {
-    const q = query(linkGroupsCollection, orderBy("order", "asc"));
+    const groupsCollection = collection(db, "link_groups");
+    const q = query(groupsCollection, orderBy("order", "asc"));
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as LinkGroup));
+    
+    return snapshot.docs.map(doc => {
+      return { 
+        id: doc.id, 
+        ...doc.data() as Omit<LinkGroup, 'id'> 
+      };
+    });
   } catch (error) {
-    console.error("Error al obtener grupos de enlaces:", error);
+    console.error("Error getting link groups:", error);
     throw error;
   }
 }
@@ -67,19 +65,19 @@ export async function getAllLinkGroups(): Promise<LinkGroup[]> {
  */
 export async function getLinkGroupById(id: string): Promise<LinkGroup | null> {
   try {
-    const docRef = doc(db, "linkGroups", id);
+    const docRef = doc(db, "link_groups", id);
     const snapshot = await getDoc(docRef);
     
     if (!snapshot.exists()) {
       return null;
     }
     
-    return {
-      id: snapshot.id,
-      ...snapshot.data()
-    } as LinkGroup;
+    return { 
+      id: snapshot.id, 
+      ...snapshot.data() as Omit<LinkGroup, 'id'> 
+    };
   } catch (error) {
-    console.error(`Error al obtener grupo de enlaces con ID ${id}:`, error);
+    console.error(`Error getting link group ${id}:`, error);
     throw error;
   }
 }
@@ -89,23 +87,24 @@ export async function getLinkGroupById(id: string): Promise<LinkGroup | null> {
  */
 export async function createLinkGroup(group: Omit<LinkGroup, 'id'>): Promise<string> {
   try {
-    // Obtener todos los grupos para determinar el orden del nuevo grupo
+    // Get all groups first to determine the maximum order
     const groups = await getAllLinkGroups();
-    const newOrder = groups.length > 0 
-      ? Math.max(...groups.map(g => g.order)) + 1 
+    const maxOrder = groups.length > 0 
+      ? Math.max(...groups.map(g => g.order || 0)) 
       : 0;
     
-    const groupWithTimestamp = {
+    // Set the order for the new group
+    const groupWithOrder = {
       ...group,
-      order: newOrder,
+      order: maxOrder + 1,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
     
-    const docRef = await addDoc(linkGroupsCollection, groupWithTimestamp);
+    const docRef = await addDoc(collection(db, "link_groups"), groupWithOrder);
     return docRef.id;
   } catch (error) {
-    console.error("Error al crear grupo de enlaces:", error);
+    console.error("Error creating link group:", error);
     throw error;
   }
 }
@@ -115,17 +114,15 @@ export async function createLinkGroup(group: Omit<LinkGroup, 'id'>): Promise<str
  */
 export async function updateLinkGroup(id: string, group: Partial<LinkGroup>): Promise<void> {
   try {
-    const groupRef = doc(db, "linkGroups", id);
-    
-    // Añadir timestamp de actualización
-    const groupWithTimestamp = {
+    const groupRef = doc(db, "link_groups", id);
+    const updateData = {
       ...group,
       updatedAt: serverTimestamp()
     };
     
-    await updateDoc(groupRef, groupWithTimestamp);
+    await updateDoc(groupRef, updateData);
   } catch (error) {
-    console.error(`Error al actualizar grupo de enlaces ${id}:`, error);
+    console.error(`Error updating link group ${id}:`, error);
     throw error;
   }
 }
@@ -135,28 +132,19 @@ export async function updateLinkGroup(id: string, group: Partial<LinkGroup>): Pr
  */
 export async function deleteLinkGroup(id: string): Promise<void> {
   try {
-    // Obtener todos los enlaces del grupo
+    // Delete the group
+    const groupRef = doc(db, "link_groups", id);
+    await deleteDoc(groupRef);
+    
+    // Get and delete all links for this group
     const links = await getLinksByGroup(id);
-    
-    // Usar un batch para eliminar todos los enlaces y el grupo en una sola operación
-    const batch = writeBatch(db);
-    
-    // Añadir operaciones para eliminar cada enlace
     for (const link of links) {
       if (link.id) {
-        const linkRef = doc(db, "links", link.id);
-        batch.delete(linkRef);
+        await deleteLink(link.id);
       }
     }
-    
-    // Añadir operación para eliminar el grupo
-    const groupRef = doc(db, "linkGroups", id);
-    batch.delete(groupRef);
-    
-    // Ejecutar todas las operaciones
-    await batch.commit();
   } catch (error) {
-    console.error(`Error al eliminar grupo de enlaces ${id}:`, error);
+    console.error(`Error deleting link group ${id}:`, error);
     throw error;
   }
 }
@@ -166,19 +154,16 @@ export async function deleteLinkGroup(id: string): Promise<void> {
  */
 export async function updateLinkGroupsOrder(orderedGroups: {id: string, order: number}[]): Promise<void> {
   try {
-    const batch = writeBatch(db);
-    
-    orderedGroups.forEach(({id, order}) => {
-      const groupRef = doc(db, "linkGroups", id);
-      batch.update(groupRef, { 
-        order,
-        updatedAt: serverTimestamp()
+    // Procesar cada grupo individualmente en lugar de usar un batch
+    for (const group of orderedGroups) {
+      const groupRef = doc(db, "link_groups", group.id);
+      await updateDoc(groupRef, { 
+        order: group.order,
+        updatedAt: serverTimestamp() 
       });
-    });
-    
-    await batch.commit();
+    }
   } catch (error) {
-    console.error("Error al actualizar el orden de los grupos:", error);
+    console.error("Error updating link groups order:", error);
     throw error;
   }
 }
@@ -188,19 +173,22 @@ export async function updateLinkGroupsOrder(orderedGroups: {id: string, order: n
  */
 export async function getLinksByGroup(groupId: string): Promise<Link[]> {
   try {
+    const linksCollection = collection(db, "links");
     const q = query(
       linksCollection, 
       where("groupId", "==", groupId),
       orderBy("order", "asc")
     );
-    
     const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    } as Link));
+    
+    return snapshot.docs.map(doc => {
+      return { 
+        id: doc.id, 
+        ...doc.data() as Omit<Link, 'id'> 
+      };
+    });
   } catch (error) {
-    console.error(`Error al obtener enlaces del grupo ${groupId}:`, error);
+    console.error(`Error getting links for group ${groupId}:`, error);
     throw error;
   }
 }
@@ -217,12 +205,12 @@ export async function getLinkById(id: string): Promise<Link | null> {
       return null;
     }
     
-    return {
-      id: snapshot.id,
-      ...snapshot.data()
-    } as Link;
+    return { 
+      id: snapshot.id, 
+      ...snapshot.data() as Omit<Link, 'id'> 
+    };
   } catch (error) {
-    console.error(`Error al obtener enlace con ID ${id}:`, error);
+    console.error(`Error getting link ${id}:`, error);
     throw error;
   }
 }
@@ -232,24 +220,25 @@ export async function getLinkById(id: string): Promise<Link | null> {
  */
 export async function createLink(link: Omit<Link, 'id'>): Promise<string> {
   try {
-    // Obtener todos los enlaces del grupo para determinar el orden del nuevo enlace
+    // Get all links first to determine the maximum order in this group
     const links = await getLinksByGroup(link.groupId);
-    const newOrder = links.length > 0 
-      ? Math.max(...links.map(l => l.order)) + 1 
+    const maxOrder = links.length > 0 
+      ? Math.max(...links.map(l => l.order || 0)) 
       : 0;
     
-    const linkWithTimestamp = {
+    // Set the order for the new link
+    const linkWithDetails = {
       ...link,
-      order: newOrder,
+      order: maxOrder + 1,
       clicks: 0,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
     
-    const docRef = await addDoc(linksCollection, linkWithTimestamp);
+    const docRef = await addDoc(collection(db, "links"), linkWithDetails);
     return docRef.id;
   } catch (error) {
-    console.error("Error al crear enlace:", error);
+    console.error("Error creating link:", error);
     throw error;
   }
 }

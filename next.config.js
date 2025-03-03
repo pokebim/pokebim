@@ -30,7 +30,7 @@ const nextConfig = {
   },
 
   webpack: (config) => {
-    // Proporcionar fallbacks vacíos para módulos de Node.js
+    // Proporcionar fallbacks para módulos de Node.js
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
@@ -39,7 +39,14 @@ const nextConfig = {
       dns: false,
       child_process: false,
       http2: false,
-      '@firebase/webchannel-wrapper/bloom-blob': false,
+      crypto: false,
+      stream: false,
+      os: false,
+      path: false,
+      zlib: false,
+      './error': false,
+      './transport': false,
+      '@firebase/webchannel-wrapper/bloom-blob': false
     };
 
     // Asegurar que los módulos de browser sean priorizados
