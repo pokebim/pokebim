@@ -1,10 +1,26 @@
-// Este archivo debe ser importado solo en componentes del cliente
-import { initializeApp, getApps } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+// Este archivo solo importa lo necesario para el cliente
+import { initializeApp, getApp, getApps } from 'firebase/app';
+import { 
+  getFirestore, 
+  collection, 
+  getDocs, 
+  getDoc, 
+  doc, 
+  setDoc, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  startAfter, 
+  DocumentData 
+} from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
-// Configuración de Firebase
+// Configuración del Firebase (sin importar módulos del servidor)
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -12,20 +28,43 @@ const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Inicializar Firebase solo una vez
-let firebaseApp;
-if (!getApps().length) {
-  firebaseApp = initializeApp(firebaseConfig);
-} else {
-  firebaseApp = getApps()[0];
+function initializeFirebaseClient() {
+  if (!getApps().length) {
+    return initializeApp(firebaseConfig);
+  }
+  return getApp();
 }
 
-// Exportar instancias
-export const auth = getAuth(firebaseApp);
-export const db = getFirestore(firebaseApp);
-export const storage = getStorage(firebaseApp);
+// Inicializar
+const app = initializeFirebaseClient();
 
-export default firebaseApp; 
+// Exportar funciones específicas del cliente
+export const clientFirestore = getFirestore(app);
+export const clientAuth = getAuth(app);
+export const clientStorage = getStorage(app);
+
+// Exportar también las funciones y tipos de Firestore para uso en cliente
+export {
+  collection,
+  getDocs,
+  getDoc,
+  doc,
+  setDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
+  startAfter,
+  DocumentData,
+  signInWithEmailAndPassword,
+  signOut,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+}; 
