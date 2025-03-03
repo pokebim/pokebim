@@ -1,6 +1,10 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { convertCurrency, formatCurrency, type Currency } from '@/lib/currencyConverter';
-import Select, { SingleValue, ActionMeta } from 'react-select';
+import Select2 from '@/components/ui/Select2';
+import { getAllProducts } from '@/lib/productService';
+import { getAllSuppliers } from '@/lib/supplierService';
 
 interface Price {
   id?: string;
@@ -13,23 +17,24 @@ interface Price {
   productId?: string;
   supplierId?: string;
   boxesPerPack?: number | null;
+  inStock?: boolean;
+  url?: string;
+  shippingCost?: number;
 }
 
 interface Product {
   id: string;
   name: string;
   language?: string;
+  imageUrl?: string;
+  type?: string;
 }
 
 interface Supplier {
   id: string;
   name: string;
   shippingCost?: number;
-}
-
-interface SelectOption {
-  value: string;
-  label: string;
+  country?: string;
 }
 
 interface PriceFormProps {
@@ -49,14 +54,17 @@ export default function PriceForm({
 }: PriceFormProps) {
   const [formData, setFormData] = useState<Price>({
     price: 0,
-    currency: 'JPY',
+    currency: 'EUR',
     priceUnit: 'Per Box',
     bulkPrice: null,
     shipping: null,
     notes: '',
     productId: '',
     supplierId: '',
-    boxesPerPack: null
+    boxesPerPack: null,
+    inStock: true,
+    url: '',
+    shippingCost: 0
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,64 +79,64 @@ export default function PriceForm({
   useEffect(() => {
     if (initialData) {
       // Asegurarse de que todas las propiedades tengan valores válidos
-      const safeInitialData = {
-        price: parseFloat(initialData.price?.toString() || '0'),
-        currency: initialData.currency || 'JPY',
+      setFormData({
+        ...initialData,
+        price: initialData.price ?? 0,
+        currency: initialData.currency || 'EUR',
         priceUnit: initialData.priceUnit || 'Per Box',
-        bulkPrice: initialData.bulkPrice != null ? parseFloat(initialData.bulkPrice.toString()) : null,
-        shipping: initialData.shipping != null ? parseFloat(initialData.shipping.toString()) : null,
+        bulkPrice: initialData.bulkPrice != null ? initialData.bulkPrice : null,
+        shipping: initialData.shipping != null ? initialData.shipping : null,
         notes: initialData.notes || '',
         productId: initialData.productId || '',
         supplierId: initialData.supplierId || '',
-        boxesPerPack: initialData.boxesPerPack != null ? parseFloat(initialData.boxesPerPack.toString()) : null
-      };
-      setFormData(safeInitialData);
+        boxesPerPack: initialData.boxesPerPack != null ? initialData.boxesPerPack : null,
+        inStock: initialData.inStock ?? true,
+        url: initialData.url || '',
+        shippingCost: initialData.shippingCost ?? 0
+      });
     }
   }, [initialData]);
   
   useEffect(() => {
-    // Cargar productos solo una vez al inicio
-    if (products.length === 0 && productsList.length === 0) {
-      setLoadingProducts(true);
-      try {
-        const storedProducts = JSON.parse(localStorage.getItem('products') || '[]');
-        const formattedProducts = storedProducts.map((product: any) => ({
-          id: product.id,
-          name: product.name,
-          language: product.language
-        }));
-        setProductsList(formattedProducts);
-      } catch (err) {
-        console.error('Error al cargar productos:', err);
-        setError('Error al cargar productos: ' + (err instanceof Error ? err.message : String(err)));
-      } finally {
-        setLoadingProducts(false);
+    // Cargar productos si no se proporcionaron como prop
+    const loadProducts = async () => {
+      if (products.length === 0 && productsList.length === 0) {
+        setLoadingProducts(true);
+        try {
+          const fetchedProducts = await getAllProducts();
+          setProductsList(fetchedProducts);
+        } catch (err) {
+          console.error('Error al cargar productos:', err);
+          setError('Error al cargar productos: ' + (err instanceof Error ? err.message : String(err)));
+        } finally {
+          setLoadingProducts(false);
+        }
+      } else if (products.length > 0 && productsList.length === 0) {
+        setProductsList(products);
       }
-    } else if (products.length > 0 && productsList.length === 0) {
-      setProductsList(products);
-    }
+    };
     
-    // Cargar proveedores solo una vez al inicio
-    if (suppliers.length === 0 && suppliersList.length === 0) {
-      setLoadingSuppliers(true);
-      try {
-        const storedSuppliers = JSON.parse(localStorage.getItem('suppliers') || '[]');
-        const formattedSuppliers = storedSuppliers.map((supplier: any) => ({
-          id: supplier.id,
-          name: supplier.name,
-          shippingCost: supplier.shippingCost
-        }));
-        setSuppliersList(formattedSuppliers);
-      } catch (err) {
-        console.error('Error al cargar proveedores:', err);
-        setError('Error al cargar proveedores: ' + (err instanceof Error ? err.message : String(err)));
-      } finally {
-        setLoadingSuppliers(false);
+    // Cargar proveedores si no se proporcionaron como prop
+    const loadSuppliers = async () => {
+      if (suppliers.length === 0 && suppliersList.length === 0) {
+        setLoadingSuppliers(true);
+        try {
+          const fetchedSuppliers = await getAllSuppliers();
+          setSuppliersList(fetchedSuppliers);
+        } catch (err) {
+          console.error('Error al cargar proveedores:', err);
+          setError('Error al cargar proveedores: ' + (err instanceof Error ? err.message : String(err)));
+        } finally {
+          setLoadingSuppliers(false);
+        }
+      } else if (suppliers.length > 0 && suppliersList.length === 0) {
+        setSuppliersList(suppliers);
       }
-    } else if (suppliers.length > 0 && suppliersList.length === 0) {
-      setSuppliersList(suppliers);
-    }
-  }, []); // Solo se ejecuta una vez al montar el componente
+    };
+    
+    loadProducts();
+    loadSuppliers();
+  }, [products, suppliers, productsList.length, suppliersList.length]);
   
   // Manejar la selección de producto/proveedor por defecto solo después de cargar datos
   useEffect(() => {
@@ -169,14 +177,20 @@ export default function PriceForm({
   }, [formData.price, formData.boxesPerPack, formData.priceUnit, formData.currency]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target;
+    
+    if (type === 'checkbox') {
+      const checkbox = e.target as HTMLInputElement;
+      setFormData(prev => ({ ...prev, [name]: checkbox.checked }));
+    } else if (type === 'number') {
+      setFormData(prev => ({ ...prev, [name]: value === '' ? '' : Number(value) }));
+    } else {
+      setFormData(prev => ({ ...prev, [name]: value }));
+    }
   };
 
-  const handleReactSelectChange = (selectedOption: SingleValue<SelectOption>, actionMeta: ActionMeta<SelectOption>) => {
-    if (actionMeta.name) {
-      setFormData(prev => ({ ...prev, [actionMeta.name]: selectedOption?.value || '' }));
-    }
+  const handleSelectChange = (name: string, value: string) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -184,19 +198,8 @@ export default function PriceForm({
     setIsSubmitting(true);
     setError('');
     
-    // No validation required - all fields are optional
-    
     try {
-      // Convertir valores numéricos
-      const dataToSubmit = {
-        ...formData,
-        price: formData.price !== undefined ? parseFloat(formData.price.toString()) : 0,
-        bulkPrice: formData.bulkPrice ? parseFloat(formData.bulkPrice.toString()) : null,
-        shipping: formData.shipping ? parseFloat(formData.shipping.toString()) : null,
-        boxesPerPack: formData.boxesPerPack ? parseFloat(formData.boxesPerPack.toString()) : null
-      };
-      
-      onSubmit(dataToSubmit);
+      onSubmit(formData);
     } catch (err) {
       setError('Ocurrió un error al guardar el precio. Por favor, inténtalo de nuevo.');
       console.error('Error al enviar formulario:', err);
@@ -205,68 +208,18 @@ export default function PriceForm({
     }
   };
 
-  // Estilos para react-select
-  const customSelectStyles = {
-    control: (base: any) => ({
-      ...base,
-      background: '#1f2937',
-      borderColor: '#374151',
-      boxShadow: 'none',
-      '&:hover': {
-        borderColor: '#22c55e'
-      }
-    }),
-    menu: (base: any) => ({
-      ...base,
-      background: '#1f2937',
-      borderRadius: '0.375rem',
-      marginTop: '0.25rem',
-      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
-    }),
-    option: (base: any, state: any) => ({
-      ...base,
-      backgroundColor: state.isSelected ? '#22c55e' : state.isFocused ? '#374151' : '#1f2937',
-      '&:hover': {
-        backgroundColor: '#374151'
-      }
-    }),
-    singleValue: (base: any) => ({
-      ...base,
-      color: 'white'
-    }),
-    input: (base: any) => ({
-      ...base,
-      color: 'white'
-    }),
-    placeholder: (base: any) => ({
-      ...base,
-      color: '#9ca3af'
-    }),
-    dropdownIndicator: (base: any) => ({
-      ...base,
-      color: '#d1d5db',
-      '&:hover': {
-        color: 'white'
-      }
-    }),
-    clearIndicator: (base: any) => ({
-      ...base,
-      color: '#d1d5db',
-      '&:hover': {
-        color: 'white'
-      }
-    })
-  };
-
-  // Opciones para los selects
+  // Convertir productos y proveedores al formato requerido por Select2
   const productOptions = productsList.map(product => ({
     value: product.id,
-    label: product.language ? `${product.name} (${product.language})` : product.name
+    label: product.name,
+    details: product.language || '',
+    imageUrl: product.imageUrl
   }));
 
   const supplierOptions = suppliersList.map(supplier => ({
     value: supplier.id,
-    label: supplier.name
+    label: supplier.name,
+    details: supplier.country || '',
   }));
 
   return (
@@ -279,48 +232,44 @@ export default function PriceForm({
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="productId" className="block text-sm font-bold text-white">
+          <label htmlFor="productId" className="block text-sm font-bold text-white mb-2">
             Producto
           </label>
-          <Select
+          <Select2
             id="productId"
             name="productId"
             options={productOptions}
-            value={productOptions.find(option => option.value === formData.productId)}
-            onChange={(option, actionMeta) => handleReactSelectChange(option, actionMeta)}
+            value={formData.productId || ''}
+            onChange={(value) => handleSelectChange('productId', value)}
             placeholder="Selecciona un producto"
-            isDisabled={loadingProducts}
-            isLoading={loadingProducts}
-            styles={customSelectStyles}
-            className="mt-1"
+            disabled={loadingProducts}
+            required
           />
         </div>
 
         <div>
-          <label htmlFor="supplierId" className="block text-sm font-bold text-white">
+          <label htmlFor="supplierId" className="block text-sm font-bold text-white mb-2">
             Proveedor
           </label>
-          <Select
+          <Select2
             id="supplierId"
             name="supplierId"
             options={supplierOptions}
-            value={supplierOptions.find(option => option.value === formData.supplierId)}
-            onChange={(option, actionMeta) => handleReactSelectChange(option, actionMeta)}
+            value={formData.supplierId || ''}
+            onChange={(value) => handleSelectChange('supplierId', value)}
             placeholder="Selecciona un proveedor"
-            isDisabled={loadingSuppliers}
-            isLoading={loadingSuppliers}
-            styles={customSelectStyles}
-            className="mt-1"
+            disabled={loadingSuppliers}
+            required
           />
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label htmlFor="price" className="block text-sm font-bold text-white">
+          <label htmlFor="price" className="block text-sm font-bold text-white mb-2">
             Precio
           </label>
-          <div className="mt-1 flex rounded-md shadow-sm">
+          <div className="flex rounded-md shadow-sm">
             <input
               type="number"
               id="price"
@@ -329,13 +278,21 @@ export default function PriceForm({
               onChange={handleChange}
               min="0"
               step="0.01"
-              className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+              className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
+              required
             />
           </div>
+          {formData.price > 0 && (
+            <div className="mt-1">
+              <span className="text-sm text-gray-400">
+                Equivale a {priceInEUR}
+              </span>
+            </div>
+          )}
         </div>
 
         <div>
-          <label htmlFor="currency" className="block text-sm font-bold text-white">
+          <label htmlFor="currency" className="block text-sm font-bold text-white mb-2">
             Moneda
           </label>
           <select
@@ -343,19 +300,20 @@ export default function PriceForm({
             name="currency"
             value={formData.currency}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+            className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
+            required
           >
-            <option value="JPY" className="text-white">JPY (¥)</option>
-            <option value="USD" className="text-white">USD ($)</option>
-            <option value="EUR" className="text-white">EUR (€)</option>
-            <option value="GBP" className="text-white">GBP (£)</option>
-            <option value="CNY" className="text-white">CNY (¥)</option>
-            <option value="KRW" className="text-white">KRW (₩)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="USD">USD ($)</option>
+            <option value="JPY">JPY (¥)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="CNY">CNY (¥)</option>
+            <option value="KRW">KRW (₩)</option>
           </select>
         </div>
 
         <div>
-          <label htmlFor="priceUnit" className="block text-sm font-bold text-white">
+          <label htmlFor="priceUnit" className="block text-sm font-bold text-white mb-2">
             Unidad de Precio
           </label>
           <select
@@ -363,13 +321,13 @@ export default function PriceForm({
             name="priceUnit"
             value={formData.priceUnit}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+            className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
           >
-            <option value="Per Box" className="text-white">Por Caja</option>
-            <option value="Per Pack" className="text-white">Por Pack</option>
-            <option value="Per Card" className="text-white">Por Carta</option>
-            <option value="Per Collection" className="text-white">Por Colección</option>
-            <option value="Per Tin" className="text-white">Por Lata</option>
+            <option value="Per Box">Por Caja</option>
+            <option value="Per Pack">Por Pack</option>
+            <option value="Per Card">Por Carta</option>
+            <option value="Per Collection">Por Colección</option>
+            <option value="Per Tin">Por Lata</option>
           </select>
         </div>
       </div>
@@ -378,10 +336,10 @@ export default function PriceForm({
       {formData.priceUnit === 'Per Pack' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="boxesPerPack" className="block text-sm font-bold text-white">
+            <label htmlFor="boxesPerPack" className="block text-sm font-bold text-white mb-2">
               Cantidad de cajas por pack
             </label>
-            <div className="mt-1 flex rounded-md shadow-sm">
+            <div className="flex rounded-md shadow-sm">
               <input
                 type="number"
                 id="boxesPerPack"
@@ -390,7 +348,7 @@ export default function PriceForm({
                 onChange={handleChange}
                 min="1"
                 step="1"
-                className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+                className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
               />
             </div>
           </div>
@@ -405,82 +363,83 @@ export default function PriceForm({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="bulkPrice" className="block text-sm font-bold text-white">
-            Precio por Volumen (opcional)
+          <label htmlFor="url" className="block text-sm font-bold text-white mb-2">
+            URL
           </label>
-          <div className="mt-1 flex rounded-md shadow-sm">
-            <input
-              type="number"
-              id="bulkPrice"
-              name="bulkPrice"
-              value={formData.bulkPrice || ''}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
-            />
-          </div>
-          <p className="mt-1 text-xs text-gray-400">
-            Precio aplicable al comprar en cantidades grandes.
-          </p>
+          <input
+            type="url"
+            id="url"
+            name="url"
+            value={formData.url || ''}
+            onChange={handleChange}
+            className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
+            placeholder="https://..."
+          />
         </div>
-
+        
         <div>
-          <label htmlFor="shipping" className="block text-sm font-bold text-white">
-            Costo de Envío (opcional)
+          <label htmlFor="shippingCost" className="block text-sm font-bold text-white mb-2">
+            Coste de envío
           </label>
-          <div className="mt-1 flex rounded-md shadow-sm">
-            <input
-              type="number"
-              id="shipping"
-              name="shipping"
-              value={formData.shipping || ''}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
-            />
-          </div>
-          <p className="mt-1 text-xs text-gray-400">
-            Dejar en blanco si el envío es gratuito.
-          </p>
+          <input
+            type="number"
+            id="shippingCost"
+            name="shippingCost"
+            value={formData.shippingCost ?? ''}
+            onChange={handleChange}
+            min="0"
+            step="0.01"
+            className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
+          />
         </div>
       </div>
 
       <div>
-        <label htmlFor="notes" className="block text-sm font-bold text-white">
-          Notas (opcional)
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="inStock"
+            name="inStock"
+            checked={formData.inStock}
+            onChange={(e) => setFormData(prev => ({ ...prev, inStock: e.target.checked }))}
+            className="h-4 w-4 rounded border-gray-700 text-green-600 focus:ring-green-500"
+          />
+          <label htmlFor="inStock" className="ml-2 block text-sm font-bold text-white">
+            Disponible en stock
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label htmlFor="notes" className="block text-sm font-bold text-white mb-2">
+          Notas
         </label>
         <textarea
           id="notes"
           name="notes"
-          value={formData.notes}
+          value={formData.notes || ''}
           onChange={handleChange}
           rows={3}
-          className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white placeholder-gray-400"
-          placeholder="Información adicional sobre el precio, disponibilidad, etc."
-        ></textarea>
-      </div>
-
-      <div className="bg-gray-800 p-3 rounded-md text-sm mt-2">
-        <p className="text-gray-300">Precio equivalente en EUR: <span className="font-medium text-white">{priceInEUR}</span></p>
+          className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
+          placeholder="Información adicional..."
+        />
       </div>
 
       <div className="flex justify-end space-x-3 pt-4">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md border border-gray-700 bg-gray-800 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700"
+          className="px-4 py-2 border border-gray-700 rounded-md bg-gray-800 text-white hover:bg-gray-700"
           disabled={isSubmitting}
         >
           Cancelar
         </button>
         <button
           type="submit"
-          className="rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-600 disabled:opacity-50"
+          className="px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600"
           disabled={isSubmitting}
         >
-          {isSubmitting ? 'Guardando...' : 'Guardar'}
+          {isSubmitting ? 'Guardando...' : initialData ? 'Actualizar' : 'Añadir'}
         </button>
       </div>
     </form>
