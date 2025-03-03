@@ -20,8 +20,9 @@ const nextConfig = {
   
   // Para excluir módulos problemáticos en el cliente
   webpack: (config, { isServer }) => {
+    // Módulos que siempre deben ser excluidos
     if (!isServer) {
-      // Proporcionar fallbacks para módulos de Node.js en el cliente
+      // Evitar que webpack intente importar módulos de Node.js en el cliente
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
@@ -39,10 +40,28 @@ const nextConfig = {
         dns: false,
         tty: false,
         module: false,
-        '@grpc/grpc-js': false
       };
+      
+      // Excluir completamente gRPC y sus dependencias
+      config.externals = [
+        ...(config.externals || []),
+        '@grpc/grpc-js',
+        '@grpc/proto-loader',
+        'grpc'
+      ];
     }
+    
     return config;
+  },
+  
+  // Evitar que Next.js intente analizar estos paquetes
+  experimental: {
+    serverComponentsExternalPackages: [
+      '@grpc/grpc-js',
+      '@grpc/proto-loader',
+      'grpc',
+      'firebase-admin'
+    ]
   },
   
   // Procesar estos paquetes correctamente
