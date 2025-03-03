@@ -25,7 +25,18 @@ const nextConfig = {
     // !! ADVERTENCIA !!
     // Ignorando los errores de ESLint para evitar problemas en el build
     ignoreDuringBuilds: true,
-  }
+  },
+
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+      // Optionally, add other fallbacks if needed
+    };
+    return config;
+  },
 };
 
 module.exports = nextConfig; 
