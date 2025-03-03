@@ -44,7 +44,7 @@ export interface Link {
  */
 export async function getAllLinkGroups(): Promise<LinkGroup[]> {
   try {
-    const groupsCollection = collection(db, "link_groups");
+    const groupsCollection = collection(db, "linkGroups");
     const q = query(groupsCollection, orderBy("order", "asc"));
     const snapshot = await getDocs(q);
     
@@ -65,7 +65,7 @@ export async function getAllLinkGroups(): Promise<LinkGroup[]> {
  */
 export async function getLinkGroupById(id: string): Promise<LinkGroup | null> {
   try {
-    const docRef = doc(db, "link_groups", id);
+    const docRef = doc(db, "linkGroups", id);
     const snapshot = await getDoc(docRef);
     
     if (!snapshot.exists()) {
@@ -101,7 +101,7 @@ export async function createLinkGroup(group: Omit<LinkGroup, 'id'>): Promise<str
       updatedAt: serverTimestamp()
     };
     
-    const docRef = await addDoc(collection(db, "link_groups"), groupWithOrder);
+    const docRef = await addDoc(collection(db, "linkGroups"), groupWithOrder);
     return docRef.id;
   } catch (error) {
     console.error("Error creating link group:", error);
@@ -114,7 +114,7 @@ export async function createLinkGroup(group: Omit<LinkGroup, 'id'>): Promise<str
  */
 export async function updateLinkGroup(id: string, group: Partial<LinkGroup>): Promise<void> {
   try {
-    const groupRef = doc(db, "link_groups", id);
+    const groupRef = doc(db, "linkGroups", id);
     const updateData = {
       ...group,
       updatedAt: serverTimestamp()
@@ -133,7 +133,7 @@ export async function updateLinkGroup(id: string, group: Partial<LinkGroup>): Pr
 export async function deleteLinkGroup(id: string): Promise<void> {
   try {
     // Delete the group
-    const groupRef = doc(db, "link_groups", id);
+    const groupRef = doc(db, "linkGroups", id);
     await deleteDoc(groupRef);
     
     // Get and delete all links for this group
@@ -156,7 +156,7 @@ export async function updateLinkGroupsOrder(orderedGroups: {id: string, order: n
   try {
     // Procesar cada grupo individualmente en lugar de usar un batch
     for (const group of orderedGroups) {
-      const groupRef = doc(db, "link_groups", group.id);
+      const groupRef = doc(db, "linkGroups", group.id);
       await updateDoc(groupRef, { 
         order: group.order,
         updatedAt: serverTimestamp() 
