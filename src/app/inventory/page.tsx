@@ -18,6 +18,7 @@ import {
   Product, 
   getAllProducts 
 } from '@/lib/productService';
+import { ChangeEvent, FormEvent } from 'react';
 
 interface Notification {
   show: boolean;
@@ -31,6 +32,23 @@ interface EnrichedInventoryItem extends InventoryItem {
     language: string;
     type?: string;
   };
+}
+
+interface InventoryFormData {
+  productId: string;
+  quantity: number;
+  location: string;
+  condition: string;
+  purchaseDate: string;
+  purchasePrice: number | string;
+  purchaseCurrency: string;
+  notes: string;
+}
+
+interface InventoryFormProps {
+  onSubmit: (data: InventoryFormData) => void;
+  onCancel: () => void;
+  initialData?: Partial<InventoryFormData>;
 }
 
 export default function InventoryPage() {
@@ -119,7 +137,7 @@ export default function InventoryPage() {
     }
   };
 
-  const handleSubmit = async (formData: any) => {
+  const handleSubmit = async (formData: InventoryFormData) => {
     try {
       if (editingItem) {
         // Actualizar elemento existente
@@ -311,8 +329,8 @@ export default function InventoryPage() {
   ], []);
 
   // Formulario para inventario
-  const InventoryForm = ({ onSubmit, onCancel, initialData }) => {
-    const [formData, setFormData] = useState({
+  const InventoryForm = ({ onSubmit, onCancel, initialData }: InventoryFormProps) => {
+    const [formData, setFormData] = useState<InventoryFormData>({
       productId: initialData?.productId || '',
       quantity: initialData?.quantity || 1,
       location: initialData?.location || '',
@@ -320,10 +338,10 @@ export default function InventoryPage() {
       purchaseDate: initialData?.purchaseDate || '',
       purchasePrice: initialData?.purchasePrice || '',
       purchaseCurrency: initialData?.purchaseCurrency || 'EUR',
-      notes: initialData?.notes || '',
+      notes: initialData?.notes || ''
     });
 
-    const handleChange = (e) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       const { name, value } = e.target;
       setFormData(prev => ({
         ...prev,
@@ -333,14 +351,14 @@ export default function InventoryPage() {
       }));
     };
 
-    const handleSelectChange = (name, value) => {
+    const handleSelectChange = (name: string, value: string) => {
       setFormData(prev => ({
         ...prev,
         [name]: value
       }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       onSubmit(formData);
     };
