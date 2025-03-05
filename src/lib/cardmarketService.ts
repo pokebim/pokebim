@@ -98,11 +98,16 @@ export async function updateCardmarketPriceForProduct(
       };
     }
     
-    // Actualizar el producto en Firebase
-    await updateProduct(productId, {
+    // Datos a actualizar en formato seguro
+    const updatedData: any = {
       cardmarketPrice: priceData.price,
-      lastPriceUpdate: serverTimestamp()
-    });
+      // En lugar de usar serverTimestamp(), usaremos una fecha convertida a string
+      // para evitar problemas con la serialización de objetos Firebase
+      lastPriceUpdate: new Date().toISOString()
+    };
+    
+    // Actualizar el producto en Firebase
+    await updateProduct(productId, updatedData);
     
     return {
       success: true,

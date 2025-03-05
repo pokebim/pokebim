@@ -44,28 +44,29 @@ export default function ProductsContent() {
       const firebaseProducts = await getAllProducts();
       console.log('FIREBASE: Loaded products:', firebaseProducts);
       
-      // Validate image URLs in stored products
+      // Validate and complete product data
       const validatedProducts = firebaseProducts.map((product: Product) => {
-        // If imageUrl is missing or empty, generate a placeholder
-        if (!product.imageUrl || product.imageUrl.trim() === '') {
-          return {
-            ...product,
-            imageUrl: `https://via.placeholder.com/400x250?text=${encodeURIComponent(product.name || 'Product')}`
-          };
+        const updatedProduct = { ...product };
+        
+        // Validate image URL
+        if (!updatedProduct.imageUrl || updatedProduct.imageUrl.trim() === '') {
+          updatedProduct.imageUrl = `https://via.placeholder.com/400x250?text=${encodeURIComponent(product.name || 'Product')}`;
+        } else {
+          try {
+            new URL(updatedProduct.imageUrl);
+          } catch (e) {
+            console.warn('Fixed invalid image URL for product:', product.name);
+            updatedProduct.imageUrl = `https://via.placeholder.com/400x250?text=${encodeURIComponent(product.name || 'Product')}`;
+          }
         }
         
-        // Check if the URL is valid
-        try {
-          new URL(product.imageUrl);
-          return product;
-        } catch (e) {
-          // If invalid, replace with a placeholder
-          console.warn('Fixed invalid image URL for product:', product.name);
-          return {
-            ...product,
-            imageUrl: `https://via.placeholder.com/400x250?text=${encodeURIComponent(product.name || 'Product')}`
-          };
+        // Ensure Cardmarket fields are initialized
+        if (typeof updatedProduct.cardmarketPrice !== 'number') {
+          updatedProduct.cardmarketPrice = 0;
         }
+        
+        // Return complete product
+        return updatedProduct;
       });
       
       // Establecer los productos validados en el estado
@@ -198,7 +199,8 @@ export default function ProductsContent() {
       const result = await updateCardmarketPriceForProduct(productId, cardmarketUrl);
       
       if (result.success && result.price) {
-        const now = new Date();
+        // Fecha actual en formato ISO para evitar problemas con objetos Date
+        const dateString = new Date().toISOString();
         
         // Actualizar el producto en el estado local
         setProducts(prev => prev.map(product => {
@@ -206,7 +208,7 @@ export default function ProductsContent() {
             return {
               ...product,
               cardmarketPrice: result.price,
-              lastPriceUpdate: now
+              lastPriceUpdate: dateString
             };
           }
           return product;
@@ -217,7 +219,7 @@ export default function ProductsContent() {
           setSelectedProduct({
             ...selectedProduct,
             cardmarketPrice: result.price,
-            lastPriceUpdate: now
+            lastPriceUpdate: dateString
           });
         }
         
@@ -230,6 +232,33 @@ export default function ProductsContent() {
       showNotification('Error al conectar con Cardmarket. Verifica el enlace e inténtalo de nuevo.', 'error');
     }
   };
+
+  // Función auxiliar para formatear fechas de forma segura
+  const formatDate = (dateValue: any): string => {
+    if (!dateValue) return '';
+    
+    try {
+      // Si es string ISO
+      if (typeof dateValue === 'string') {
+        return new Date(dateValue).toLocaleDateString();
+      }
+      
+      // Si es objeto de Firebase con método toDate()
+      if (typeof dateValue === 'object' && dateValue && typeof dateValue.toDate === 'function') {
+        return dateValue.toDate().toLocaleDateString();
+      }
+      
+      // Si es objeto Date
+      if (dateValue instanceof Date) {
+        return dateValue.toLocaleDateString();
+      }
+      
+      return '';
+    } catch (e) {
+      console.error('Error al formatear fecha:', e);
+      return '';
+    }
+  }
 
   // Función para actualizar todos los precios de Cardmarket
   const handleUpdateAllPrices = async () => {
@@ -295,15 +324,15 @@ export default function ProductsContent() {
                 onClick={() => product.imageUrl && handleImageClick(product.imageUrl)}
               />
               
-              {/* Badge para el precio de Cardmarket */}
+              {/* Badge para el precio de Cardmarket - versión mejorada */}
               {product.cardmarketPrice > 0 && (
-                <div className="absolute top-2 right-2 bg-green-700 text-white px-2 py-1 rounded-md font-medium text-sm shadow-md">
+                <div className="absolute top-2 right-2 bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold text-base shadow-lg">
                   {product.cardmarketPrice.toFixed(2)} €
                 </div>
               )}
             </div>
             
-            <div className="p-2 flex-grow flex flex-col">
+            <div className="p-3 flex-grow flex flex-col">
               <div className="flex justify-between items-start gap-1">
                 <h3 className="text-sm font-medium text-white line-clamp-1">{product.name}</h3>
                 <span className="px-1.5 py-0.5 bg-blue-900 text-blue-200 text-xs rounded-full whitespace-nowrap">
@@ -316,33 +345,23 @@ export default function ProductsContent() {
                   <p className="line-clamp-1">{product.description}</p>
                 )}
                 
-                {/* Precio de Cardmarket como texto normal también */}
-                {product.cardmarketPrice > 0 && (
-                  <p className="mt-1 text-green-500 font-semibold">
-                    Precio CM: {product.cardmarketPrice.toFixed(2)} €
-                    {product.lastPriceUpdate && (
-                      <span className="text-gray-500 text-xs ml-1">
-                        {typeof product.lastPriceUpdate === 'object' && product.lastPriceUpdate && product.lastPriceUpdate.toDate 
-                          ? `(${new Date(product.lastPriceUpdate.toDate()).toLocaleDateString()})` 
-                          : product.lastPriceUpdate instanceof Date 
-                            ? `(${product.lastPriceUpdate.toLocaleDateString()})` 
-                            : ''}
-                      </span>
-                    )}
-                  </p>
+                {/* Enlace a Cardmarket con precio adicional para más visibilidad */}
+                {product.cardmarketUrl && (
+                  <div className="mt-2 flex items-center">
+                    <a 
+                      href={product.cardmarketUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="flex items-center text-blue-400 hover:text-blue-300 text-xs"
+                    >
+                      <svg className="w-3.5 h-3.5 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V12L17.206 8.207L11.2071 14.2071L9.79289 12.7929L15.792 6.793L12 3H21Z"></path>
+                      </svg>
+                      Ver en Cardmarket
+                    </a>
+                  </div>
                 )}
                 
-                {/* Enlace a Cardmarket */}
-                {product.cardmarketUrl && (
-                  <a 
-                    href={product.cardmarketUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 text-xs mt-1 inline-block"
-                  >
-                    Ver en Cardmarket
-                  </a>
-                )}
               </div>
               <div className="mt-2 flex justify-between items-center">
                 <div className="flex space-x-1">
@@ -492,32 +511,49 @@ export default function ProductsContent() {
               {/* Precio de Cardmarket */}
               {selectedProduct.cardmarketPrice > 0 ? (
                 <div className="mt-6 p-4 bg-gray-850 rounded-lg border border-gray-700">
-                  <h4 className="text-sm font-medium text-white mb-2">Precio en Cardmarket:</h4>
+                  <h4 className="text-sm font-medium text-white mb-2 flex items-center">
+                    <svg className="w-4 h-4 mr-2 text-green-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-14a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V5z" clipRule="evenodd"></path>
+                    </svg>
+                    Precio actual en Cardmarket:
+                  </h4>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <span className="text-3xl font-bold text-green-500">
+                    <span className="text-3xl font-bold text-green-500 bg-gray-900 px-3 py-2 rounded-lg inline-flex">
                       {selectedProduct.cardmarketPrice.toFixed(2)} €
                     </span>
                     <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
                       {selectedProduct.lastPriceUpdate && (
-                        <span className="text-xs text-gray-400">
-                          Última actualización: {
-                            typeof selectedProduct.lastPriceUpdate === 'object' && selectedProduct.lastPriceUpdate && selectedProduct.lastPriceUpdate.toDate 
-                              ? new Date(selectedProduct.lastPriceUpdate.toDate()).toLocaleString()
-                              : selectedProduct.lastPriceUpdate instanceof Date
-                                ? selectedProduct.lastPriceUpdate.toLocaleString()
-                                : ''
-                          }
+                        <span className="text-xs text-gray-400 bg-gray-900 px-2 py-1 rounded">
+                          Actualizado: {formatDate(selectedProduct.lastPriceUpdate)}
                         </span>
                       )}
                       <div className="flex-grow"></div>
                       <button 
                         onClick={() => handleUpdateCardmarketPrice(selectedProduct.id, selectedProduct.cardmarketUrl)}
-                        className="px-3 py-1.5 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600"
+                        className="px-3 py-1.5 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600 flex items-center"
                       >
+                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
                         Actualizar precio
                       </button>
                     </div>
                   </div>
+                  {selectedProduct.cardmarketUrl && (
+                    <div className="mt-3 text-sm">
+                      <a 
+                        href={selectedProduct.cardmarketUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 flex items-center"
+                      >
+                        <svg className="w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M10 6V8H5V19H16V14H18V20C18 20.5523 17.5523 21 17 21H4C3.44772 21 3 20.5523 3 20V7C3 6.44772 3.44772 6 4 6H10ZM21 3V12L17.206 8.207L11.2071 14.2071L9.79289 12.7929L15.792 6.793L12 3H21Z"></path>
+                        </svg>
+                        Ver producto en Cardmarket
+                      </a>
+                    </div>
+                  )}
                 </div>
               ) : selectedProduct.cardmarketUrl ? (
                 <div className="mt-6 p-4 bg-gray-850 rounded-lg border border-gray-700">
@@ -526,8 +562,11 @@ export default function ProductsContent() {
                     <span className="text-gray-400">No hay datos de precio disponibles</span>
                     <button 
                       onClick={() => handleUpdateCardmarketPrice(selectedProduct.id, selectedProduct.cardmarketUrl)}
-                      className="px-3 py-1.5 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600"
+                      className="px-3 py-1.5 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600 flex items-center"
                     >
+                      <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
                       Obtener precio
                     </button>
                   </div>
