@@ -2,426 +2,222 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Tiempo máximo de espera para la operación en ms (20 segundos)
-const TIMEOUT = 20000;
+// Import required packages
+import puppeteerExtra from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-// URL del paquete de Chromium en GitHub
-const CHROMIUM_URL = "https://github.com/Sparticuz/chromium/releases/download/v119.0.0/chromium-v119.0.0-pack.tar";
+// Configure cache directories
+const CACHE_DIR = process.platform === 'win32' 
+  ? path.join(process.cwd(), '.chromium-cache') 
+  : '/tmp/chromium-cache';
 
-// Ruta temporal donde se descargará el paquete de Chromium
-// Usar una ruta compatible con entornos serverless y Windows
-const CHROMIUM_CACHE_DIR = process.platform === 'win32' ? path.join(process.cwd(), '.chromium-cache') : '/tmp/chromium-cache';
-const LOCK_FILE = process.platform === 'win32' ? path.join(process.cwd(), '.chromium-download.lock') : '/tmp/chromium-download.lock';
+// Install the stealth plugin
+puppeteerExtra.use(StealthPlugin());
 
-// Lista de User-Agents para simular diferentes navegadores
-const USER_AGENTS = [
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0'
-];
-
-// Obtener un User-Agent aleatorio
-function getRandomUserAgent(): string {
-  return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
-}
-
-// Esperar un tiempo aleatorio para evitar colisiones
-async function waitRandomTime(min: number, max: number): Promise<void> {
-  const waitMs = Math.floor(Math.random() * (max - min + 1)) + min;
-  return new Promise(resolve => setTimeout(resolve, waitMs));
-}
-
-// Función para comprobar si Chromium ya está extraído
-function isChromiumExtracted(): boolean {
-  try {
-    if (!fs.existsSync(CHROMIUM_CACHE_DIR)) {
-      return false;
-    }
-    
-    // Verificar si el ejecutable existe y es accesible
-    const executablePath = path.join(CHROMIUM_CACHE_DIR, process.platform === 'win32' ? 'chrome.exe' : 'chromium');
-    return fs.existsSync(executablePath) && fs.statSync(executablePath).size > 0;
-  } catch (error) {
-    console.error('Error al comprobar si Chromium está extraído:', error);
-    return false;
-  }
-}
-
-// Función para verificar el bloqueo
-function isLocked(): boolean {
-  try {
-    return fs.existsSync(LOCK_FILE);
-  } catch (error) {
-    return false;
-  }
-}
-
-// Función para crear un bloqueo
-function createLock(): void {
-  try {
-    fs.writeFileSync(LOCK_FILE, Date.now().toString());
-  } catch (error) {
-    console.error('Error al crear el archivo de bloqueo:', error);
-  }
-}
-
-// Función para liberar el bloqueo
-function releaseLock(): void {
-  try {
-    if (fs.existsSync(LOCK_FILE)) {
-      fs.unlinkSync(LOCK_FILE);
-    }
-  } catch (error) {
-    console.error('Error al liberar el bloqueo:', error);
-  }
-}
-
-// Función para descargar y extraer Chromium de forma segura
-async function safeDownloadChromium() {
-  try {
-    // Asegurarse de que el directorio de caché existe
-    if (!fs.existsSync(CHROMIUM_CACHE_DIR)) {
-      fs.mkdirSync(CHROMIUM_CACHE_DIR, { recursive: true });
-    }
-    
-    console.log('API: Descargando y extrayendo Chromium desde URL...');
-    
-    // En Windows, usamos una estrategia diferente para evitar el error de protocolo
-    if (process.platform === 'win32') {
-      // Importar chromium solo cuando sea necesario
-      const chromium = require('@sparticuz/chromium-min');
-      
-      // Configurar la URL correctamente para Windows
-      const execPath = await chromium.executablePath({
-        folder: CHROMIUM_CACHE_DIR,
-        // No pasamos la URL directamente, dejamos que el módulo use su URL por defecto
-        // que está configurada correctamente para funcionar en Windows
-      });
-      
-      return execPath;
-    } else {
-      // En entornos serverless (Linux), usamos la URL directamente
-      const chromium = require('@sparticuz/chromium-min');
-      return await chromium.executablePath(CHROMIUM_URL, {
-        targetDirectory: CHROMIUM_CACHE_DIR
-      });
-    }
-  } catch (error) {
-    console.error('API: Error al descargar Chromium:', error);
-    throw error;
-  }
-}
-
+// Log the start of processing
 export async function GET(request: NextRequest) {
   let browser = null;
-  let retryCount = 0;
-  const MAX_RETRIES = 2;
   
   try {
-    // Obtener la URL de la consulta
+    // Parse URL parameter
     const { searchParams } = new URL(request.url);
     const url = searchParams.get('url');
     
-    console.log(`API: Solicitud recibida para URL: ${url}, intento: ${retryCount}`);
+    console.log(`API: Processing request for URL: ${url}`);
     
-    // Validar la URL
+    // Validate URL
     if (!url || !url.includes('cardmarket.com')) {
       return NextResponse.json({ error: 'URL inválida o no proporcionada' }, { status: 400 });
     }
     
-    try {
-      console.log('API: Cargando dependencias...');
-      
-      // Importar puppeteer-core de forma explícita
-      const puppeteer = require('puppeteer-core');
-      
-      console.log('API: Dependencias cargadas correctamente');
-      
-      // Crear el directorio de caché si no existe
-      if (!fs.existsSync(CHROMIUM_CACHE_DIR)) {
-        try {
-          fs.mkdirSync(CHROMIUM_CACHE_DIR, { recursive: true });
-          console.log(`API: Directorio de caché creado: ${CHROMIUM_CACHE_DIR}`);
-        } catch (error) {
-          console.error(`API: Error al crear directorio de caché: ${error}`);
-        }
-      }
-      
-      // Obtener la ruta del ejecutable de Chromium
-      let executablePath;
-      
-      if (isChromiumExtracted()) {
-        console.log('API: Chromium ya está extraído, usando versión en caché');
-        executablePath = path.join(CHROMIUM_CACHE_DIR, process.platform === 'win32' ? 'chrome.exe' : 'chromium');
-      } else {
-        // Verificar si hay un bloqueo activo
-        if (isLocked()) {
-          console.log('API: Otro proceso está descargando Chromium, esperando...');
-          
-          // Esperar con backoff exponencial
-          let waitTime = 500;
-          const startTime = Date.now();
-          
-          while (isLocked() && Date.now() - startTime < TIMEOUT) {
-            await waitRandomTime(waitTime, waitTime * 2);
-            waitTime *= 1.5;
-          }
-          
-          // Si después de esperar Chromium ya está extraído, usarlo
-          if (isChromiumExtracted()) {
-            console.log('API: Chromium extraído por otro proceso, usando versión en caché');
-            executablePath = path.join(CHROMIUM_CACHE_DIR, process.platform === 'win32' ? 'chrome.exe' : 'chromium');
-          } else {
-            // Si sigue bloqueado pero el tiempo expiró, forzar descarga
-            if (isLocked()) {
-              console.log('API: Forzando liberación del bloqueo después de timeout');
-              releaseLock();
-            }
-            
-            // Establecer bloqueo y descargar
-            createLock();
-            
-            try {
-              executablePath = await safeDownloadChromium();
-              console.log(`API: Chromium descargado y extraído en: ${executablePath}`);
-            } catch (error) {
-              console.error('API: Error al descargar Chromium:', error);
-              return NextResponse.json({ error: error.message || 'Error al descargar Chromium' }, { status: 500 });
-            } finally {
-              releaseLock();
-            }
-          }
-        } else {
-          // No hay bloqueo, podemos descargar directamente
-          createLock();
-          
-          try {
-            executablePath = await safeDownloadChromium();
-            console.log(`API: Chromium descargado y extraído en: ${executablePath}`);
-          } catch (error) {
-            console.error('API: Error al descargar Chromium:', error);
-            return NextResponse.json({ error: error.message || 'Error al descargar Chromium' }, { status: 500 });
-          } finally {
-            releaseLock();
-          }
-        }
-      }
-      
-      console.log('API: Lanzando navegador...');
-      
-      const browserArgs = [
-        ...chromium.args,
+    console.log('API: Loading dependencies...');
+    
+    // Import modules dynamically to reduce memory usage until needed
+    const chromium = await import('@sparticuz/chromium');
+    
+    console.log('API: Dependencies loaded successfully');
+    
+    // Ensure cache directory exists
+    if (!fs.existsSync(CACHE_DIR)) {
+      fs.mkdirSync(CACHE_DIR, { recursive: true });
+      console.log(`API: Cache directory created: ${CACHE_DIR}`);
+    }
+    
+    // Configure browser launch options with anti-detection measures
+    const launchOptions = {
+      args: [
+        ...chromium.default.args,
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
         '--disable-gpu',
         '--hide-scrollbars',
-        '--disable-web-security'
+        '--disable-notifications',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-sync',
+        '--no-default-browser-check',
+        '--no-first-run',
+        '--disable-background-networking',
+        '--window-size=1920,1080',
+        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
+      ],
+      defaultViewport: {
+        width: 1920,
+        height: 1080
+      },
+      executablePath: process.platform === 'win32'
+        ? await chromium.default.executablePath({
+            folder: CACHE_DIR,
+          })
+        : await chromium.default.executablePath(
+            'https://github.com/Sparticuz/chromium/releases/download/v123.0.1/chromium-v123.0.1-pack.tar',
+            { targetDirectory: CACHE_DIR }
+          ),
+      headless: true,
+      ignoreHTTPSErrors: true
+    };
+    
+    console.log('API: Launching browser...');
+    
+    // Launch browser with stealth
+    browser = await puppeteerExtra.launch(launchOptions);
+    
+    console.log('API: Browser launched successfully');
+    
+    // Create a new page with additional evasion techniques
+    const page = await browser.newPage();
+    
+    // Apply additional evasion techniques
+    await page.evaluateOnNewDocument(() => {
+      // Override properties that identify as headless
+      Object.defineProperty(navigator, 'webdriver', { get: () => false });
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+      
+      // Mock the Chrome app
+      if (!window.chrome) {
+        window.chrome = {};
+      }
+      window.chrome.app = {
+        InstallState: 'hehe',
+        RunningState: 'running',
+        getDetails: () => ({}),
+        getIsInstalled: () => true,
+        installState: () => 'installed',
+        isInstalled: true,
+        runningState: () => 'running',
+      };
+      
+      // Mock window.Notification
+      window.Notification = {
+        permission: 'default',
+        requestPermission: () => Promise.resolve('default'),
+      };
+      
+      // Add WebGL renderer
+      const getParameter = WebGLRenderingContext.prototype.getParameter;
+      WebGLRenderingContext.prototype.getParameter = function(parameter) {
+        if (parameter === 37445) {
+          return 'Intel Inc.';
+        }
+        if (parameter === 37446) {
+          return 'Intel Iris OpenGL Engine';
+        }
+        return getParameter.apply(this, [parameter]);
+      };
+    });
+    
+    // Set cookies and additional headers to appear more human
+    await page.setExtraHTTPHeaders({
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-User': '?1',
+      'Sec-Fetch-Dest': 'document',
+      'Accept-Encoding': 'gzip, deflate, br',
+      'Upgrade-Insecure-Requests': '1'
+    });
+    
+    console.log(`API: Navigating to URL: ${url}`);
+    
+    // Navigate to the page with wait until load to ensure full page load
+    await page.goto(url, { 
+      waitUntil: 'networkidle2',
+      timeout: 30000 
+    });
+    
+    console.log('API: Page loaded successfully');
+    
+    // Extract prices using more reliable techniques
+    const result = await page.evaluate(() => {
+      // Look for prices with various selectors to enhance reliability
+      const priceElements = [
+        ...document.querySelectorAll('.price-card'),
+        ...document.querySelectorAll('.product-price'),
+        ...document.querySelectorAll('.col-offer-price'),
+        ...document.querySelectorAll('.price'),
+        ...document.querySelectorAll('[data-price]')
       ];
       
-      // Lanzar navegador
-      browser = await puppeteer.launch({
-        args: browserArgs,
-        defaultViewport: chromium.defaultViewport,
-        executablePath,
-        headless: true,
-        ignoreHTTPSErrors: true,
-      });
-      
-      console.log('API: Navegador lanzado correctamente');
-      
-      // Crear una nueva página
-      const page = await browser.newPage();
-      const userAgent = getRandomUserAgent();
-      await page.setUserAgent(userAgent);
-      console.log(`API: User-Agent configurado: ${userAgent.substring(0, 20)}...`);
-      
-      // Bloquear recursos para mejorar rendimiento
-      await page.setRequestInterception(true);
-      page.on('request', (req) => {
-        const resourceType = req.resourceType();
-        if (
-          resourceType === 'image' || 
-          resourceType === 'stylesheet' || 
-          resourceType === 'font' ||
-          resourceType === 'media' ||
-          req.url().includes('google-analytics') ||
-          req.url().includes('facebook') ||
-          req.url().includes('doubleclick')
-        ) {
-          req.abort();
-        } else {
-          req.continue();
-        }
-      });
-      
-      console.log(`API: Navegando a ${url}...`);
-      const response = await page.goto(url, {
-        waitUntil: 'domcontentloaded',
-        timeout: TIMEOUT
-      });
-      
-      if (!response) {
-        throw new Error('No se recibió respuesta de la página');
-      }
-      
-      console.log(`API: Página cargada (status: ${response.status()})`);
-      
-      // Esperar a que el contenido relevante se cargue
-      await page.waitForSelector('.color-primary', { timeout: TIMEOUT })
-        .catch(() => console.log('API: No se encontró el selector .color-primary, continuando...'));
-      
-      console.log('API: Extrayendo precio mediante DOM...');
-      
-      // Método 1: Extraer precios mediante evaluación del DOM
-      let price = await page.evaluate(() => {
-        const priceElements = document.querySelectorAll('.color-primary');
-        const prices = [];
+      const prices = priceElements.map(el => {
+        // Try to get price from different attributes and contents
+        const text = el.textContent?.trim() || '';
+        const dataPrice = el.getAttribute('data-price') || '';
         
-        priceElements.forEach(el => {
-          const text = el.textContent?.trim() || '';
-          const match = text.match(/(\d+)[,\.](\d+)/);
-          if (match) {
-            const price = parseFloat(`${match[1]}.${match[2]}`);
-            if (!isNaN(price) && price > 0) {
-              prices.push(price);
-            }
-          }
-        });
+        // Regular expression to match prices in various formats
+        const priceRegex = /(\d+[,.]\d+)/;
+        const textMatch = text.match(priceRegex);
+        const dataPriceMatch = dataPrice.match(priceRegex);
         
-        if (prices.length > 0) {
-          // Para Super Electric Breaker, buscar precios alrededor de 70€
-          if (window.location.href.includes('Super-Electric-Breaker')) {
-            const targetPrices = prices.filter(p => p >= 60 && p <= 80);
-            if (targetPrices.length > 0) {
-              return targetPrices[0];
-            }
-          }
-          
-          // Ordenar precios y devolver el más bajo que sea razonable (> 5€)
-          return prices.filter(p => p > 5).sort((a, b) => a - b)[0] || 0;
-        }
-        
-        return 0;
+        return {
+          text: text,
+          dataPrice: dataPrice,
+          extractedFromText: textMatch ? textMatch[0] : null,
+          extractedFromData: dataPriceMatch ? dataPriceMatch[0] : null
+        };
       });
       
-      // Método 2: Si falla el método 1, usar expresiones regulares
-      if (!price || price === 0) {
-        console.log('API: DOM no encontró precios, intentando con regex...');
-        const content = await page.content();
-        price = extractPricesWithRegex(content, url);
-      }
-      
-      if (!price || price === 0) {
-        throw new Error('No se pudo extraer ningún precio de la página');
-      }
-      
-      console.log(`API: Precio extraído: ${price}€`);
-      console.log(`API: Tiempo total: ${Date.now() - startTime}ms`);
-      
-      return NextResponse.json({
-        price,
-        currency: '€',
-        success: true,
-        method: 'puppeteer',
-        timeMs: Date.now() - startTime
-      }, {
-        status: 200,
-        headers: {
-          'Cache-Control': 'max-age=3600, s-maxage=3600'
-        }
-      });
-      
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`API Error: ${errorMessage}`);
-      
-      return NextResponse.json({
-        error: `Error al extraer precio con Puppeteer: ${errorMessage}`,
-        success: false,
-        timeMs: Date.now() - startTime
-      }, { 
-        status: 500 
-      });
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`API Error general: ${errorMessage}`);
+      return {
+        title: document.title,
+        url: window.location.href,
+        prices: prices
+      };
+    });
     
+    console.log('API: Data extracted successfully');
+    
+    // Close browser to free resources
+    await browser.close();
+    browser = null;
+    
+    // Return the extracted data
     return NextResponse.json({
-      error: `Error general: ${errorMessage}`,
-      success: false,
-      timeMs: Date.now() - startTime
+      success: true,
+      data: result
+    });
+    
+  } catch (error: any) {
+    console.error('API: Error during processing:', error);
+    
+    // Return appropriate error response
+    return NextResponse.json({ 
+      error: error.message || 'Error processing request',
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     }, { 
       status: 500 
     });
+    
   } finally {
+    // Ensure browser is closed to prevent memory leaks
     if (browser) {
-      console.log('API: Cerrando navegador...');
-      await browser.close().catch(e => console.error('Error al cerrar el navegador:', e));
-    }
-  }
-}
-
-// Función auxiliar para extraer precios con regex
-function extractPricesWithRegex(html: string, url: string): number {
-  console.log('API: Extrayendo precios con regex...');
-  
-  try {
-    // Definir diferentes patrones de regex para extraer precios
-    const patterns = [
-      // Patrón específico para Super Electric Breaker
-      /<span class="color-primary[^>]*>([0-9]+[,.][0-9]+) ?€<\/span>/g,
-      // Patrón general para precios en CardMarket
-      /<span[^>]*class=".*?color-primary.*?"[^>]*>([0-9]+[,.][0-9]+) ?€<\/span>/g,
-      // Patrón alternativo
-      /class=".*?color-primary.*?"[^>]*>([0-9]+[,.][0-9]+) ?€</g,
-      // Último recurso
-      /([0-9]+[,.][0-9]+) ?€/g
-    ];
-    
-    let prices: number[] = [];
-    
-    // Probar cada patrón hasta encontrar coincidencias
-    for (const pattern of patterns) {
-      let match;
-      const currentPattern = new RegExp(pattern);
-      
-      while ((match = currentPattern.exec(html)) !== null) {
-        const priceText = match[1].replace(',', '.');
-        const price = parseFloat(priceText);
-        
-        if (!isNaN(price) && price > 0) {
-          prices.push(price);
-        }
-      }
-      
-      // Si encontramos precios con este patrón, no seguir con los siguientes
-      if (prices.length > 0) {
-        console.log(`API: Encontrados ${prices.length} precios con regex: ${prices.join(', ')}`);
-        break;
+      try {
+        await browser.close();
+      } catch (error) {
+        console.error('API: Error closing browser:', error);
       }
     }
-    
-    // Para Super Electric Breaker, buscar precios alrededor de 70€
-    if (url.includes('Super-Electric-Breaker')) {
-      const targetPrices = prices.filter(p => p >= 60 && p <= 80);
-      if (targetPrices.length > 0) {
-        return targetPrices[0];
-      }
-    }
-    
-    // Filtrar precios razonables y ordenar
-    prices = prices.filter(p => p > 5).sort((a, b) => a - b);
-    return prices.length > 0 ? prices[0] : 0;
-  } catch (error) {
-    console.error('Error al extraer precios con regex:', error);
-    return 0;
   }
 } 

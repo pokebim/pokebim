@@ -54,9 +54,15 @@ const nextConfig = {
         'pokebimapp.vercel.app'
       ],
     },
-    // Ya no necesitamos especificar paquetes externos
-    serverComponentsExternalPackages: [],
   },
+  
+  // Mover a la configuración principal para evitar warnings y usar la propiedad correcta
+  serverExternalPackages: [
+    'puppeteer-core',
+    'puppeteer-extra',
+    'puppeteer-extra-plugin-stealth',
+    '@sparticuz/chromium'
+  ],
 };
 
 module.exports = nextConfig; 
