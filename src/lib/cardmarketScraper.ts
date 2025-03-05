@@ -1,29 +1,46 @@
 import puppeteer from 'puppeteer';
 
+let browserPromise: Promise<any> | null = null;
+
+async function getBrowser() {
+  if (!browserPromise) {
+    browserPromise = puppeteer.launch({
+      headless: 'new',
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--single-process'
+      ]
+    });
+  }
+  return browserPromise;
+}
+
 export async function getCardmarketPrice(url: string): Promise<number | null> {
   if (!url || !url.includes('cardmarket.com')) {
     return null;
   }
 
-  try {
-    // Iniciar el navegador
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    });
+  let browser;
+  let page;
 
-    // Crear una nueva página
-    const page = await browser.newPage();
+  try {
+    browser = await getBrowser();
+    page = await browser.newPage();
 
     // Configurar el User-Agent
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/115.0');
 
-    // Navegar a la URL
-    await page.goto(url, { waitUntil: 'networkidle0' });
+    // Navegar a la URL con timeout reducido
+    await page.goto(url, { 
+      waitUntil: 'networkidle0',
+      timeout: 15000 
+    });
 
-    // Esperar a que los precios se carguen
+    // Esperar a que los precios se carguen con timeout reducido
     await page.waitForSelector('.col-offer .price-container .d-flex .d-flex span.color-primary', {
-      timeout: 5000
+      timeout: 10000
     });
 
     // Extraer todos los precios
@@ -35,8 +52,8 @@ export async function getCardmarketPrice(url: string): Promise<number | null> {
       }).filter(price => !isNaN(price));
     });
 
-    // Cerrar el navegador
-    await browser.close();
+    // Cerrar solo la página, no el navegador
+    await page.close();
 
     // Retornar el precio más bajo si hay precios
     if (prices.length > 0) {
@@ -47,5 +64,13 @@ export async function getCardmarketPrice(url: string): Promise<number | null> {
   } catch (error) {
     console.error('Error al obtener el precio de Cardmarket:', error);
     return null;
+  } finally {
+    if (page) {
+      try {
+        await page.close();
+      } catch (e) {
+        console.error('Error cerrando la página:', e);
+      }
+    }
   }
 } 

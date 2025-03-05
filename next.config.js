@@ -40,16 +40,35 @@ const nextConfig = {
   },
 
   // Configuración de transpilación
-  transpilePackages: ['firebase', '@firebase/firestore'],
+  transpilePackages: [
+    'firebase', 
+    '@firebase/firestore',
+    '@grpc/grpc-js',
+    '@grpc/proto-loader',
+    'long'
+  ],
   
   // Optimizaciones para Vercel
   experimental: {
-    optimizeCss: true,
-    optimizePackageImports: ['@heroicons/react'],
+    serverComponentsExternalPackages: ['puppeteer', '@grpc/grpc-js', '@grpc/proto-loader'],
+    esmExternals: 'loose'
   },
   
   // Configuración de output
   output: 'standalone',
+
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        child_process: false,
+      };
+    }
+    return config;
+  },
 };
 
 module.exports = nextConfig; 
