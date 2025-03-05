@@ -39,18 +39,15 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  // Configuración de transpilación
+  // Configuración de transpilación solo para paquetes del cliente
   transpilePackages: [
     'firebase', 
-    '@firebase/firestore',
-    '@grpc/grpc-js',
-    '@grpc/proto-loader',
-    'long'
+    '@firebase/firestore'
   ],
   
-  // Optimizaciones para Vercel
+  // Configuración para paquetes que necesitan Node.js
   experimental: {
-    serverComponentsExternalPackages: ['puppeteer', '@grpc/grpc-js', '@grpc/proto-loader'],
+    serverComponentsExternalPackages: ['puppeteer', '@grpc/grpc-js', '@grpc/proto-loader', 'long'],
     esmExternals: 'loose'
   },
   
