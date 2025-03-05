@@ -60,82 +60,49 @@ function isValidCardmarketUrl(url: string): boolean {
  * @returns Objeto con el precio más bajo encontrado
  */
 export async function fetchCardmarketPrice(url: string): Promise<{price: number, success: boolean, error?: string}> {
-  console.log("Intentando obtener precio para:", url);
-  
-  // Validar que la URL es de Cardmarket
   if (!isValidCardmarketUrl(url)) {
-    console.error("URL de Cardmarket inválida:", url);
-    return {
-      price: 0,
-      success: false,
-      error: 'URL no válida. Debe ser un enlace a cardmarket.com'
+    console.error(`💔 URL no válida para Cardmarket: ${url}`);
+    return { 
+      success: false, 
+      price: 0, 
+      error: 'URL no válida para Cardmarket' 
     };
   }
-  
-  try {
-    // IMPLEMENTACIÓN DEL SCRAPING DE PRECIOS DE CARDMARKET
-    // Nota: Esta función requiere que se configure un servidor proxy o una función serverless
-    // para evitar problemas de CORS al realizar solicitudes desde el navegador
 
-    // Extraer información del producto de la URL para mejor logging
-    const urlParts = url.split('/');
-    const lastPart = urlParts[urlParts.length - 1] || '';
-    const productName = lastPart.split('?')[0] || '';
+  try {
+    console.log(`🔍 Obteniendo precio de Cardmarket para URL: ${url}`);
     
-    console.log("URL original:", url);
-    console.log("Partes extraídas para identificación de producto:", productName);
+    // Llamar a nuestra API interna que maneja el scraping
+    const apiUrl = `/api/cardmarket-price?url=${encodeURIComponent(url)}`;
+    const response = await fetch(apiUrl);
     
-    // Implementación del fetch real (esto puede necesitar ejecutarse en un backend)
-    try {
-      // OPCIÓN 1: Solicitud directa a la API de Cardmarket (requiere autenticación)
-      // const apiResponse = await fetch('https://api.cardmarket.com/marketplace/product/info', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer YOUR_API_KEY' },
-      //   body: JSON.stringify({ url })
-      // });
-      
-      // OPCIÓN 2: A través de un servidor proxy propio que realice el scraping
-      const apiEndpoint = process.env.NEXT_PUBLIC_CARDMARKET_PRICE_API || '/api/cardmarket-price';
-      const response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(url)}`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Error en la respuesta del servidor: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.success || !data.price || data.price <= 0) {
-        throw new Error(data.error || 'No se pudo extraer el precio');
-      }
-      
-      console.log(`Precio obtenido dinámicamente para ${productName}: ${data.price}€`);
-      
-      return {
-        price: data.price,
-        success: true
-      };
-    } catch (fetchError) {
-      console.error("Error al realizar fetch del precio:", fetchError);
-      
-      // Fallback temporal mientras se implementa la solución real
-      // NOTA: Esto es solo para desarrollo - debe eliminarse en producción
-      console.warn("⚠️ Utilizando precio simulado temporalmente mientras se implementa la solución real");
-      const tempPrice = 100.00; // Valor temporal - DEBE REEMPLAZARSE
-      
-      return {
-        price: tempPrice,
-        success: true
-      };
+    if (!response.ok) {
+      // Obtener el mensaje de error detallado de la respuesta API
+      const errorData = await response.json();
+      throw new Error(`API respondió con error ${response.status}: ${errorData.error || 'Sin detalles'}`);
     }
-  } catch (error) {
-    console.error('Error al obtener precio de Cardmarket:', error);
+    
+    const data = await response.json();
+    
+    if (!data.success || !data.price || data.price <= 0) {
+      throw new Error(`No se pudo obtener un precio válido: ${data.error || 'Sin detalles del error'}`);
+    }
+    
+    console.log(`✅ Precio obtenido correctamente: ${data.price}€ (fuente: ${data.source || 'desconocida'})`);
+    
     return {
-      price: 0,
-      success: false,
-      error: 'Error al obtener el precio: ' + (error instanceof Error ? error.message : String(error))
+      success: true,
+      price: data.price
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`💔 Error obteniendo precio de Cardmarket: ${errorMessage}`);
+    
+    // No devolvemos un precio fijo, sino precio 0 con indicación de error
+    return { 
+      success: false, 
+      price: 0, 
+      error: errorMessage 
     };
   }
 }
@@ -144,28 +111,30 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
  * Guarda o actualiza un precio de Cardmarket en la base de datos
  */
 export async function saveCardmarketPrice(data: Omit<CardmarketPrice, 'id' | 'updatedAt'>): Promise<string> {
-  console.log("Guardando precio de Cardmarket:", data);
-  
-  if (!data.productId || !data.price || data.price <= 0) {
-    console.error("⚠️ Datos de precio inválidos:", data);
-    throw new Error("Datos de precio inválidos");
-  }
-  
   try {
-    // Primero, eliminar cualquier precio existente para este producto
-    // para evitar duplicados o datos inconsistentes
+    // Validar los datos antes de guardar
+    if (!data.productId || !data.price || data.price <= 0) {
+      const errorMsg = `Datos de precio inválidos: productId=${data.productId}, price=${data.price}`;
+      console.error(`❌ ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+
+    console.log(`💾 Guardando precio para ${data.productName}: ${data.price}€`);
+    
+    // Eliminar cualquier precio existente para este producto
     await deleteCardmarketPrice(data.productId);
     
-    // Luego, crear un nuevo registro con datos frescos
+    // Guardar el nuevo precio
     const docRef = await addDoc(pricesCollection, {
       ...data,
       updatedAt: serverTimestamp()
     });
     
-    console.log(`✅ Nuevo precio guardado para ${data.productName} (${data.productId}): ${data.price}€`);
+    console.log(`✅ Precio guardado correctamente para ${data.productName}: ${data.price}€ (ID: ${docRef.id})`);
     return docRef.id;
   } catch (error) {
-    console.error("❌ Error al guardar precio de Cardmarket:", error);
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    console.error(`💔 Error al guardar precio para ${data.productName}: ${errorMsg}`);
     throw error;
   }
 }
@@ -252,69 +221,80 @@ export async function updateCardmarketPriceForProduct(
   cardmarketUrl: string,
   forceUpdate: boolean = true
 ): Promise<{success: boolean, price?: number, error?: string}> {
-  console.log(`Actualizando precio para ${productName} (${productId}) con URL: ${cardmarketUrl}`);
-  console.log(`Forzar actualización: ${forceUpdate}`);
-  
-  if (!productId) {
-    console.error("ID de producto no válido");
-    return {
-      success: false,
-      error: 'ID de producto no válido'
-    };
-  }
-  
-  if (!isValidCardmarketUrl(cardmarketUrl)) {
-    console.error("URL de Cardmarket no válida:", cardmarketUrl);
-    return {
-      success: false,
-      error: 'URL de Cardmarket no válida. Asegúrate de que es una URL de cardmarket.com'
-    };
-  }
-  
+  console.log(`🔄 Actualizando precio de Cardmarket para: ${productName}`);
+
   try {
-    // FORZAR la eliminación del precio anterior siempre que se solicite una actualización
-    // Esto garantiza que no nos quedemos con datos anticuados
-    console.log(`🧹 Limpiando todos los precios existentes para ${productName}...`);
-    await deleteCardmarketPrice(productId);
+    // Verificar si ya existe un precio y si necesitamos actualizarlo
+    const existingPrice = await getCardmarketPriceForProduct(productId);
     
-    // 1. Obtener el precio actual de Cardmarket (siempre fresco)
-    console.log(`🔄 Obteniendo nuevo precio para ${productName}...`);
-    const priceData = await fetchCardmarketPrice(cardmarketUrl);
-    
-    if (!priceData.success || priceData.price <= 0) {
-      console.error("No se pudo obtener el precio:", priceData.error);
+    // Si existe un precio y no se fuerza la actualización, devolver el precio existente
+    if (existingPrice && !forceUpdate) {
+      console.log(`ℹ️ Usando precio existente para ${productName}: ${existingPrice.price}€`);
       return {
-        success: false,
-        error: priceData.error || 'No se pudo obtener el precio'
+        success: true,
+        price: existingPrice.price
       };
     }
-    
-    // 2. Guardar el precio en la colección de precios
-    console.log(`💾 Guardando nuevo precio (${priceData.price}€) para ${productName}...`);
+
+    // Si estamos actualizando, primero limpiamos cualquier precio existente
+    if (existingPrice) {
+      console.log(`🧹 Limpiando precio existente para ${productName}`);
+      await deleteCardmarketPrice(productId);
+    }
+
+    // Obtener el precio actualizado de Cardmarket
+    console.log(`🔍 Obteniendo precio actualizado para ${productName} desde ${cardmarketUrl}`);
+    const cardmarketData = await fetchCardmarketPrice(cardmarketUrl);
+
+    if (!cardmarketData.success || cardmarketData.price <= 0) {
+      const errorMsg = cardmarketData.error || 'Precio no disponible en este momento';
+      console.error(`❌ Error al obtener precio para ${productName}: ${errorMsg}`);
+      
+      // Si hay un error pero teníamos un precio anterior, podemos seguir usando ese
+      if (existingPrice) {
+        console.log(`⚠️ Manteniendo precio anterior para ${productName}: ${existingPrice.price}€`);
+        // Re-guardar el precio anterior pero actualizar la fecha
+        await saveCardmarketPrice({
+          productId,
+          productName,
+          url: cardmarketUrl,
+          price: existingPrice.price
+        });
+        
+        return {
+          success: true,
+          price: existingPrice.price,
+          error: `Usando precio anterior. ${errorMsg}`
+        };
+      }
+      
+      return {
+        success: false,
+        error: errorMsg
+      };
+    }
+
+    // Guardar el nuevo precio
+    console.log(`💾 Guardando nuevo precio para ${productName}: ${cardmarketData.price}€`);
     await saveCardmarketPrice({
       productId,
       productName,
       url: cardmarketUrl,
-      price: priceData.price
+      price: cardmarketData.price
     });
-    
-    // 3. Actualizar la URL en el producto
-    console.log(`🔄 Actualizando URL en el producto ${productName}...`);
-    await updateProduct(productId, {
-      cardmarketUrl: cardmarketUrl
-    });
-    
-    console.log(`✅ Precio actualizado exitosamente para ${productName}: ${priceData.price}€`);
-    
+
+    console.log(`✅ Precio actualizado para ${productName}: ${cardmarketData.price}€`);
     return {
       success: true,
-      price: priceData.price
+      price: cardmarketData.price
     };
   } catch (error) {
-    console.error('❌ Error al actualizar precio:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`💔 Error en actualización de precio para ${productName}: ${errorMessage}`);
+    
     return {
       success: false,
-      error: 'Error al actualizar precio: ' + (error instanceof Error ? error.message : String(error))
+      error: errorMessage
     };
   }
 }
