@@ -43,14 +43,14 @@
     },
     "src/app/api/cardmarket-scraper/route.ts": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 20
     },
     "src/app/api/cardmarket-proxy/route.ts": {
       "memory": 1024,
-      "maxDuration": 10
+      "maxDuration": 20
     },
     "src/app/api/cardmarket-puppeteer/**": {
-      "memory": 1024,
+      "memory": 1536,
       "maxDuration": 60
     }
   },

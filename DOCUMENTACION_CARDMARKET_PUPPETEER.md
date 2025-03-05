@@ -26,6 +26,30 @@ Implementación actual que utiliza un enfoque optimizado basado en el artículo 
 - Implementación de un sistema de caché más eficiente
 - Mejoras en la estabilidad y manejo de errores
 
+### Versión 5: Mejora en la gestión de Chromium
+
+#### Mejoras implementadas en esta versión:
+
+1. **Sistema de caché y bloqueo de archivos**:
+   - Se implementó un sistema de caché para conservar la descarga de Chromium entre invocaciones.
+   - Se agregó un mecanismo de bloqueo para evitar descargas simultáneas cuando múltiples funciones intentan acceder al mismo tiempo.
+   - Verificación previa de la extracción de Chromium para evitar repetir el proceso.
+
+2. **Gestión coordinada de recursos**:
+   - Implementación de un mecanismo de espera inteligente con tiempo aleatorio para evitar colisiones.
+   - Creación de un directorio de caché dedicado (`/tmp/chromium-cache`).
+   - Verificación de existencia y tamaño de los archivos ejecutables.
+
+3. **Mejoras en el manejo de errores**:
+   - Detección y solución para el error `ENOENT` con archivos faltantes.
+   - Prevención del error `ETXTBSY` mediante coordinación de acceso a recursos.
+   - Mejor logging con timestamps para rastrear el proceso completo.
+
+4. **Optimización de rendimiento**:
+   - Bloqueo de recursos innecesarios (imágenes, estilos, fuentes) durante la navegación.
+   - Mecanismo de liberación de bloqueo en caso de timeout.
+   - Configuración optimizada del navegador para entornos serverless.
+
 ## Detalles de la Implementación Actual
 
 ### Tecnologías Utilizadas

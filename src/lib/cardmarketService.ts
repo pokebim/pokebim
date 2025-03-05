@@ -15,6 +15,8 @@ import {
 } from "firebase/firestore/lite";
 import { db } from "./firebase";
 import { updateProduct } from "./productService";
+import axios from 'axios';
+import { logToConsole } from './serverLogging';
 
 // Referencia a la colección de precios de Cardmarket
 const pricesCollection = collection(db, "cardmarketPrices");
@@ -33,134 +35,112 @@ export interface CardmarketPrice {
  * Valida si la URL de CardMarket proporcionada es válida
  */
 function isValidCardmarketUrl(url: string): boolean {
-  // Validar que la URL sea de CardMarket y tenga un formato correcto
-  const isCardMarketUrl = url.includes('cardmarket.com');
-  const hasValidFormat = url.includes('/Products/') || url.includes('/Magic/') || url.includes('/Pokemon/');
-  
-  return isCardMarketUrl && hasValidFormat;
+  // Verificar que la URL es de cardmarket.com y tiene un formato válido
+  return url.includes('cardmarket.com') && url.match(/^https?:\/\/[^\s]+\.[^\s]+$/i) !== null;
 }
 
 /**
  * Obtiene el precio de un producto de CardMarket a través de la API de Puppeteer
  */
-export async function fetchCardmarketPrice(url: string): Promise<{ success: boolean; price?: number; error?: string }> {
-  console.log(`🔍 Obteniendo precio para: ${url}`);
+export async function fetchCardmarketPrice(url: string) {
+  logToConsole("CardmarketService", `Iniciando obtención de precio para URL: ${url}`);
   
   // Validar URL
   if (!isValidCardmarketUrl(url)) {
-    console.error(`❌ URL inválida: ${url}`);
-    return { success: false, error: 'URL inválida de CardMarket' };
+    const errorMsg = `URL inválida: ${url}`;
+    logToConsole("CardmarketService", `Error: ${errorMsg}`);
+    return { success: false, error: errorMsg };
   }
   
-  // Configuración de reintentos
-  const maxRetries = 2;
+  // Configurar para reintentos en caso de error
+  const maxRetries = 3;
   let currentRetry = 0;
-  let lastError = '';
+  let lastError = null;
   
-  // Intentar obtener el precio con reintentos
+  // Exponential backoff para reintentos
+  const getBackoffTime = (retry: number) => Math.min(Math.pow(2, retry) * 1000, 10000);
+  
   while (currentRetry <= maxRetries) {
     try {
-      // Si es un reintento, agregar el parámetro retry
-      const apiUrl = new URL('/api/cardmarket-puppeteer', window.location.origin);
-      apiUrl.searchParams.set('url', url);
-      
+      // Si es un reintento, esperar antes de volver a intentar
       if (currentRetry > 0) {
-        console.log(`🔄 Reintento ${currentRetry}/${maxRetries} para obtener precio...`);
-        apiUrl.searchParams.set('retry', currentRetry.toString());
-      } else {
-        console.log(`🔄 Intento inicial para obtener precio...`);
+        const backoffTime = getBackoffTime(currentRetry);
+        logToConsole("CardmarketService", `Reintento ${currentRetry}/${maxRetries} después de ${backoffTime}ms`);
+        await new Promise(resolve => setTimeout(resolve, backoffTime));
       }
       
-      // Realizar la petición a la API
-      const response = await fetch(apiUrl, {
-        method: 'GET',
+      // URL del endpoint con la URL del producto y número de reintento
+      const apiUrl = `/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}&retry=${currentRetry}`;
+      logToConsole("CardmarketService", `Llamando a: ${apiUrl}`);
+      
+      // Realizar solicitud
+      const response = await axios.get(apiUrl, {
+        timeout: 30000, // 30 segundos de timeout
         headers: {
-          'Content-Type': 'application/json',
-        },
+          'Cache-Control': 'no-cache',
+          'User-Agent': 'Pokebim-Price-Agent'
+        }
       });
       
-      // Verificar si la respuesta es correcta
-      if (!response.ok) {
-        // Si el status es 503 o 429, es probable que sea un error temporal
-        // 503: Servicio no disponible (Vercel, problema de memoria, etc.)
-        // 429: Demasiadas solicitudes (rate limiting)
-        const shouldRetry = response.status === 503 || response.status === 429;
-        
-        // Obtener detalles del error
-        const errorData = await response.json();
-        lastError = `${response.status} - ${JSON.stringify(errorData)}`;
-        console.error(`❌ Error en API: ${lastError}`);
-        
-        // Si debemos reintentar y no hemos superado el máximo, esperar y reintentar
-        if (shouldRetry && currentRetry < maxRetries) {
-          // Implementar backoff exponencial (1s, 3s, 9s, etc.)
-          const delay = errorData.retryAfter || Math.pow(3, currentRetry) * 1000;
-          console.log(`⏱️ Esperando ${delay/1000}s antes de reintentar...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          currentRetry++;
-          continue;
-        }
-        
-        // Si no debemos reintentar o hemos alcanzado el máximo, devolver error
-        return { 
-          success: false, 
-          error: `Error en API: ${lastError}`
-        };
-      }
-      
-      // Procesar respuesta exitosa
-      const data = await response.json();
-      console.log(`✅ Precio obtenido: ${data.price}€`);
-      
-      if (data.success && data.price) {
+      // Verificar respuesta
+      if (response.data && response.data.success === true && response.data.price) {
+        const price = response.data.price;
+        logToConsole("CardmarketService", `Precio obtenido exitosamente: ${price}€`);
         return {
           success: true,
-          price: data.price
+          price,
+          currency: response.data.currency || '€',
+          method: response.data.method || 'puppeteer'
         };
       } else {
-        lastError = `Respuesta incorrecta: ${JSON.stringify(data)}`;
-        console.error(`❌ ${lastError}`);
+        // Respuesta sin precio válido
+        const errorMsg = response.data?.error || 'No se pudo extraer el precio (respuesta sin precio)';
+        logToConsole("CardmarketService", `Error en respuesta: ${errorMsg}`);
+        lastError = errorMsg;
         
-        // Si hay un error pero debemos reintentar, intentarlo de nuevo
-        if (data.shouldRetry && currentRetry < maxRetries) {
-          const delay = data.retryAfter || Math.pow(3, currentRetry) * 1000;
-          console.log(`⏱️ Esperando ${delay/1000}s antes de reintentar...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+        if (response.status === 503 || response.status === 429) {
+          // Si el error es por límite de tasa o servicio no disponible, reintentar
           currentRetry++;
           continue;
+        } else {
+          return { 
+            success: false, 
+            error: errorMsg,
+            response: {
+              status: response.status,
+              data: response.data
+            }
+          };
         }
-        
-        return { 
-          success: false, 
-          error: lastError 
-        };
       }
+    } catch (error: any) {
+      // Capturar cualquier error durante la solicitud
+      const errorMsg = error.response?.data?.error || error.message || 'Error desconocido';
+      const statusCode = error.response?.status || 0;
       
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-      console.error(`❌ Error al obtener precio: ${lastError}`);
+      logToConsole("CardmarketService", `Error (${statusCode}): ${errorMsg}`);
+      lastError = errorMsg;
       
-      // Si no hemos superado el máximo de reintentos, intentarlo de nuevo
-      if (currentRetry < maxRetries) {
-        const delay = Math.pow(3, currentRetry) * 1000;
-        console.log(`⏱️ Esperando ${delay/1000}s antes de reintentar...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
+      // Para errores 429 (rate limit) y 503 (servicio no disponible), reintentar
+      if (statusCode === 429 || statusCode === 503) {
         currentRetry++;
         continue;
+      } else {
+        return { 
+          success: false, 
+          error: errorMsg,
+          response: error.response ? {
+            status: error.response.status,
+            data: error.response.data
+          } : null
+        };
       }
-      
-      return { 
-        success: false, 
-        error: `Error al obtener precio: ${lastError}` 
-      };
     }
   }
   
-  // Si llegamos aquí es porque hemos agotado los reintentos sin éxito
-  return { 
-    success: false, 
-    error: `Error después de ${maxRetries} intentos: ${lastError}` 
-  };
+  // Si llegamos aquí, se agotaron los reintentos sin éxito
+  logToConsole("CardmarketService", `Se agotaron ${maxRetries} reintentos sin éxito. Último error: ${lastError}`);
+  return { success: false, error: `Agotados reintentos (${maxRetries}). Último error: ${lastError}` };
 }
 
 /**

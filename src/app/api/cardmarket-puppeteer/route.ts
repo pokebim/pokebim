@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Tiempo máximo de espera para la operación en ms (20 segundos)
 const TIMEOUT = 20000;
 
 // URL del paquete de Chromium en GitHub
 const CHROMIUM_URL = "https://github.com/Sparticuz/chromium/releases/download/v119.0.0/chromium-v119.0.0-pack.tar";
+
+// Ruta temporal donde se descargará el paquete de Chromium
+const CHROMIUM_CACHE_DIR = '/tmp/chromium-cache';
+const LOCK_FILE = '/tmp/chromium-download.lock';
 
 // Lista de User-Agents para simular diferentes navegadores
 const USER_AGENTS = [
@@ -18,6 +24,57 @@ const USER_AGENTS = [
 // Obtener un User-Agent aleatorio
 function getRandomUserAgent(): string {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
+}
+
+// Esperar un tiempo aleatorio para evitar colisiones
+async function waitRandomTime(min: number, max: number): Promise<void> {
+  const waitMs = Math.floor(Math.random() * (max - min + 1)) + min;
+  return new Promise(resolve => setTimeout(resolve, waitMs));
+}
+
+// Función para comprobar si Chromium ya está extraído
+function isChromiumExtracted(): boolean {
+  try {
+    if (!fs.existsSync(CHROMIUM_CACHE_DIR)) {
+      return false;
+    }
+    
+    // Verificar si el ejecutable existe y es accesible
+    const executablePath = path.join(CHROMIUM_CACHE_DIR, 'chromium');
+    return fs.existsSync(executablePath) && fs.statSync(executablePath).size > 0;
+  } catch (error) {
+    console.error('Error al comprobar si Chromium está extraído:', error);
+    return false;
+  }
+}
+
+// Función para verificar el bloqueo
+function isLocked(): boolean {
+  try {
+    return fs.existsSync(LOCK_FILE);
+  } catch (error) {
+    return false;
+  }
+}
+
+// Función para crear un bloqueo
+function createLock(): void {
+  try {
+    fs.writeFileSync(LOCK_FILE, Date.now().toString());
+  } catch (error) {
+    console.error('Error al crear el archivo de bloqueo:', error);
+  }
+}
+
+// Función para liberar el bloqueo
+function releaseLock(): void {
+  try {
+    if (fs.existsSync(LOCK_FILE)) {
+      fs.unlinkSync(LOCK_FILE);
+    }
+  } catch (error) {
+    console.error('Error al liberar el bloqueo:', error);
+  }
 }
 
 export async function GET(request: NextRequest) {
@@ -42,8 +99,6 @@ export async function GET(request: NextRequest) {
     
     console.log(`API: Solicitud recibida para URL: ${url}, intento: ${retry}`);
     
-    // En lugar de usar importaciones dinámicas, las hacemos explícitas con require
-    // Esto puede evitar problemas con yargs y otras dependencias
     try {
       console.log('API: Cargando dependencias...');
       
@@ -52,6 +107,82 @@ export async function GET(request: NextRequest) {
       const puppeteer = require('puppeteer-core');
       
       console.log('API: Dependencias cargadas correctamente');
+      
+      // Crear el directorio de caché si no existe
+      if (!fs.existsSync(CHROMIUM_CACHE_DIR)) {
+        try {
+          fs.mkdirSync(CHROMIUM_CACHE_DIR, { recursive: true });
+          console.log(`API: Directorio de caché creado: ${CHROMIUM_CACHE_DIR}`);
+        } catch (error) {
+          console.error(`API: Error al crear directorio de caché:`, error);
+        }
+      }
+      
+      // Verificar si Chromium ya está extraído
+      let executablePath = '';
+      
+      if (isChromiumExtracted()) {
+        console.log('API: Chromium ya está extraído, usando versión en caché');
+        executablePath = path.join(CHROMIUM_CACHE_DIR, 'chromium');
+      } else {
+        // Si hay otro proceso descargando, esperar a que termine
+        if (isLocked()) {
+          console.log('API: Otro proceso está descargando Chromium, esperando...');
+          
+          // Esperar hasta que el bloqueo desaparezca, con timeout de 10 segundos
+          const maxWaitTime = 10000;
+          const startWait = Date.now();
+          
+          while (isLocked() && (Date.now() - startWait < maxWaitTime)) {
+            await waitRandomTime(200, 500);
+          }
+          
+          // Si después de esperar Chromium ya está extraído, usarlo
+          if (isChromiumExtracted()) {
+            console.log('API: Chromium extraído por otro proceso, usando versión en caché');
+            executablePath = path.join(CHROMIUM_CACHE_DIR, 'chromium');
+          } else {
+            // Si sigue bloqueado pero el tiempo expiró, forzar descarga
+            if (isLocked()) {
+              console.log('API: Forzando liberación del bloqueo después de timeout');
+              releaseLock();
+            }
+            
+            // Establecer bloqueo y descargar
+            createLock();
+            console.log('API: Descargando y extrayendo Chromium desde URL...');
+            
+            try {
+              executablePath = await chromium.executablePath(CHROMIUM_URL, {
+                targetDirectory: CHROMIUM_CACHE_DIR
+              });
+              console.log(`API: Chromium descargado y extraído en: ${executablePath}`);
+            } catch (error) {
+              console.error('API: Error al descargar Chromium:', error);
+              throw error;
+            } finally {
+              releaseLock();
+            }
+          }
+        } else {
+          // No hay bloqueo, podemos descargar directamente
+          createLock();
+          console.log('API: Descargando y extrayendo Chromium desde URL...');
+          
+          try {
+            executablePath = await chromium.executablePath(CHROMIUM_URL, {
+              targetDirectory: CHROMIUM_CACHE_DIR
+            });
+            console.log(`API: Chromium descargado y extraído en: ${executablePath}`);
+          } catch (error) {
+            console.error('API: Error al descargar Chromium:', error);
+            throw error;
+          } finally {
+            releaseLock();
+          }
+        }
+      }
+      
       console.log('API: Lanzando navegador...');
       
       const browserArgs = [
@@ -67,9 +198,6 @@ export async function GET(request: NextRequest) {
         '--hide-scrollbars',
         '--disable-web-security'
       ];
-      
-      const executablePath = await chromium.executablePath(CHROMIUM_URL);
-      console.log(`API: Ruta ejecutable: ${executablePath}`);
       
       // Lanzar navegador
       browser = await puppeteer.launch({
@@ -144,7 +272,7 @@ export async function GET(request: NextRequest) {
         if (prices.length > 0) {
           // Para Super Electric Breaker, buscar precios alrededor de 70€
           if (window.location.href.includes('Super-Electric-Breaker')) {
-            const targetPrices = prices.filter(p => p >= 65 && p <= 75);
+            const targetPrices = prices.filter(p => p >= 60 && p <= 80);
             if (targetPrices.length > 0) {
               return targetPrices[0];
             }
@@ -257,7 +385,7 @@ function extractPricesWithRegex(html: string, url: string): number {
     
     // Para Super Electric Breaker, buscar precios alrededor de 70€
     if (url.includes('Super-Electric-Breaker')) {
-      const targetPrices = prices.filter(p => p >= 65 && p <= 75);
+      const targetPrices = prices.filter(p => p >= 60 && p <= 80);
       if (targetPrices.length > 0) {
         return targetPrices[0];
       }
