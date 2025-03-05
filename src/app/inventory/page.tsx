@@ -7,8 +7,8 @@ import { formatCurrency, type Currency } from '@/lib/currencyConverter';
 import DataTable from '@/components/ui/DataTable';
 import { createColumnHelper } from '@tanstack/react-table';
 import Select2 from '@/components/ui/Select2';
+import { InventoryItem } from '@/types';
 import { 
-  InventoryItem,
   getAllInventoryItems,
   addInventoryItem,
   updateInventoryItem,
