@@ -165,11 +165,10 @@ async function fetchWithDirectRequest(url: string, isProxy = false): Promise<{su
       prices.push(...altPrices);
     }
     
-    // Ordenar precios y obtener el más bajo
-    prices.sort((a, b) => a - b);
-    const lowestPrice = prices[0];
-    
-    console.log(`API: Precio más bajo encontrado: ${lowestPrice}€`);
+    // Ordenar precios y obtener el más bajo/fiable
+    let selectedPrice = selectMostReliablePrice(prices);
+    console.log(`API: Precios encontrados: ${prices.join(', ')}€`);
+    console.log(`API: Precio seleccionado: ${selectedPrice}€`);
     
     // Devolver respuesta con cache para reducir carga en Vercel
     return {
@@ -177,7 +176,7 @@ async function fetchWithDirectRequest(url: string, isProxy = false): Promise<{su
       response: new NextResponse(
         JSON.stringify({
           success: true,
-          price: lowestPrice,
+          price: selectedPrice,
           url: url,
           timestamp: new Date().toISOString()
         }),
@@ -207,38 +206,49 @@ async function fetchWithDirectRequest(url: string, isProxy = false): Promise<{su
 function extractPricesWithRegex(html: string): number[] {
   const prices: number[] = [];
   
-  // Patrones para encontrar precios en el HTML
+  // Patrones más precisos para encontrar precios en el HTML
   const patterns = [
-    // Patrón para precios con formato X,XX €
-    /(\d+,\d+)\s*€/g,
-    // Patrón para precios en elementos price-container
-    /price-container[^>]*>([^<]*\d+,\d+[^<]*)</g,
-    // Patrón para precios en elementos color-primary
-    /color-primary[^>]*>([^<]*\d+,\d+[^<]*)</g,
-    // Patrones adicionales para capturar más formatos
-    /priceGuide[^>]*>([^<]*\d+,\d+[^<]*)</g,
-    /price[^>]*>([^<]*\d+,\d+[^<]*)</g,
-    /value[^>]*>([^<]*\d+,\d+[^<]*)</g,
-    /<span[^>]*>(\d+,\d+)\s*€<\/span>/g,
-    // Patrones más específicos para diferentes secciones de CardMarket
-    /averagePrice[^>]*>([^<]*\d+,\d+[^<]*)</g,
-    /sellPrice[^>]*>([^<]*\d+,\d+[^<]*)</g,
-    /"price">\s*(\d+,\d+)\s*</g,
-    /<div[^>]*class="price"[^>]*>\s*(\d+,\d+)\s*</g,
-    /\bPrice:?\s*(\d+,\d+)/g
+    // Patrón específico para CardMarket (precio con símbolo €)
+    /(\d+,\d+)\s*€(?![^<]*<\/span>\s*<span[^>]*>\d+<\/span>)/g, // Evita capturar la cantidad que sigue al precio
+    // Precio en elementos sellprice y formato común
+    /sellPrice[^>]*>[^<]*?(\d+,\d+)\s*€/g,
+    // Precio en formato de tabla de ofertas
+    /<div[^>]*class="[^"]*price[^"]*"[^>]*>\s*(\d+,\d+)\s*€\s*<\/div>/g,
+    // Precios en sección de tabla (con contexto de precio)
+    /<td[^>]*>([^<]*?(\d+,\d+)\s*€[^<]*?)<\/td>/g
   ];
   
   for (const pattern of patterns) {
     const matches = Array.from(html.matchAll(pattern));
     for (const match of matches) {
+      // Capturar el grupo que contiene el precio, preferiblemente el segundo grupo si existe
       let priceText = match[1] || match[0];
       
       // Extraer solo números y comas del texto
       const priceMatches = priceText.match(/(\d+,\d+)/);
       if (priceMatches && priceMatches[1]) {
         const price = parseFloat(priceMatches[1].replace(',', '.'));
-        if (!isNaN(price) && price > 0 && price < 5000) { // Filtrar precios no realistas
+        // Filtro más estricto para precios realistas (mínimo 3€ para evitar cantidades)
+        if (!isNaN(price) && price >= 3 && price < 5000) {
           prices.push(price);
+        }
+      }
+    }
+  }
+  
+  // Si no encontramos precios o los precios son demasiado bajos, intenta buscar el patrón específico
+  // de precio en ofertas de CardMarket
+  if (prices.length === 0 || Math.min(...prices) < 3) {
+    // Intentar extraer los precios de la tabla de ofertas
+    const offerTableRegex = /<tr[^>]*>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>([^<]*?(\d+,\d+)\s*€[^<]*?)<\/td>/g;
+    const offerMatches = Array.from(html.matchAll(offerTableRegex));
+    
+    for (const match of offerMatches) {
+      if (match[2]) {
+        const price = parseFloat(match[2].replace(',', '.'));
+        if (!isNaN(price) && price >= 3 && price < 5000) {
+          prices.push(price);
+          console.log(`API: Encontrado precio en tabla de ofertas: ${price}€`);
         }
       }
     }
@@ -248,39 +258,125 @@ function extractPricesWithRegex(html: string): number[] {
 }
 
 /**
- * Método alternativo de extracción de precios con patrones más generales
+ * Método alternativo de extracción de precios con patrones más específicos para CardMarket
  */
 function extractPricesAlternative(html: string): number[] {
-  // Buscar cualquier número con formato decimal en el HTML cerca de símbolo €
+  // Buscar específicamente en las secciones de oferta/precio de CardMarket
   const prices: number[] = [];
   
-  // Buscar patrones de precio cerca del símbolo €
-  const euroRegex = /(\d+[.,]\d+)\s*€/g;
-  const euroMatches = Array.from(html.matchAll(euroRegex));
+  // Buscar patrones de precio en secciones específicas de CardMarket
+  const patterns = [
+    // Patrón para precios en la tabla de ofertas
+    /<td[^>]*>[^<]*<\/td>\s*<td[^>]*>[^<]*<\/td>\s*<td[^>]*>[^<]*?(\d+,\d+)\s*€[^<]*?<\/td>/g,
+    // Patrón para el precio de tendencia
+    /Precio de tendencia:?[^<]*?(\d+,\d+)\s*€/g,
+    // Patrón para el precio de guía
+    /priceGuideValue[^>]*>[^<]*?(\d+,\d+)\s*€[^<]*?</g,
+    // Patrón para precio en info del artículo
+    /articleRow[^>]*>[\s\S]*?Price:?[^<]*?(\d+,\d+)\s*€/g
+  ];
   
-  for (const match of euroMatches) {
-    if (match[1]) {
-      const price = parseFloat(match[1].replace(',', '.'));
-      if (!isNaN(price) && price > 0 && price < 5000) {
-        prices.push(price);
+  for (const pattern of patterns) {
+    const matches = Array.from(html.matchAll(pattern));
+    for (const match of matches) {
+      if (match[1]) {
+        const price = parseFloat(match[1].replace(',', '.'));
+        if (!isNaN(price) && price >= 3 && price < 5000) {
+          prices.push(price);
+          console.log(`API: Encontrado precio alternativo: ${price}€`);
+        }
       }
     }
   }
   
-  // Si no encontramos nada con el símbolo €, buscamos decimales generales
+  // Si aún no encontramos nada, buscar precios cerca del símbolo € con más contexto
   if (prices.length === 0) {
-    const regex = /(\d+[.,]\d+)/g;
-    const matches = html.match(regex);
+    // Intentar extraer solo cuando el formato es claramente un precio (con €)
+    const euroContextRegex = /(?<!quantity">|stock">|Qty:|units|items|pcs)[^\d]*(\d+,\d+)\s*€/g;
+    const euroMatches = Array.from(html.matchAll(euroContextRegex));
     
-    if (matches) {
-      for (const match of matches) {
-        const price = parseFloat(match.replace(',', '.'));
-        if (!isNaN(price) && price > 0 && price < 1000) { // Filtrar precios no realistas
+    for (const match of euroMatches) {
+      if (match[1]) {
+        const price = parseFloat(match[1].replace(',', '.'));
+        if (!isNaN(price) && price >= 3 && price < 5000) {
           prices.push(price);
+          console.log(`API: Encontrado precio con contexto €: ${price}€`);
+        }
+      }
+    }
+    
+    // Solo como último recurso, buscar cualquier decimal
+    if (prices.length === 0) {
+      const regex = /(\d+[.,]\d+)/g;
+      const matches = html.match(regex);
+      
+      if (matches) {
+        for (const match of matches) {
+          const price = parseFloat(match.replace(',', '.'));
+          // Filtro más estricto
+          if (!isNaN(price) && price >= 3 && price < 1000) {
+            prices.push(price);
+          }
         }
       }
     }
   }
   
   return prices;
+}
+
+/**
+ * Selecciona el precio más fiable de una lista de precios
+ * Prioriza precios que aparecen múltiples veces o el precio más común en un rango
+ */
+function selectMostReliablePrice(prices: number[]): number {
+  if (!prices || prices.length === 0) {
+    throw new Error('No hay precios para seleccionar');
+  }
+  
+  // Si solo hay un precio, devolverlo
+  if (prices.length === 1) {
+    return prices[0];
+  }
+  
+  // Contar frecuencia de precios (redondeados a euros para agrupar similares)
+  const priceCounts: Record<number, number> = {};
+  
+  for (const price of prices) {
+    const roundedPrice = Math.round(price);
+    priceCounts[roundedPrice] = (priceCounts[roundedPrice] || 0) + 1;
+  }
+  
+  // Encontrar el precio más frecuente
+  let mostFrequentPrice = 0;
+  let highestFrequency = 0;
+  
+  for (const [priceStr, count] of Object.entries(priceCounts)) {
+    const price = parseInt(priceStr);
+    if (count > highestFrequency) {
+      highestFrequency = count;
+      mostFrequentPrice = price;
+    }
+  }
+  
+  // Si hay un precio claramente más frecuente, buscar el precio exacto más cercano a él
+  if (highestFrequency > 1) {
+    // Encontrar el precio real más cercano al valor redondeado más frecuente
+    prices.sort((a, b) => 
+      Math.abs(Math.round(a) - mostFrequentPrice) - Math.abs(Math.round(b) - mostFrequentPrice)
+    );
+    return prices[0];
+  }
+  
+  // Si no hay un precio claramente más frecuente, tomar el precio más bajo que sea realista
+  // Filtrar precios extremadamente bajos que podrían ser falsos positivos
+  const realisticPrices = prices.filter(p => p >= 3);
+  if (realisticPrices.length > 0) {
+    realisticPrices.sort((a, b) => a - b);
+    return realisticPrices[0]; // Devolver el precio más bajo realista
+  }
+  
+  // Si todo lo demás falla, simplemente ordenar y devolver el más bajo
+  prices.sort((a, b) => a - b);
+  return prices[0];
 } 
