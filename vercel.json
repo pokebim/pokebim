@@ -67,7 +67,7 @@
       "maxDuration": 20
     },
     "src/app/api/cardmarket-puppeteer/route.ts": {
-      "memory": 3008,
+      "memory": 1024,
       "maxDuration": 60
     },
     "src/app/api/cardmarket-test/route.ts": {
