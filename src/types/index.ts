@@ -24,6 +24,20 @@ export interface Supplier {
   notes?: string;
 }
 
+export interface InventoryItem {
+  id: string;
+  productId: string;
+  quantity: number;
+  location?: string;
+  condition?: string;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  purchaseCurrency?: string;
+  notes?: string;
+  owner?: string;
+  purchasedBy?: string;
+}
+
 export interface InventoryEntry {
   id: string;
   productId: string;
