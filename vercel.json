@@ -50,7 +50,7 @@
       "maxDuration": 20
     },
     "src/app/api/cardmarket-puppeteer/**": {
-      "memory": 1536,
+      "memory": 1024,
       "maxDuration": 60
     }
   },

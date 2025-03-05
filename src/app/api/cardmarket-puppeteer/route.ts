@@ -9,8 +9,9 @@ const TIMEOUT = 20000;
 const CHROMIUM_URL = "https://github.com/Sparticuz/chromium/releases/download/v119.0.0/chromium-v119.0.0-pack.tar";
 
 // Ruta temporal donde se descargará el paquete de Chromium
-const CHROMIUM_CACHE_DIR = '/tmp/chromium-cache';
-const LOCK_FILE = '/tmp/chromium-download.lock';
+// Usar una ruta compatible con entornos serverless y Windows
+const CHROMIUM_CACHE_DIR = process.platform === 'win32' ? path.join(process.cwd(), '.chromium-cache') : '/tmp/chromium-cache';
+const LOCK_FILE = process.platform === 'win32' ? path.join(process.cwd(), '.chromium-download.lock') : '/tmp/chromium-download.lock';
 
 // Lista de User-Agents para simular diferentes navegadores
 const USER_AGENTS = [
@@ -40,7 +41,7 @@ function isChromiumExtracted(): boolean {
     }
     
     // Verificar si el ejecutable existe y es accesible
-    const executablePath = path.join(CHROMIUM_CACHE_DIR, 'chromium');
+    const executablePath = path.join(CHROMIUM_CACHE_DIR, process.platform === 'win32' ? 'chrome.exe' : 'chromium');
     return fs.existsSync(executablePath) && fs.statSync(executablePath).size > 0;
   } catch (error) {
     console.error('Error al comprobar si Chromium está extraído:', error);
@@ -77,33 +78,63 @@ function releaseLock(): void {
   }
 }
 
+// Función para descargar y extraer Chromium de forma segura
+async function safeDownloadChromium() {
+  try {
+    // Asegurarse de que el directorio de caché existe
+    if (!fs.existsSync(CHROMIUM_CACHE_DIR)) {
+      fs.mkdirSync(CHROMIUM_CACHE_DIR, { recursive: true });
+    }
+    
+    console.log('API: Descargando y extrayendo Chromium desde URL...');
+    
+    // En Windows, usamos una estrategia diferente para evitar el error de protocolo
+    if (process.platform === 'win32') {
+      // Importar chromium solo cuando sea necesario
+      const chromium = require('@sparticuz/chromium-min');
+      
+      // Configurar la URL correctamente para Windows
+      const execPath = await chromium.executablePath({
+        folder: CHROMIUM_CACHE_DIR,
+        // No pasamos la URL directamente, dejamos que el módulo use su URL por defecto
+        // que está configurada correctamente para funcionar en Windows
+      });
+      
+      return execPath;
+    } else {
+      // En entornos serverless (Linux), usamos la URL directamente
+      const chromium = require('@sparticuz/chromium-min');
+      return await chromium.executablePath(CHROMIUM_URL, {
+        targetDirectory: CHROMIUM_CACHE_DIR
+      });
+    }
+  } catch (error) {
+    console.error('API: Error al descargar Chromium:', error);
+    throw error;
+  }
+}
+
 export async function GET(request: NextRequest) {
   let browser = null;
-  const startTime = Date.now();
+  let retryCount = 0;
+  const MAX_RETRIES = 2;
   
   try {
-    // Obtener parámetros de la URL
+    // Obtener la URL de la consulta
     const { searchParams } = new URL(request.url);
     const url = searchParams.get('url');
-    const retryParam = searchParams.get('retry');
-    const retry = retryParam ? parseInt(retryParam) : 0;
     
-    // Validación de URL
-    if (!url) {
-      return NextResponse.json({ error: 'URL no proporcionada', success: false }, { status: 400 });
+    console.log(`API: Solicitud recibida para URL: ${url}, intento: ${retryCount}`);
+    
+    // Validar la URL
+    if (!url || !url.includes('cardmarket.com')) {
+      return NextResponse.json({ error: 'URL inválida o no proporcionada' }, { status: 400 });
     }
-    
-    if (!url.includes('cardmarket.com')) {
-      return NextResponse.json({ error: 'URL inválida. Debe ser de cardmarket.com', success: false }, { status: 400 });
-    }
-    
-    console.log(`API: Solicitud recibida para URL: ${url}, intento: ${retry}`);
     
     try {
       console.log('API: Cargando dependencias...');
       
-      // Importar chromium-min y puppeteer-core de forma explícita
-      const chromium = require('@sparticuz/chromium-min');
+      // Importar puppeteer-core de forma explícita
       const puppeteer = require('puppeteer-core');
       
       console.log('API: Dependencias cargadas correctamente');
@@ -114,33 +145,34 @@ export async function GET(request: NextRequest) {
           fs.mkdirSync(CHROMIUM_CACHE_DIR, { recursive: true });
           console.log(`API: Directorio de caché creado: ${CHROMIUM_CACHE_DIR}`);
         } catch (error) {
-          console.error(`API: Error al crear directorio de caché:`, error);
+          console.error(`API: Error al crear directorio de caché: ${error}`);
         }
       }
       
-      // Verificar si Chromium ya está extraído
-      let executablePath = '';
+      // Obtener la ruta del ejecutable de Chromium
+      let executablePath;
       
       if (isChromiumExtracted()) {
         console.log('API: Chromium ya está extraído, usando versión en caché');
-        executablePath = path.join(CHROMIUM_CACHE_DIR, 'chromium');
+        executablePath = path.join(CHROMIUM_CACHE_DIR, process.platform === 'win32' ? 'chrome.exe' : 'chromium');
       } else {
-        // Si hay otro proceso descargando, esperar a que termine
+        // Verificar si hay un bloqueo activo
         if (isLocked()) {
           console.log('API: Otro proceso está descargando Chromium, esperando...');
           
-          // Esperar hasta que el bloqueo desaparezca, con timeout de 10 segundos
-          const maxWaitTime = 10000;
-          const startWait = Date.now();
+          // Esperar con backoff exponencial
+          let waitTime = 500;
+          const startTime = Date.now();
           
-          while (isLocked() && (Date.now() - startWait < maxWaitTime)) {
-            await waitRandomTime(200, 500);
+          while (isLocked() && Date.now() - startTime < TIMEOUT) {
+            await waitRandomTime(waitTime, waitTime * 2);
+            waitTime *= 1.5;
           }
           
           // Si después de esperar Chromium ya está extraído, usarlo
           if (isChromiumExtracted()) {
             console.log('API: Chromium extraído por otro proceso, usando versión en caché');
-            executablePath = path.join(CHROMIUM_CACHE_DIR, 'chromium');
+            executablePath = path.join(CHROMIUM_CACHE_DIR, process.platform === 'win32' ? 'chrome.exe' : 'chromium');
           } else {
             // Si sigue bloqueado pero el tiempo expiró, forzar descarga
             if (isLocked()) {
@@ -150,16 +182,13 @@ export async function GET(request: NextRequest) {
             
             // Establecer bloqueo y descargar
             createLock();
-            console.log('API: Descargando y extrayendo Chromium desde URL...');
             
             try {
-              executablePath = await chromium.executablePath(CHROMIUM_URL, {
-                targetDirectory: CHROMIUM_CACHE_DIR
-              });
+              executablePath = await safeDownloadChromium();
               console.log(`API: Chromium descargado y extraído en: ${executablePath}`);
             } catch (error) {
               console.error('API: Error al descargar Chromium:', error);
-              throw error;
+              return NextResponse.json({ error: error.message || 'Error al descargar Chromium' }, { status: 500 });
             } finally {
               releaseLock();
             }
@@ -167,16 +196,13 @@ export async function GET(request: NextRequest) {
         } else {
           // No hay bloqueo, podemos descargar directamente
           createLock();
-          console.log('API: Descargando y extrayendo Chromium desde URL...');
           
           try {
-            executablePath = await chromium.executablePath(CHROMIUM_URL, {
-              targetDirectory: CHROMIUM_CACHE_DIR
-            });
+            executablePath = await safeDownloadChromium();
             console.log(`API: Chromium descargado y extraído en: ${executablePath}`);
           } catch (error) {
             console.error('API: Error al descargar Chromium:', error);
-            throw error;
+            return NextResponse.json({ error: error.message || 'Error al descargar Chromium' }, { status: 500 });
           } finally {
             releaseLock();
           }
