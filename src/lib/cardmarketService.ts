@@ -84,57 +84,82 @@ export async function fetchCardmarketPrice(url: string): Promise<CardmarketPrice
     const puppeteerUrl = `${baseUrl}${puppeteerPath}`;
     console.log(`Llamando a: ${puppeteerUrl}`);
     
-    // Usamos fetch con URL absoluta
-    const response = await fetch(puppeteerUrl);
+    // Añadir un timeout mayor y configuración de reintentos
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
     
-    // Verificar la respuesta del API
-    if (response.ok) {
-      const data = await response.json();
+    try {
+      // Usamos fetch con URL absoluta
+      const response = await fetch(puppeteerUrl, {
+        signal: controller.signal,
+        // Se asegura de que las cookies y credenciales se envíen si es necesario
+        credentials: 'same-origin'
+      });
       
-      if (data && data.success) {
-        // Extraer el precio más bajo
-        let lowestPrice = null;
+      clearTimeout(timeoutId); // Limpiar el timeout si la solicitud termina antes
+      
+      // Verificar la respuesta del API
+      if (response.ok) {
+        const data = await response.json();
         
-        if (data.data) {
-          // Primero intentamos usar priceFrom si está disponible
-          if (data.data.priceFrom && data.data.priceFrom > 0) {
-            lowestPrice = data.data.priceFrom;
-          } 
-          // Si no hay priceFrom, buscamos el precio más bajo en el array de precios
-          else if (data.data.prices && data.data.prices.length > 0) {
-            // Los precios ya vienen ordenados de menor a mayor
-            lowestPrice = data.data.prices[0].price;
+        if (data && data.success) {
+          // Extraer el precio más bajo
+          let lowestPrice = null;
+          
+          if (data.data) {
+            // Primero intentamos usar priceFrom si está disponible
+            if (data.data.priceFrom && data.data.priceFrom > 0) {
+              lowestPrice = data.data.priceFrom;
+            } 
+            // Si no hay priceFrom, buscamos el precio más bajo en el array de precios
+            else if (data.data.prices && data.data.prices.length > 0) {
+              // Los precios ya vienen ordenados de menor a mayor
+              lowestPrice = data.data.prices[0].price;
+            }
           }
-        }
-        
-        if (lowestPrice && lowestPrice > 0) {
-          console.log(`Precio obtenido correctamente: ${lowestPrice}€`);
-          return {
-            success: true,
-            price: lowestPrice,
-            currency: '€',
-            method: 'puppeteer'
-          };
+          
+          if (lowestPrice && lowestPrice > 0) {
+            console.log(`Precio obtenido correctamente: ${lowestPrice}€`);
+            return {
+              success: true,
+              price: lowestPrice,
+              currency: '€',
+              method: 'puppeteer'
+            };
+          } else {
+            console.error('No se encontró un precio válido en los datos');
+            return {
+              success: false,
+              error: 'No se encontró un precio válido en los datos'
+            };
+          }
         } else {
-          console.error('No se encontró un precio válido en los datos');
+          console.error('Error en la respuesta del API:', data.error);
           return {
             success: false,
-            error: 'No se encontró un precio válido en los datos'
+            error: data.error || 'Error en la respuesta del API'
           };
         }
       } else {
-        console.error('Error en la respuesta del API:', data.error);
+        const errorText = `Error HTTP: ${response.status} ${response.statusText}`;
+        console.error('Error en la respuesta del API:', errorText);
         return {
           success: false,
-          error: data.error || 'Error en la respuesta del API'
+          error: errorText
         };
       }
-    } else {
-      console.error('Error en la respuesta del API:', response.statusText);
-      return {
-        success: false,
-        error: response.statusText || 'Error en la respuesta del API'
-      };
+    } catch (fetchError) {
+      clearTimeout(timeoutId); // Asegurarse de limpiar el timeout en caso de error
+      
+      if (fetchError.name === 'AbortError') {
+        console.error('La solicitud superó el tiempo máximo de espera (30 segundos)');
+        return {
+          success: false,
+          error: 'Tiempo de espera agotado'
+        };
+      }
+      
+      throw fetchError; // Re-lanzar para que lo capture el catch externo
     }
   } catch (error) {
     console.error('Error al obtener precio:', error);

@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
+// Configurar el tiempo de ejecución máximo para Vercel (30 segundos)
+export const maxDuration = 30;
+
 export async function GET(request: NextRequest) {
   try {
     // Obtener la URL de los parámetros de consulta
@@ -36,8 +39,17 @@ export async function GET(request: NextRequest) {
       
       console.log(`API Test: URL completa: ${puppeteerUrl}`);
       
+      // Configuramos un timeout para la solicitud
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 segundos timeout
+      
       // Usamos fetch nativo con URL absoluta
-      const response = await fetch(puppeteerUrl);
+      const response = await fetch(puppeteerUrl, {
+        signal: controller.signal,
+        credentials: 'same-origin'
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         console.error(`API Test: Error HTTP: ${response.status}`);
@@ -94,6 +106,15 @@ export async function GET(request: NextRequest) {
       }
     } catch (fetchError) {
       console.error('API Test: Error al llamar a puppeteer:', fetchError);
+      
+      // Manejar específicamente los errores de timeout
+      if (fetchError.name === 'AbortError') {
+        return NextResponse.json({
+          success: false,
+          error: 'La solicitud a puppeteer superó el tiempo máximo de espera'
+        }, { status: 504 }); // 504 Gateway Timeout
+      }
+      
       return NextResponse.json({
         success: false,
         error: `Error al llamar a puppeteer: ${fetchError instanceof Error ? fetchError.message : String(fetchError)}`
