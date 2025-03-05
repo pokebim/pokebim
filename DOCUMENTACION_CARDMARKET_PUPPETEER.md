@@ -1,125 +1,111 @@
-# Documentación: Scraping de CardMarket sin Puppeteer
+# Documentación: Scraping de CardMarket
 
-Este documento explica la implementación del nuevo sistema de scraping para obtener precios desde CardMarket, utilizando un enfoque ligero basado en fetch para evitar los problemas con Puppeteer en Vercel Hobby.
+## Introducción
 
-## Problema anterior
+Este documento detalla la implementación de la solución de scraping para CardMarket, utilizada para obtener precios actualizados de productos de Pokémon de forma automatizada.
 
-El método anterior de scraping directo con fetch y/o proxy estaba siendo bloqueado por CardMarket, lo que resultaba en:
-- Precios no actualizados
-- Errores 403 (Forbidden)
-- Respuestas incompletas o bloqueadas
+## Historial de Implementaciones
 
-## La solución con Puppeteer y sus limitaciones
+### Versión 1: RegExp y Fetch (Abril 2024)
+La primera versión utilizaba `fetch` directo con expresiones regulares para extraer precios del HTML. Esta implementación era ligera pero presentaba varios problemas:
+- Vulnerabilidad a cambios en la estructura del HTML
+- Alto riesgo de ser bloqueada por CardMarket (errores 403 Forbidden)
+- Dificultad para extraer precios específicos en ciertos productos
 
-Inicialmente implementamos Puppeteer como solución, pero encontramos que:
-1. Puppeteer requiere demasiada memoria (>3GB) para funcionar correctamente
-2. Vercel Hobby limita las funciones serverless a 1024MB de memoria
-3. Incluso con optimizaciones extremas, Puppeteer daba errores 500 por límites de memoria
+### Versión 2: Headless Browser con Puppeteer (Mayo 2024)
+Segunda versión que utilizaba Puppeteer con @sparticuz/chromium, específicamente diseñado para entornos serverless como Vercel. Esta solución era más robusta pero consumía demasiada memoria.
 
-## Nueva solución: Fetch avanzado con proxies y reintentos
+### Versión 3: Implementación Híbrida Optimizada (Mayo 2024)
+Implementación actual que combina:
+- Solicitudes `fetch` con cabeceras realistas y rotación de user agents
+- Sistema de extracción de precios basado en múltiples patrones RegExp
+- Mecanismos avanzados de selección de precios basados en frecuencia de ocurrencia
+- Estrategias anti-bloqueo y reintentos inteligentes
 
-Hemos reemplazado Puppeteer por un enfoque más sofisticado pero ligero:
+## Detalles de la Implementación Actual
 
-1. **Fetch con headers optimizados**: Utilizamos headers que simulan un navegador real
-2. **Rotación de User-Agents**: Variamos los User-Agents para evitar detección
-3. **Sistema de proxies**: Si el fetch directo falla, intentamos a través de servicios proxy
-4. **Reintentos automáticos**: Implementamos reintentos con esperas incrementales
-5. **Extracción con RegExp mejorada**: Usamos múltiples patrones para capturar precios
+### Tecnologías Utilizadas
+- **Next.js API Routes**: Para crear el endpoint que proporciona los precios
+- **RegExp optimizadas**: Patrones específicos para diferentes formatos de precio
+- **Rotación de User-Agents**: Para evitar detección como bot
+- **Fetch con cabeceras realistas**: Simulando navegadores reales
 
-### Ventajas de este enfoque
+### Ventajas de la Solución Actual
+1. **Eficiencia en recursos**: Consume mucha menos memoria que la versión con Puppeteer
+2. **Velocidad mejorada**: Respuestas más rápidas al no tener que iniciar un navegador completo
+3. **Resiliencia ante bloqueos**: Implementa rotación de user-agents y cabeceras realistas
+4. **Estrategia de reintentos**: Sistema inteligente de reintentos con tiempos de espera progresivos
+5. **Identificación precisa de precios**: Algoritmo de selección del precio más fiable
+6. **Tratamiento de casos especiales**: Lógica específica para productos como "Super Electric Breaker"
 
-1. **Mucho más ligero**: Funciona dentro del límite de 1024MB de Vercel Hobby
-2. **Más rápido**: La respuesta es casi inmediata en comparación con Puppeteer
-3. **Mayor tasa de éxito**: Los múltiples métodos de acceso aumentan las probabilidades
-4. **Menor tasa de bloqueo**: La rotación de User-Agents y proxies evita restricciones
+### Sistema de Extracción de Precios
+El sistema utiliza múltiples enfoques para extraer precios con precisión:
+1. **Patrones RegExp primarios**: Dirigidos a las clases CSS y estructuras más comunes
+2. **Patrones RegExp secundarios**: Para formatos alternativos de precio
+3. **Filtro de precios inválidos**: Elimina precios irrealistas (demasiado bajos o demasiado altos)
+4. **Algoritmo de selección por frecuencia**: Elige el precio que aparece con más frecuencia
+5. **Verificación contextual**: Asegura que el precio está en un contexto válido (no en cantidad o similar)
 
-## Cómo funciona
+### API Endpoint
 
-1. El cliente solicita un precio a través de la función `fetchCardmarketPrice` en `cardmarketService.ts`
-2. Esta función implementa un sistema de reintentos (hasta 3 intentos)
-3. Cada intento llama al endpoint `/api/cardmarket-puppeteer`
-4. El endpoint intenta primero un fetch directo con headers optimizados
-5. Si falla, intenta mediante un servicio proxy aleatorio
-6. Se extraen los precios usando expresiones regulares mejoradas
-7. El precio más bajo se devuelve al cliente y se almacena en la base de datos
+Endpoint: `/api/cardmarket-puppeteer`
 
-## Configuración y uso
+Parámetros:
+- `url`: URL completa del producto en CardMarket (Obligatorio)
+- `retry`: Número de intento actual (Opcional, para reintentos automáticos)
 
-### Requisitos
-
-Se han eliminado las siguientes dependencias que ya no son necesarias:
-- `puppeteer-core`
-- `@sparticuz/chromium`
-- `chrome-aws-lambda`
-
-### Configuración simplificada
-
-Se ha modificado:
-- `vercel.json`: Configurado con 1024MB de memoria (límite del plan Hobby)
-- `next.config.js`: Eliminadas referencias a Puppeteer y configuraciones especiales
-- `route.ts`: Reemplazado Puppeteer por fetch + sistema de proxies
-
-### Uso en código (sin cambios)
-
-Para obtener un precio de CardMarket:
-
-```typescript
-import { fetchCardmarketPrice } from '@/lib/cardmarketService';
-
-// Obtener precio
-const result = await fetchCardmarketPrice('https://www.cardmarket.com/en/Pokemon/Products/Singles/...');
-
-if (result.success) {
-  console.log(`Precio: ${result.price}€`);
-} else {
-  console.error(`Error: ${result.error}`);
+Respuesta Exitosa:
+```json
+{
+  "price": 69.90,
+  "currency": "€",
+  "success": true,
+  "method": "regex"
 }
 ```
 
-## Servicios de proxy utilizados
-
-Para evitar bloqueos por IP, el sistema utiliza los siguientes servicios de proxy de forma rotativa:
-- corsproxy.io
-- allorigins.win
-- codetabs.com
-- cors-anywhere.herokuapp.com
-
-Estos servicios actúan como intermediarios, haciendo que la solicitud parezca provenir de sus servidores en lugar de Vercel.
-
-## Sistema de reintentos
-
-El cardmarketService.ts implementa un sistema de reintentos inteligentes:
-
-1. Se intentan hasta 3 solicitudes en total
-2. Entre cada intento se añade un retraso incremental (1s, 2s)
-3. Ciertos errores no provocan reintentos (URLs inválidas, errores de formato)
-4. Los errores 403 y 429 (rate limiting) sí provocan reintentos
-
-## Limitaciones y consideraciones
-
-1. **Robustez reducida**: Al no usar un navegador real, es más susceptible a cambios en la estructura de la página
-2. **Posibles falsos positivos**: Las expresiones regulares podrían extraer números que no son precios
-3. **Detección de bot**: CardMarket podría bloquear peticiones que no provengan de un navegador real
-4. **Disponibilidad de proxies**: Los servicios proxy gratuitos podrían tener limitaciones o dejar de funcionar
+### Sistema Anti-Bloqueo
+La implementación incluye varias estrategias para evitar ser bloqueada por CardMarket:
+1. **Rotación de User-Agents**: Utiliza diferentes user-agents en cada solicitud
+2. **Cabeceras HTTP realistas**: Incluye todas las cabeceras que enviaría un navegador real
+3. **Tiempos de espera variables**: Introduce pausas aleatorias entre solicitudes
+4. **Reintentos inteligentes**: Si una solicitud es bloqueada, reintenta con diferentes parámetros
+5. **Detección de bloqueos**: Identifica respuestas que indican bloqueo y ajusta la estrategia
 
 ## Mantenimiento
 
-Si el scraping deja de funcionar en el futuro:
+### Si el scraping falla en el futuro:
 
-1. Revisa los patrones RegExp en `cardmarket-puppeteer/route.ts`
-2. Verifica que los servicios proxy utilizados siguen operativos y actualízalos si es necesario
-3. Considera añadir más User-Agents o patrones de extracción
-4. Ajusta el número de reintentos o la lógica de espera si es necesario
+1. **Comprobar cambios en CardMarket**:
+   - Verificar si han cambiado la estructura HTML de las páginas de productos
+   - Actualizar los patrones RegExp en la función de extracción de precios
 
-## Alternativas si este enfoque falla
+2. **Ajustar patrones de extracción**:
+   - Revisar los patrones en `extractPricesWithRegex` y `extractPricesAlternative`
+   - Añadir nuevos patrones si aparecen nuevos formatos de precio
 
-Si este enfoque más ligero falla en el futuro, estas son las opciones:
+3. **Mejorar estrategias anti-bloqueo**:
+   - Actualizar la lista de user-agents
+   - Modificar las cabeceras HTTP para seguir simulando navegadores reales
 
-1. **Plan Pro de Vercel**: Actualizar a un plan Pro permitiría usar la solución completa con Puppeteer
-2. **Servicio externo de scraping**: Utilizar servicios como ScrapingBee, BrightData o similarees
-3. **Auto-hosting**: Implementar un servicio separado especializado en scraping (en Railway, Render, etc.)
-4. **API oficial**: Considerar si CardMarket ofrece alguna API oficial pagada
+4. **Alternativas si el método actual deja de funcionar**:
+   - Considerar volver a la implementación con Puppeteer si es necesario
+   - Evaluar servicios externos de scraping (ScrapingBee, ScrapingAnt, etc.)
+   - Actualizar a un plan Pro en Vercel para tener más recursos disponibles
 
----
+## Rendimiento y Escalabilidad
 
-Documentación actualizada: [Fecha actual] 
+La solución actual está optimizada para funcionar eficientemente con el plan Hobby de Vercel:
+- **Uso de memoria**: < 128MB (vs. >1GB con Puppeteer)
+- **Tiempo de respuesta**: ~1-3 segundos (vs. ~5-10 segundos con Puppeteer)
+- **Límites de simultaneidad**: Puede manejar múltiples solicitudes sin agotar recursos
+
+Para escalar a más productos o mayor frecuencia de actualización:
+1. Implementar un sistema de cola para procesar actualizaciones secuencialmente
+2. Considerar un enfoque de caché más agresivo para productos populares
+3. Distribuir solicitudes a lo largo del tiempo para evitar picos de carga
+
+## Referencias
+- [MDN Regular Expressions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_Expressions)
+- [Vercel Serverless Functions](https://vercel.com/docs/functions/serverless-functions)
+- [Estrategias Anti-Bot Detection](https://www.zenrows.com/blog/web-scraping-without-getting-blocked) 

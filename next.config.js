@@ -50,6 +50,12 @@ const nextConfig = {
     
     return config;
   },
+
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['localhost:3000', 'pokebimapp-git-master-pokebims-projects.vercel.app'],
+    },
+  },
 };
 
 module.exports = nextConfig; 

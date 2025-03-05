@@ -47,103 +47,90 @@ function isValidCardmarketUrl(url: string): boolean {
 }
 
 /**
- * Función simplificada para obtener precios 
- * Usa la API optimizada que implementa fetch en lugar de Puppeteer
+ * Obtiene el precio de un artículo en CardMarket
+ * Utiliza la nueva API optimizada para extracción de precios
+ * 
+ * @param url URL de CardMarket
+ * @returns Objeto con el precio o error
  */
-export async function fetchCardmarketPrice(url: string): Promise<{price: number, success: boolean, error?: string}> {
-  if (!isValidCardmarketUrl(url)) {
-    console.error(`Error: URL no válida para Cardmarket: ${url}`);
-    return { 
-      success: false, 
-      price: 0, 
-      error: 'URL no válida para Cardmarket' 
-    };
+export async function fetchCardmarketPrice(url: string): Promise<{ success: boolean; price?: number; error?: string }> {
+  // Validar URL
+  if (!url || !url.includes('cardmarket.com')) {
+    console.error('❌ URL inválida para CardMarket:', url);
+    return { success: false, error: 'URL inválida. Debe ser de cardmarket.com' };
   }
 
   console.log(`🔍 Obteniendo precio para URL: ${url}`);
   
-  // Implementar reintentos (máximo 3 intentos)
+  // Implementación de reintentos
   const MAX_RETRIES = 2;
-  let retryCount = 0;
-  let lastError = null;
+  let lastError = '';
   
-  while (retryCount <= MAX_RETRIES) {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
-      if (retryCount > 0) {
-        console.log(`🔄 Reintento ${retryCount}/${MAX_RETRIES} para obtener precio...`);
-        // Esperar entre reintentos (1s, 2s)
-        await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
+      // Si no es el primer intento, mostrar información de reintento
+      if (attempt > 0) {
+        console.log(`🔄 Reintento ${attempt}/${MAX_RETRIES} para obtener precio...`);
+        // Esperar un tiempo incremental entre reintentos
+        await new Promise(resolve => setTimeout(resolve, attempt * 1500));
       }
       
-      // Usar la API optimizada
-      const response = await fetch(`/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}&retry=${retryCount}`, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
+      // Llamar a la API con el intento actual
+      const response = await fetch(`/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}&retry=${attempt}`);
       
+      // Analizar la respuesta
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMsg = `Error en API: ${response.status}${errorData.error ? ` - ${errorData.error}` : ''}`;
-        console.error(`❌ ${errorMsg}`);
+        const errorData = await response.json().catch(() => ({ error: `Error ${response.status}` }));
+        const errorMessage = errorData.error || `Error ${response.status} - ${response.statusText}`;
         
-        // Si es un error 429 (demasiadas solicitudes) o 403 (prohibido), podemos reintentar
-        if ((response.status === 429 || response.status === 403) && retryCount < MAX_RETRIES) {
-          lastError = new Error(errorMsg);
-          retryCount++;
+        console.error(`❌ Error en API: ${response.status} - ${errorMessage}`);
+        
+        // Determinar si debemos reintentar basado en el código de error y si hay intentos restantes
+        if (response.status === 503 && errorData.shouldRetry && attempt < MAX_RETRIES) {
+          lastError = errorMessage;
+          // El API sugiere reintentar, continuamos al siguiente intento
+          if (errorData.retryAfter) {
+            await new Promise(resolve => setTimeout(resolve, errorData.retryAfter));
+          }
           continue;
         }
         
-        throw new Error(errorMsg);
+        lastError = errorMessage;
+        throw new Error(`Error en API: ${response.status} - ${errorMessage}`);
       }
       
+      // Procesar respuesta exitosa
       const data = await response.json();
       
-      if (!data.success || !data.price || data.price <= 0) {
-        throw new Error(data.error || 'No se obtuvo un precio válido');
+      if (!data.success) {
+        throw new Error(data.error || 'Error desconocido en la respuesta');
       }
       
-      console.log(`✅ Precio obtenido correctamente: ${data.price}€`);
+      console.log(`✅ Precio obtenido: ${data.price}${data.currency}`);
       return {
         success: true,
         price: data.price
       };
+      
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`❌ Error obteniendo precio: ${errorMessage}`);
+      lastError = error instanceof Error ? error.message : String(error);
+      console.error(`❌ Error obteniendo precio:`, lastError);
       
-      // Guardar el error para reportarlo si agotamos los reintentos
-      lastError = error;
-      
-      // Si incluye ciertos mensajes específicos, no reintentar
-      const noRetryMessages = [
-        'URL no válida', 
-        'No se encontraron precios',
-        'HTML incompleta'
-      ];
-      
-      const shouldRetry = !noRetryMessages.some(msg => errorMessage.includes(msg));
-      
-      if (shouldRetry && retryCount < MAX_RETRIES) {
-        retryCount++;
-        continue;
+      // Si es el último intento, fallar definitivamente
+      if (attempt === MAX_RETRIES) {
+        return { 
+          success: false, 
+          error: lastError
+        };
       }
-      
-      // Si fallan todos los reintentos o no debemos reintentar, devolver el error
-      return {
-        success: false,
-        price: 0,
-        error: errorMessage
-      };
+      // De lo contrario, continuamos al siguiente intento
     }
   }
   
-  // Este punto solo se alcanza si se agotaron los reintentos
-  return {
-    success: false,
-    price: 0,
-    error: lastError instanceof Error ? lastError.message : 'Error desconocido después de varios intentos'
+  // Este código no debería alcanzarse, pero por seguridad:
+  return { 
+    success: false, 
+    error: lastError || 'Error desconocido obteniendo precio' 
   };
 }
 
@@ -244,26 +231,32 @@ export async function updateCardmarketPriceForProduct(
     // Verificar si ya existe un precio y si necesitamos actualizarlo
     const existingPrice = await getCardmarketPriceForProduct(productId);
     
-    // Si existe un precio y no se fuerza la actualización, devolver el precio existente
+    // Si existe un precio, verificar la antigüedad y decidir si actualizar
     if (existingPrice && !forceUpdate) {
-      console.log(`ℹ️ Usando precio existente para ${productName}: ${existingPrice.price}€`);
-      return {
-        success: true,
-        price: existingPrice.price
-      };
-    }
-
-    // Si estamos actualizando, primero limpiamos cualquier precio existente
-    if (existingPrice) {
-      console.log(`🧹 Limpiando precio existente para ${productName}`);
-      await deleteCardmarketPrice(productId);
+      const currentTime = new Date().getTime();
+      const lastUpdateTime = existingPrice.updatedAt?.toDate?.() 
+                            ? existingPrice.updatedAt.toDate().getTime() 
+                            : 0;
+      
+      // Si el precio se actualizó en las últimas 24 horas y no forzamos, usar el existente
+      const hoursSinceUpdate = (currentTime - lastUpdateTime) / (1000 * 60 * 60);
+      
+      if (hoursSinceUpdate < 24) {
+        console.log(`ℹ️ Usando precio existente para ${productName}: ${existingPrice.price}€ (actualizado hace ${hoursSinceUpdate.toFixed(1)} horas)`);
+        return {
+          success: true,
+          price: existingPrice.price
+        };
+      }
+      
+      console.log(`ℹ️ El precio existente para ${productName} tiene ${hoursSinceUpdate.toFixed(1)} horas de antigüedad. Actualizando...`);
     }
 
     // Obtener el precio actualizado
     console.log(`🔍 Obteniendo precio actualizado para ${productName} desde ${cardmarketUrl}`);
     const cardmarketData = await fetchCardmarketPrice(cardmarketUrl);
 
-    if (!cardmarketData.success || cardmarketData.price <= 0) {
+    if (!cardmarketData.success) {
       const errorMsg = cardmarketData.error || 'Precio no disponible en este momento';
       console.error(`❌ Error al obtener precio para ${productName}: ${errorMsg}`);
       
@@ -271,6 +264,34 @@ export async function updateCardmarketPriceForProduct(
       if (existingPrice) {
         console.log(`⚠️ Manteniendo precio anterior para ${productName}: ${existingPrice.price}€`);
         // Re-guardar el precio anterior pero actualizar la fecha
+        await saveCardmarketPrice({
+          productId,
+          productName,
+          url: cardmarketUrl,
+          price: existingPrice.price
+        });
+        
+        return {
+          success: true,
+          price: existingPrice.price,
+          error: `Usando precio anterior. ${errorMsg}`
+        };
+      }
+      
+      return {
+        success: false,
+        error: errorMsg
+      };
+    }
+
+    // Verificar si el precio es razonable (mayor que cero)
+    if (!cardmarketData.price || cardmarketData.price <= 0) {
+      const errorMsg = 'El precio obtenido no es válido (cero o negativo)';
+      console.error(`❌ ${errorMsg} para ${productName}`);
+      
+      // Si teníamos un precio anterior, seguimos usándolo
+      if (existingPrice) {
+        console.log(`⚠️ Manteniendo precio anterior para ${productName}: ${existingPrice.price}€`);
         await saveCardmarketPrice({
           productId,
           productName,
@@ -326,22 +347,24 @@ export async function updateAllCardmarketPrices(
   success: boolean, 
   updated: number, 
   failed: number,
-  errors: string[]
+  errors: string[],
+  updatedProducts: {id: string, name: string, price: number}[]
 }> {
-  console.log("Actualizando todos los precios de Cardmarket...");
-  console.log(`Forzar actualización: ${forceUpdate}`);
+  console.log(`🔄 Actualizando precios de Cardmarket para ${products.length} productos...`);
+  console.log(`ℹ️ Forzar actualización: ${forceUpdate ? 'Sí' : 'No'}`);
   
   const result = {
     success: true,
     updated: 0,
     failed: 0,
-    errors: [] as string[]
+    errors: [] as string[],
+    updatedProducts: [] as {id: string, name: string, price: number}[]
   };
   
   // Filtra productos que tienen URL de Cardmarket
   const productsWithUrl = products.filter(p => p.cardmarketUrl && p.cardmarketUrl.trim() !== '');
   
-  console.log(`Se encontraron ${productsWithUrl.length} productos con URL de Cardmarket`);
+  console.log(`📊 Se encontraron ${productsWithUrl.length} productos con URL de Cardmarket`);
   
   // Si no hay productos con URL, terminamos
   if (productsWithUrl.length === 0) {
@@ -353,9 +376,21 @@ export async function updateAllCardmarketPrices(
   }
   
   // Actualizar cada producto secuencialmente
-  for (const product of productsWithUrl) {
+  for (let i = 0; i < productsWithUrl.length; i++) {
+    const product = productsWithUrl[i];
+    
     try {
-      console.log(`Actualizando precio para ${product.name}...`);
+      // Mostrar progreso
+      console.log(`🔄 [${i+1}/${productsWithUrl.length}] Actualizando precio para ${product.name}...`);
+      
+      // Aplicar pausa escalonada para evitar sobrecarga del servidor
+      if (i > 0) {
+        const pauseTime = Math.min(1000 + (i * 100), 3000); // Aumenta gradualmente hasta 3s
+        console.log(`⏱️ Esperando ${pauseTime}ms antes de la siguiente solicitud...`);
+        await new Promise(resolve => setTimeout(resolve, pauseTime));
+      }
+      
+      // Actualizar el precio
       const updateResult = await updateCardmarketPriceForProduct(
         product.id, 
         product.name || 'Producto sin nombre',
@@ -363,25 +398,37 @@ export async function updateAllCardmarketPrices(
         forceUpdate
       );
       
-      if (updateResult.success) {
+      if (updateResult.success && updateResult.price) {
         result.updated++;
-        console.log(`✅ Precio actualizado para ${product.name}: ${updateResult.price}€`);
+        result.updatedProducts.push({
+          id: product.id,
+          name: product.name || 'Producto sin nombre',
+          price: updateResult.price
+        });
+        
+        // Si se actualizó con éxito pero había un mensaje de error (por ejemplo, usando precio anterior)
+        if (updateResult.error) {
+          console.warn(`⚠️ Actualización parcial para ${product.name}: ${updateResult.error}`);
+        } else {
+          console.log(`✅ Precio actualizado para ${product.name}: ${updateResult.price}€`);
+        }
       } else {
         result.failed++;
-        result.errors.push(`Error al actualizar ${product.name}: ${updateResult.error}`);
-        console.error(`❌ Error al actualizar ${product.name}: ${updateResult.error}`);
+        const errorMsg = `Error al actualizar ${product.name}: ${updateResult.error || 'Error desconocido'}`;
+        result.errors.push(errorMsg);
+        console.error(`❌ ${errorMsg}`);
       }
-      
-      // Pequeña pausa para no sobrecargar el servidor
-      await new Promise(resolve => setTimeout(resolve, 500));
     } catch (error) {
       result.failed++;
-      const errorMsg = `Error inesperado al actualizar ${product.name}: ${error}`;
+      const errorMsg = `Error inesperado al actualizar ${product.name}: ${error instanceof Error ? error.message : String(error)}`;
       result.errors.push(errorMsg);
       console.error(`❌ ${errorMsg}`);
     }
   }
   
-  console.log(`Actualización completada: ${result.updated} actualizados, ${result.failed} fallidos`);
+  console.log(`📊 Resumen de actualización:`);
+  console.log(`   ✅ ${result.updated} productos actualizados con éxito`);
+  console.log(`   ❌ ${result.failed} productos fallidos`);
+  
   return result;
 }
