@@ -79,28 +79,33 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
     // Simulación: esperar un tiempo aleatorio para simular la latencia de red
     await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
     
-    // Normalizar la URL para mejor detección
-    const urlLower = url.toLowerCase();
-    console.log("URL normalizada para detección:", urlLower);
+    // IMPORTANTE: No normalizar a minúsculas la URL completa
+    // Solo extraer las partes relevantes para identificar el producto
+    const urlParts = url.split('/');
+    const lastPart = urlParts[urlParts.length - 1] || '';
+    const productName = lastPart.split('?')[0] || '';
+    
+    console.log("URL original:", url);
+    console.log("Partes extraídas para identificación de producto:", productName);
     
     // Precios exactos para productos específicos
     // NOTA: Estos precios son constantes simulados que representan
     // los precios más bajos de los productos en Cardmarket
     const EXACT_PRICES = {
-      // Precios exactos mencionados por el usuario
-      'terastal-festival': 54.83,  // Precio más bajo real para Terastal Festival
-      'heat-wave': 62.50,
-      'lost-abyss': 48.99,
-      'shiny-treasures': 71.25,
-      'super-electric': 58.90,
+      // Precios exactos confirmados por el usuario
+      'Terastal-Festival-ex-Booster-Box': 54.83,  // Precio más bajo real para Terastal Festival
+      'Super-Electric-Breaker-Booster-Box': 44.99, // Corregido según datos reales
+      'Heat-Wave-30-Booster-Box': 62.50,
+      'Lost-Abyss-Booster-Box': 48.99,
+      'Shiny-Treasure-ex-Booster-Box': 71.25,
       // Otros productos populares (simulados)
-      'vstar-universe': 87.50,
-      'eevee-heroes': 99.95,
-      'blue-sky-stream': 64.75,
-      'fusion-arts': 53.40,
-      'battle-partners': 51.95,
-      'crimson-haze': 55.60,
-      '151': 110.00,
+      'Vstar-Universe-Booster-Box': 87.50,
+      'Eevee-Heroes-Booster-Box': 99.95,
+      'Blue-Sky-Stream-Booster-Box': 64.75,
+      'Fusion-Arts-Booster-Box': 53.40,
+      'Battle-Partners-30-Booster-Box': 51.95,
+      'Crimson-Haze-Booster-Box': 55.60,
+      '151-Booster-Box': 110.00,
     };
     
     // Determinar el precio basado en la URL
@@ -109,7 +114,9 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
     
     // Buscar coincidencias exactas para productos conocidos
     for (const [productKey, productPrice] of Object.entries(EXACT_PRICES)) {
-      if (urlLower.includes(productKey)) {
+      // Comparamos ignorando case pero respetando guiones y estructura
+      if (productName.toLowerCase() === productKey.toLowerCase() || 
+          url.toLowerCase().includes(productKey.toLowerCase())) {
         price = productPrice;
         priceSource = `${productKey} (precio exacto)`;
         break;
@@ -144,36 +151,26 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
 export async function saveCardmarketPrice(data: Omit<CardmarketPrice, 'id' | 'updatedAt'>): Promise<string> {
   console.log("Guardando precio de Cardmarket:", data);
   
+  if (!data.productId || !data.price || data.price <= 0) {
+    console.error("⚠️ Datos de precio inválidos:", data);
+    throw new Error("Datos de precio inválidos");
+  }
+  
   try {
-    // Buscar si ya existe un registro para este producto
-    const q = query(pricesCollection, where("productId", "==", data.productId));
-    const querySnapshot = await getDocs(q);
+    // Primero, eliminar cualquier precio existente para este producto
+    // para evitar duplicados o datos inconsistentes
+    await deleteCardmarketPrice(data.productId);
     
-    if (!querySnapshot.empty) {
-      // Actualizar el registro existente
-      const docId = querySnapshot.docs[0].id;
-      const priceRef = doc(db, "cardmarketPrices", docId);
-      
-      await updateDoc(priceRef, {
-        price: data.price,
-        url: data.url,
-        updatedAt: serverTimestamp()
-      });
-      
-      console.log(`Precio actualizado para ${data.productName} (${data.productId}): ${data.price}€`);
-      return docId;
-    } else {
-      // Crear un nuevo registro
-      const docRef = await addDoc(pricesCollection, {
-        ...data,
-        updatedAt: serverTimestamp()
-      });
-      
-      console.log(`Nuevo precio guardado para ${data.productName} (${data.productId}): ${data.price}€`);
-      return docRef.id;
-    }
+    // Luego, crear un nuevo registro con datos frescos
+    const docRef = await addDoc(pricesCollection, {
+      ...data,
+      updatedAt: serverTimestamp()
+    });
+    
+    console.log(`✅ Nuevo precio guardado para ${data.productName} (${data.productId}): ${data.price}€`);
+    return docRef.id;
   } catch (error) {
-    console.error("Error al guardar precio de Cardmarket:", error);
+    console.error("❌ Error al guardar precio de Cardmarket:", error);
     throw error;
   }
 }
@@ -280,12 +277,13 @@ export async function updateCardmarketPriceForProduct(
   }
   
   try {
-    // Si forzamos la actualización, eliminamos el precio anterior
-    if (forceUpdate) {
-      await deleteCardmarketPrice(productId);
-    }
+    // FORZAR la eliminación del precio anterior siempre que se solicite una actualización
+    // Esto garantiza que no nos quedemos con datos anticuados
+    console.log(`🧹 Limpiando todos los precios existentes para ${productName}...`);
+    await deleteCardmarketPrice(productId);
     
-    // 1. Obtener el precio actual de Cardmarket
+    // 1. Obtener el precio actual de Cardmarket (siempre fresco)
+    console.log(`🔄 Obteniendo nuevo precio para ${productName}...`);
     const priceData = await fetchCardmarketPrice(cardmarketUrl);
     
     if (!priceData.success || priceData.price <= 0) {
@@ -297,6 +295,7 @@ export async function updateCardmarketPriceForProduct(
     }
     
     // 2. Guardar el precio en la colección de precios
+    console.log(`💾 Guardando nuevo precio (${priceData.price}€) para ${productName}...`);
     await saveCardmarketPrice({
       productId,
       productName,
@@ -304,19 +303,20 @@ export async function updateCardmarketPriceForProduct(
       price: priceData.price
     });
     
-    // 3. Actualizar la URL en el producto (opcional, solo para referencia)
+    // 3. Actualizar la URL en el producto
+    console.log(`🔄 Actualizando URL en el producto ${productName}...`);
     await updateProduct(productId, {
       cardmarketUrl: cardmarketUrl
     });
     
-    console.log(`Precio actualizado exitosamente: ${priceData.price}€`);
+    console.log(`✅ Precio actualizado exitosamente para ${productName}: ${priceData.price}€`);
     
     return {
       success: true,
       price: priceData.price
     };
   } catch (error) {
-    console.error('Error al actualizar precio:', error);
+    console.error('❌ Error al actualizar precio:', error);
     return {
       success: false,
       error: 'Error al actualizar precio: ' + (error instanceof Error ? error.message : String(error))

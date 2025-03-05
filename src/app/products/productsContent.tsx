@@ -371,8 +371,25 @@ export default function ProductsContent() {
               <div className="absolute top-2 right-2 flex flex-col items-end gap-1 z-10">
                 {/* Badge de precio */}
                 {product.cardmarketPrice > 0 && (
-                  <div className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold text-base shadow-lg flex items-center">
-                    <span>{product.cardmarketPrice.toFixed(2)} €</span>
+                  <div className="group relative">
+                    <div className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold text-base shadow-lg flex items-center">
+                      <span>{product.cardmarketPrice.toFixed(2)} €</span>
+                      {/* Botón de actualización de emergencia */}
+                      <button 
+                        title="Forzar actualización del precio"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (window.confirm(`¿Forzar actualización de precio para "${product.name}"? Esto eliminará el precio actual y obtendrá uno nuevo.`)) {
+                            handleUpdateCardmarketPrice(product.id, product.name, product.cardmarketUrl);
+                          }
+                        }}
+                        className="ml-1 invisible group-hover:visible p-1 text-xs bg-blue-700 rounded-full hover:bg-blue-600"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
                 )}
                 
