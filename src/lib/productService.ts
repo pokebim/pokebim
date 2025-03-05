@@ -20,6 +20,9 @@ export interface Product {
   description?: string;
   notes?: string;
   type?: string;  // Tipo de producto para facilitar clasificación
+  cardmarketUrl?: string; // Enlace a Cardmarket
+  cardmarketPrice?: number; // Precio más barato de Cardmarket
+  lastPriceUpdate?: any; // Fecha de la última actualización del precio
 }
 
 // Obtener todos los productos
@@ -55,7 +58,10 @@ export const getAllProducts = async (): Promise<Product[]> => {
             language: data.language || 'es',
             type: data.type || 'regular', // Asegurar que siempre tenga un tipo
             imageUrl: data.imageUrl || `https://via.placeholder.com/400x400?text=${encodeURIComponent(data.name || 'Producto')}`,
-            notes: data.notes || ''
+            notes: data.notes || '',
+            cardmarketUrl: data.cardmarketUrl || '',
+            cardmarketPrice: data.cardmarketPrice || 0,
+            lastPriceUpdate: data.lastPriceUpdate || null
           };
           result.push(product);
         } catch (itemError) {

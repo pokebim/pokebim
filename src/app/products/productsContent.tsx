@@ -11,6 +11,7 @@ import {
   updateProduct, 
   deleteProduct 
 } from '@/lib/productService';
+import { updateCardmarketPriceForProduct, updateAllCardmarketPrices } from '@/lib/cardmarketService';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailImage } from '@/components/ui/DetailView';
 import ProductImage from '@/components/ui/ProductImage';
 
@@ -30,6 +31,7 @@ export default function ProductsContent() {
   // Estado para el modal de imagen ampliada
   const [imageModalOpen, setImageModalOpen] = useState(false);
   const [selectedImageUrl, setSelectedImageUrl] = useState<string>('');
+  const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -172,6 +174,91 @@ export default function ProductsContent() {
     setImageModalOpen(true);
   };
 
+  // Nueva función para actualizar el precio de Cardmarket
+  const handleUpdateCardmarketPrice = async (productId: string, cardmarketUrl: string) => {
+    if (!productId || !cardmarketUrl) {
+      showNotification('No se puede actualizar el precio. Falta ID del producto o URL de Cardmarket.', 'error');
+      return;
+    }
+    
+    try {
+      // Mostrar notificación de carga
+      setNotification({
+        show: true,
+        message: 'Actualizando precio desde Cardmarket...',
+        type: 'success'
+      });
+      
+      // Llamar al servicio para actualizar el precio
+      const result = await updateCardmarketPriceForProduct(productId, cardmarketUrl);
+      
+      if (result.success && result.price) {
+        // Actualizar el producto en el estado local
+        setProducts(prev => prev.map(product => {
+          if (product.id === productId) {
+            return {
+              ...product,
+              cardmarketPrice: result.price,
+              lastPriceUpdate: new Date()
+            };
+          }
+          return product;
+        }));
+        
+        // Si el producto seleccionado es el que se está actualizando, actualizar también
+        if (selectedProduct && selectedProduct.id === productId) {
+          setSelectedProduct({
+            ...selectedProduct,
+            cardmarketPrice: result.price,
+            lastPriceUpdate: new Date()
+          });
+        }
+        
+        showNotification(`Precio actualizado: ${result.price.toFixed(2)} €`);
+      } else {
+        showNotification(result.error || 'Error al actualizar el precio', 'error');
+      }
+    } catch (error) {
+      console.error('Error al actualizar precio:', error);
+      showNotification('Error al actualizar el precio de Cardmarket', 'error');
+    }
+  };
+
+  // Función para actualizar todos los precios de Cardmarket
+  const handleUpdateAllPrices = async () => {
+    if (isUpdatingPrices) return;
+    
+    if (!window.confirm('¿Deseas actualizar los precios de todos los productos? Esta operación puede tardar varios minutos.')) {
+      return;
+    }
+    
+    setIsUpdatingPrices(true);
+    
+    try {
+      setNotification({
+        show: true,
+        message: 'Actualizando todos los precios desde Cardmarket...',
+        type: 'success'
+      });
+      
+      const result = await updateAllCardmarketPrices();
+      
+      if (result.success) {
+        // Recargar todos los productos para obtener los precios actualizados
+        await fetchProducts();
+        
+        showNotification(`Se actualizaron ${result.updated} precios correctamente.`);
+      } else {
+        showNotification(`Error al actualizar precios. ${result.failed} actualizaciones fallidas.`, 'error');
+      }
+    } catch (error) {
+      console.error('Error al actualizar todos los precios:', error);
+      showNotification('Error al actualizar los precios de Cardmarket', 'error');
+    } finally {
+      setIsUpdatingPrices(false);
+    }
+  };
+
   // Modificar la función para renderizar los productos
   const renderProducts = () => {
     if (loading) return <div className="text-center py-8">Cargando productos...</div>;
@@ -212,6 +299,30 @@ export default function ProductsContent() {
                 <p>Tipo: {product.type || 'No especificado'}</p>
                 {product.description && (
                   <p className="line-clamp-1">{product.description}</p>
+                )}
+                
+                {/* Precio de Cardmarket */}
+                {product.cardmarketPrice > 0 && (
+                  <p className="mt-1 text-green-500 font-semibold">
+                    Precio: {product.cardmarketPrice.toFixed(2)} €
+                    {product.lastPriceUpdate && (
+                      <span className="text-gray-500 text-xs ml-1">
+                        ({new Date(product.lastPriceUpdate.toDate()).toLocaleDateString()})
+                      </span>
+                    )}
+                  </p>
+                )}
+                
+                {/* Enlace a Cardmarket */}
+                {product.cardmarketUrl && (
+                  <a 
+                    href={product.cardmarketUrl} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 text-xs mt-1 inline-block"
+                  >
+                    Ver en Cardmarket
+                  </a>
                 )}
               </div>
               <div className="mt-2 flex justify-between items-center">
@@ -299,110 +410,138 @@ export default function ProductsContent() {
       </Modal>
       
       {/* Vista detallada del producto */}
-      {selectedProduct && (
-        <DetailView
-          isOpen={detailViewOpen}
-          onClose={() => setDetailViewOpen(false)}
-          title={`Detalle de Producto: ${selectedProduct.name}`}
-          actions={
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setDetailViewOpen(false);
-                  setEditingProduct(selectedProduct);
-                  setShowModal(true);
-                }}
-                className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailViewOpen(false)}
-                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-              >
-                Cerrar
-              </button>
-            </>
-          }
-        >
-          <DetailSection title="Información General">
-            {/* Mostrar imagen del producto */}
-            {selectedProduct.imageUrl && (
-              <div className="mb-6 flex justify-center">
-                <div 
-                  className="relative w-full h-80 cursor-pointer hover:opacity-95 transition-opacity"
-                  onClick={() => handleImageClick(selectedProduct.imageUrl || '')}
+      <Modal isOpen={detailViewOpen} onClose={() => setDetailViewOpen(false)}>
+        {selectedProduct && (
+          <DetailView 
+            title={selectedProduct.name || 'Producto'}
+            onClose={() => setDetailViewOpen(false)}
+            actions={
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => {
+                    setDetailViewOpen(false);
+                    handleEdit(selectedProduct);
+                  }}
+                  className="px-3 py-1.5 bg-green-700 text-white rounded hover:bg-green-600"
                 >
-                  <ProductImage 
-                    src={selectedProduct.imageUrl} 
-                    alt={selectedProduct.name}
-                    size="large"
-                    className="border-2 border-gray-700"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black bg-opacity-30 transition-opacity">
-                    <span className="text-white font-medium px-3 py-1 bg-gray-800 rounded-md">
-                      Click para ampliar
+                  Editar
+                </button>
+                <button
+                  onClick={() => setDetailViewOpen(false)}
+                  className="px-3 py-1.5 bg-gray-700 text-white rounded hover:bg-gray-600"
+                >
+                  Cerrar
+                </button>
+              </div>
+            }
+          >
+            {/* Información del producto */}
+            <DetailSection title="Información del producto">
+              <DetailGrid>
+                <DetailField label="Nombre" value={selectedProduct.name || '-'} />
+                <DetailField 
+                  label="Idioma" 
+                  value={
+                    <DetailBadge color={
+                      selectedProduct.language === 'Japanese' ? 'red' : 
+                      selectedProduct.language === 'English' ? 'blue' : 
+                      'green'
+                    }>
+                      {selectedProduct.language || 'No especificado'}
+                    </DetailBadge>
+                  } 
+                />
+                <DetailField label="Tipo" value={selectedProduct.type || '-'} />
+                <DetailField label="Descripción" value={selectedProduct.description || '-'} />
+              </DetailGrid>
+              
+              {/* Enlace a Cardmarket */}
+              {selectedProduct.cardmarketUrl && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-white">Enlace a Cardmarket:</h4>
+                  <a 
+                    href={selectedProduct.cardmarketUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-400 hover:text-blue-300 break-all"
+                  >
+                    {selectedProduct.cardmarketUrl}
+                  </a>
+                </div>
+              )}
+              
+              {/* Precio de Cardmarket */}
+              {selectedProduct.cardmarketPrice > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-white">Precio en Cardmarket:</h4>
+                  <div className="flex items-center">
+                    <span className="text-xl font-bold text-green-500">
+                      {selectedProduct.cardmarketPrice.toFixed(2)} €
                     </span>
+                    {selectedProduct.lastPriceUpdate && (
+                      <span className="ml-2 text-xs text-gray-400">
+                        Última actualización: {new Date(selectedProduct.lastPriceUpdate.toDate()).toLocaleString()}
+                      </span>
+                    )}
+                    <button 
+                      onClick={() => handleUpdateCardmarketPrice(selectedProduct.id, selectedProduct.cardmarketUrl)}
+                      className="ml-4 px-2 py-1 bg-indigo-700 text-white text-xs rounded hover:bg-indigo-600"
+                    >
+                      Actualizar precio
+                    </button>
                   </div>
                 </div>
-              </div>
+              )}
+            </DetailSection>
+            
+            {/* Imagen del producto */}
+            {selectedProduct.imageUrl && (
+              <DetailSection title="Imagen">
+                <div className="flex justify-center">
+                  <div className="relative w-full max-w-md h-64 rounded overflow-hidden">
+                    <DetailImage 
+                      src={selectedProduct.imageUrl} 
+                      alt={selectedProduct.name || 'Producto'}
+                      onClick={() => handleImageClick(selectedProduct.imageUrl)}
+                    />
+                  </div>
+                </div>
+              </DetailSection>
             )}
-            <DetailGrid>
-              <DetailField label="Nombre" value={selectedProduct.name || 'Sin nombre'} />
-              <DetailField 
-                label="Idioma" 
-                value={
-                  <DetailBadge color="blue">
-                    {selectedProduct.language || 'No especificado'}
-                  </DetailBadge>
-                } 
-              />
-              <DetailField 
-                label="Tipo" 
-                value={selectedProduct.type || 'No especificado'} 
-              />
-              <DetailField 
-                label="ID" 
-                value={
-                  <span className="text-xs font-mono bg-gray-700 px-2 py-1 rounded">
-                    {selectedProduct.id}
-                  </span>
-                } 
-              />
-            </DetailGrid>
-          </DetailSection>
-
-          {selectedProduct.description && (
-            <DetailSection title="Descripción">
-              <p className="text-gray-300 whitespace-pre-line">{selectedProduct.description}</p>
-            </DetailSection>
-          )}
-
-          {selectedProduct.notes && (
-            <DetailSection title="Notas">
-              <p className="text-gray-300 whitespace-pre-line">{selectedProduct.notes}</p>
-            </DetailSection>
-          )}
-        </DetailView>
-      )}
+          </DetailView>
+        )}
+      </Modal>
       
       <div className="py-6 px-4 sm:px-6 md:px-8">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-white">Productos</h1>
-            <p className="mt-1 text-gray-400 text-sm">Gestiona el catálogo de productos de tu tienda</p>
+            <h1 className="text-2xl font-bold text-white mb-2">Productos</h1>
+            <p className="text-gray-400">
+              Total: {products.length} productos
+            </p>
           </div>
-          <button
-            onClick={() => {
-              setEditingProduct(null);
-              setShowModal(true);
-            }}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
-          >
-            Añadir Producto
-          </button>
+          
+          <div className="flex flex-col md:flex-row gap-2 mt-4 md:mt-0">
+            {/* Botón para actualizar todos los precios */}
+            <button
+              onClick={handleUpdateAllPrices}
+              disabled={isUpdatingPrices}
+              className="px-4 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isUpdatingPrices ? 'Actualizando...' : 'Actualizar precios de Cardmarket'}
+            </button>
+            
+            {/* Botón para añadir producto */}
+            <button
+              onClick={() => {
+                setEditingProduct(null);
+                setShowModal(true);
+              }}
+              className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-600"
+            >
+              Añadir Producto
+            </button>
+          </div>
         </div>
         
         {/* Buscador */}
