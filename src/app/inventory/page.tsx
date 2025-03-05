@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import Modal from '@/components/ui/Modal';
 import { formatCurrency, type Currency } from '@/lib/currencyConverter';
@@ -48,30 +48,7 @@ export default function InventoryPage() {
   const [editingItem, setEditingItem] = useState<EnrichedInventoryItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      // Cargar productos primero
-      const firebaseProducts = await getAllProducts();
-      console.log('FIREBASE: Loaded products for inventory:', firebaseProducts);
-      setProducts(firebaseProducts);
-      
-      // Luego cargar inventario
-      await fetchInventory();
-      
-      setLoading(false);
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError('Error al cargar los datos. Por favor, inténtalo de nuevo más tarde.');
-      setLoading(false);
-    }
-  };
-
-  const fetchInventory = async () => {
+  const fetchInventory = useCallback(async () => {
     try {
       const inventoryData = await getAllInventoryItems();
       
@@ -98,7 +75,30 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [products]);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Cargar productos primero
+      const firebaseProducts = await getAllProducts();
+      console.log('FIREBASE: Loaded products for inventory:', firebaseProducts);
+      setProducts(firebaseProducts);
+      
+      // Luego cargar inventario
+      await fetchInventory();
+      
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Error al cargar los datos. Por favor, inténtalo de nuevo más tarde.');
+      setLoading(false);
+    }
+  }, [fetchInventory]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleEdit = (item: EnrichedInventoryItem) => {
     setEditingItem(item);
