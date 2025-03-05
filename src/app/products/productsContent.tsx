@@ -11,7 +11,11 @@ import {
   updateProduct, 
   deleteProduct 
 } from '@/lib/productService';
-import { updateCardmarketPriceForProduct, updateAllCardmarketPrices } from '@/lib/cardmarketService';
+import { 
+  updateCardmarketPriceForProduct, 
+  updateAllCardmarketPrices,
+  getCardmarketPriceForProduct
+} from '@/lib/cardmarketService';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailImage } from '@/components/ui/DetailView';
 import ProductImage from '@/components/ui/ProductImage';
 
@@ -33,49 +37,75 @@ export default function ProductsContent() {
   const [selectedImageUrl, setSelectedImageUrl] = useState<string>('');
   const [isUpdatingPrices, setIsUpdatingPrices] = useState(false);
 
+  // Estado para controlar la carga de precios
+  const [loadingPrices, setLoadingPrices] = useState(false);
+
   useEffect(() => {
     fetchProducts();
   }, []);
 
   const fetchProducts = async () => {
     setLoading(true);
+    console.log("Cargando productos...");
+    
     try {
-      // Obtener datos desde Firebase
+      // 1. Obtener todos los productos
       const firebaseProducts = await getAllProducts();
-      console.log('FIREBASE: Loaded products:', firebaseProducts);
+      console.log(`FIREBASE: Cargados ${firebaseProducts.length} productos`);
       
-      // Validate and complete product data
-      const validatedProducts = firebaseProducts.map((product: Product) => {
-        const updatedProduct = { ...product };
-        
-        // Validate image URL
-        if (!updatedProduct.imageUrl || updatedProduct.imageUrl.trim() === '') {
-          updatedProduct.imageUrl = `https://via.placeholder.com/400x250?text=${encodeURIComponent(product.name || 'Product')}`;
-        } else {
-          try {
-            new URL(updatedProduct.imageUrl);
-          } catch (e) {
-            console.warn('Fixed invalid image URL for product:', product.name);
-            updatedProduct.imageUrl = `https://via.placeholder.com/400x250?text=${encodeURIComponent(product.name || 'Product')}`;
+      // 2. Procesamos los productos para garantizar campos consistentes
+      const productsWithDefaults = firebaseProducts.map(product => ({
+        ...product,
+        cardmarketUrl: product.cardmarketUrl || '',
+        // No inicializamos cardmarketPrice aquí
+      }));
+      
+      // 3. Cargar la lista inicial sin precios para mostrar algo rápido
+      setProducts(productsWithDefaults);
+      setLoading(false);
+      
+      // 4. Ahora, cargar los precios para cada producto (en segundo plano)
+      setLoadingPrices(true);
+      
+      const productsWithPrices = [...productsWithDefaults];
+      let pricesLoaded = 0;
+      
+      // Iterar por los productos para obtener sus precios
+      for (const product of productsWithPrices) {
+        try {
+          // Intenta obtener el precio desde la colección de precios
+          const priceData = await getCardmarketPriceForProduct(product.id);
+          
+          if (priceData) {
+            // Si encontramos precio, lo asignamos al producto
+            const index = productsWithPrices.findIndex(p => p.id === product.id);
+            if (index !== -1) {
+              productsWithPrices[index] = {
+                ...productsWithPrices[index],
+                cardmarketPrice: priceData.price,
+                cardmarketUrl: priceData.url,
+                lastPriceUpdate: priceData.updatedAt
+              };
+              
+              pricesLoaded++;
+              console.log(`Precio cargado para ${product.name}: ${priceData.price}€`);
+            }
           }
+        } catch (err) {
+          console.error(`Error al cargar precio para ${product.name}:`, err);
         }
-        
-        // Ensure Cardmarket fields are initialized
-        if (typeof updatedProduct.cardmarketPrice !== 'number') {
-          updatedProduct.cardmarketPrice = 0;
-        }
-        
-        // Return complete product
-        return updatedProduct;
-      });
+      }
       
-      // Establecer los productos validados en el estado
-      setProducts(validatedProducts);
-      setLoading(false);
+      // 5. Actualizar el estado con los productos que tienen precios
+      setProducts(productsWithPrices);
+      console.log(`Precios cargados: ${pricesLoaded} de ${productsWithPrices.length} productos`);
+      
     } catch (err) {
-      console.error('Error fetching products:', err);
+      console.error('Error al cargar productos:', err);
       setError('No se pudieron cargar los productos. Por favor, inténtalo de nuevo más tarde.');
+    } finally {
       setLoading(false);
+      setLoadingPrices(false);
     }
   };
 
@@ -175,8 +205,10 @@ export default function ProductsContent() {
     setImageModalOpen(true);
   };
 
-  // Nueva función para actualizar el precio de Cardmarket
-  const handleUpdateCardmarketPrice = async (productId: string, cardmarketUrl: string) => {
+  // Nueva función para actualizar el precio de Cardmarket para un solo producto
+  const handleUpdateCardmarketPrice = async (productId: string, productName: string, cardmarketUrl: string) => {
+    console.log(`Solicitando actualización de precio para ${productName} (${productId})`);
+    
     if (!productId) {
       showNotification('No se puede actualizar el precio. Falta ID del producto.', 'error');
       return;
@@ -195,41 +227,35 @@ export default function ProductsContent() {
         type: 'success'
       });
       
-      // Llamar al servicio para actualizar el precio
-      const result = await updateCardmarketPriceForProduct(productId, cardmarketUrl);
+      // Llamar al servicio actualizado para actualizar el precio
+      const result = await updateCardmarketPriceForProduct(productId, productName, cardmarketUrl);
       
       if (result.success && result.price) {
-        // Fecha actual en formato ISO para evitar problemas con objetos Date
-        const dateString = new Date().toISOString();
+        // Recargamos los productos para obtener los datos actualizados
+        await fetchProducts();
         
-        // Actualizar el producto en el estado local
-        setProducts(prev => prev.map(product => {
-          if (product.id === productId) {
-            return {
-              ...product,
-              cardmarketPrice: result.price,
-              lastPriceUpdate: dateString
-            };
-          }
-          return product;
-        }));
-        
-        // Si el producto seleccionado es el que se está actualizando, actualizar también
-        if (selectedProduct && selectedProduct.id === productId) {
-          setSelectedProduct({
-            ...selectedProduct,
-            cardmarketPrice: result.price,
-            lastPriceUpdate: dateString
-          });
-        }
-        
+        // Mostrar notificación de éxito
         showNotification(`Precio actualizado correctamente: ${result.price.toFixed(2)} €`);
+        
+        // Si estamos viendo un detalle, también lo actualizamos
+        if (selectedProduct && selectedProduct.id === productId) {
+          // Obtener el precio actualizado
+          const updatedPrice = await getCardmarketPriceForProduct(productId);
+          if (updatedPrice) {
+            setSelectedProduct({
+              ...selectedProduct,
+              cardmarketPrice: updatedPrice.price,
+              cardmarketUrl: updatedPrice.url,
+              lastPriceUpdate: updatedPrice.updatedAt
+            });
+          }
+        }
       } else {
-        showNotification(result.error || 'Error al actualizar el precio. Inténtalo de nuevo más tarde.', 'error');
+        showNotification(result.error || 'Error al actualizar el precio. Verifica que la URL sea correcta.', 'error');
       }
     } catch (error) {
       console.error('Error al actualizar precio:', error);
-      showNotification('Error al conectar con Cardmarket. Verifica el enlace e inténtalo de nuevo.', 'error');
+      showNotification('Error inesperado al conectar con Cardmarket. Inténtalo de nuevo más tarde.', 'error');
     }
   };
 
@@ -262,7 +288,7 @@ export default function ProductsContent() {
 
   // Función para actualizar todos los precios de Cardmarket
   const handleUpdateAllPrices = async () => {
-    if (isUpdatingPrices) return;
+    if (isUpdatingPrices || loadingPrices) return;
     
     if (!window.confirm('¿Deseas actualizar los precios de todos los productos? Esta operación puede tardar varios minutos.')) {
       return;
@@ -271,25 +297,41 @@ export default function ProductsContent() {
     setIsUpdatingPrices(true);
     
     try {
+      // Mostrar notificación inicial
       setNotification({
         show: true,
-        message: 'Actualizando todos los precios desde Cardmarket...',
+        message: 'Iniciando actualización de precios desde Cardmarket...',
         type: 'success'
       });
       
-      const result = await updateAllCardmarketPrices();
+      // Filtrar productos que tienen URL de Cardmarket
+      const productsWithUrl = products.filter(p => p.cardmarketUrl && p.cardmarketUrl.trim() !== '');
+      
+      if (productsWithUrl.length === 0) {
+        showNotification('No hay productos con URL de Cardmarket configurada. Edita algún producto para añadirla.', 'error');
+        setIsUpdatingPrices(false);
+        return;
+      }
+      
+      // Actualizar precios usando la nueva función
+      const result = await updateAllCardmarketPrices(productsWithUrl);
       
       if (result.success) {
         // Recargar todos los productos para obtener los precios actualizados
         await fetchProducts();
         
         showNotification(`Se actualizaron ${result.updated} precios correctamente.`);
+      } else if (result.updated > 0) {
+        // Recargar productos aunque hayan fallado algunos
+        await fetchProducts();
+        
+        showNotification(`Actualización parcial: ${result.updated} actualizados y ${result.failed} fallidos.`, 'error');
       } else {
         showNotification(`Error al actualizar precios. ${result.failed} actualizaciones fallidas.`, 'error');
       }
     } catch (error) {
       console.error('Error al actualizar todos los precios:', error);
-      showNotification('Error al actualizar los precios de Cardmarket', 'error');
+      showNotification('Error al actualizar los precios de Cardmarket. Inténtalo de nuevo más tarde.', 'error');
     } finally {
       setIsUpdatingPrices(false);
     }
@@ -324,12 +366,31 @@ export default function ProductsContent() {
                 onClick={() => product.imageUrl && handleImageClick(product.imageUrl)}
               />
               
-              {/* Badge para el precio de Cardmarket - versión mejorada */}
-              {product.cardmarketPrice > 0 && (
-                <div className="absolute top-2 right-2 bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold text-base shadow-lg">
-                  {product.cardmarketPrice.toFixed(2)} €
-                </div>
-              )}
+              {/* Componente Badge para precios */}
+              <div className="absolute top-2 right-2 flex flex-col items-end gap-1 z-10">
+                {/* Badge de precio */}
+                {product.cardmarketPrice > 0 && (
+                  <div className="bg-green-600 text-white px-3 py-1.5 rounded-lg font-bold text-base shadow-lg flex items-center">
+                    <span>{product.cardmarketPrice.toFixed(2)} €</span>
+                  </div>
+                )}
+                
+                {/* Badge para actualizar precio si tiene URL pero no precio */}
+                {product.cardmarketUrl && !product.cardmarketPrice && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUpdateCardmarketPrice(product.id, product.name, product.cardmarketUrl);
+                    }}
+                    className="bg-indigo-600 text-white px-2 py-1 rounded text-xs shadow-lg flex items-center hover:bg-indigo-500"
+                  >
+                    <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Obtener precio
+                  </button>
+                )}
+              </div>
             </div>
             
             <div className="p-3 flex-grow flex flex-col">
@@ -529,7 +590,7 @@ export default function ProductsContent() {
                       )}
                       <div className="flex-grow"></div>
                       <button 
-                        onClick={() => handleUpdateCardmarketPrice(selectedProduct.id, selectedProduct.cardmarketUrl)}
+                        onClick={() => handleUpdateCardmarketPrice(selectedProduct.id, selectedProduct.name, selectedProduct.cardmarketUrl)}
                         className="px-3 py-1.5 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600 flex items-center"
                       >
                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -561,7 +622,7 @@ export default function ProductsContent() {
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400">No hay datos de precio disponibles</span>
                     <button 
-                      onClick={() => handleUpdateCardmarketPrice(selectedProduct.id, selectedProduct.cardmarketUrl)}
+                      onClick={() => handleUpdateCardmarketPrice(selectedProduct.id, selectedProduct.name, selectedProduct.cardmarketUrl)}
                       className="px-3 py-1.5 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600 flex items-center"
                     >
                       <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -596,19 +657,47 @@ export default function ProductsContent() {
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-white mb-2">Productos</h1>
-            <p className="text-gray-400">
-              Total: {products.length} productos
-            </p>
+            <div className="flex items-center">
+              <p className="text-gray-400 mr-3">
+                Total: {products.length} productos
+              </p>
+              
+              {/* Indicador de carga de precios */}
+              {loadingPrices && (
+                <div className="flex items-center text-gray-400">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-sm">Cargando precios...</span>
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="flex flex-col md:flex-row gap-2 mt-4 md:mt-0">
             {/* Botón para actualizar todos los precios */}
             <button
-              onClick={handleUpdateAllPrices}
-              disabled={isUpdatingPrices}
-              className="px-4 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => handleUpdateAllPrices()}
+              disabled={isUpdatingPrices || loadingPrices}
+              className="px-4 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
-              {isUpdatingPrices ? 'Actualizando...' : 'Actualizar precios de Cardmarket'}
+              {isUpdatingPrices ? (
+                <>
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Actualizando...</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Actualizar precios de Cardmarket
+                </>
+              )}
             </button>
             
             {/* Botón para añadir producto */}
@@ -617,8 +706,11 @@ export default function ProductsContent() {
                 setEditingProduct(null);
                 setShowModal(true);
               }}
-              className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-600"
+              className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-600 flex items-center justify-center"
             >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
               Añadir Producto
             </button>
           </div>
@@ -626,19 +718,42 @@ export default function ProductsContent() {
         
         {/* Banner informativo sobre precios de Cardmarket */}
         <div className="mb-6 p-4 bg-blue-900 bg-opacity-40 rounded-lg border border-blue-800">
-          <h2 className="text-lg font-semibold text-white mb-2">Precios de Cardmarket</h2>
-          <p className="text-gray-300 text-sm mb-2">
-            Ahora puedes vincular tus productos con Cardmarket para obtener información de precios. 
-            Sigue estos pasos:
-          </p>
-          <ol className="text-gray-300 text-sm list-decimal list-inside space-y-1 ml-2">
-            <li>Edita un producto y añade la URL de su página en Cardmarket</li>
-            <li>Haz clic en "Actualizar precio" para obtener el precio más reciente</li>
-            <li>Los precios se mostrarán con una etiqueta verde en cada producto</li>
-          </ol>
-          <p className="text-gray-400 text-xs mt-2">
-            Nota: Los precios se actualizan manualmente. Para actualizar todos los precios a la vez, usa el botón "Actualizar precios de Cardmarket".
-          </p>
+          <div className="flex items-start">
+            <svg className="w-6 h-6 text-blue-300 mt-1 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <h2 className="text-lg font-semibold text-white mb-2">Precios de Cardmarket</h2>
+              <p className="text-gray-300 text-sm mb-2">
+                Para utilizar la integración con Cardmarket:
+              </p>
+              <ol className="text-gray-300 text-sm list-decimal list-inside space-y-1 ml-2">
+                <li>Edita un producto y añade la URL completa de su página en Cardmarket</li>
+                <li>Guarda el producto. La próxima vez que actualices precios, se obtendrá automáticamente</li>
+                <li>Puedes actualizar todos los precios a la vez con el botón "Actualizar precios"</li>
+              </ol>
+              <div className="mt-2 text-gray-400 text-xs flex flex-wrap items-center">
+                <span className="mr-2">Última actualización:</span>
+                {products.some(p => p.lastPriceUpdate) ? (
+                  <span>
+                    {new Date().toLocaleDateString()} {new Date().toLocaleTimeString()}
+                  </span>
+                ) : (
+                  <span>Nunca</span>
+                )}
+                <button 
+                  onClick={() => fetchProducts()} 
+                  className="ml-3 text-blue-400 hover:text-blue-300 flex items-center"
+                  disabled={loading || loadingPrices}
+                >
+                  <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Recargar precios
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
         
         {/* Buscador de productos */}
