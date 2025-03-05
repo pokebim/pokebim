@@ -13,8 +13,21 @@
       "VERCEL_FORCE_NO_BUILD_CACHE": "1"
     }
   },
+  "headers": [
+    {
+      "source": "/api/cardmarket-scraper",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "s-maxage=3600, stale-while-revalidate=1800" }
+      ]
+    }
+  ],
   "functions": {
     "src/app/api/**/*": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "src/app/api/cardmarket-scraper/route.ts": {
       "memory": 1024,
       "maxDuration": 10
     }
