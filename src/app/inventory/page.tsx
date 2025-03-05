@@ -50,7 +50,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const fetchData = async () => {
     setLoading(true);
