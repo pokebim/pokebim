@@ -32,9 +32,7 @@ const nextConfig = {
     '@firebase/firestore', 
     '@grpc/grpc-js', 
     '@grpc/proto-loader', 
-    'long',
-    '@sparticuz/chromium',
-    'puppeteer-core'
+    'long'
   ],
   
   // Configuración específica para Vercel
