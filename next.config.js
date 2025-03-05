@@ -46,7 +46,9 @@ const nextConfig = {
     '@tanstack/react-table',
     'date-fns',
     'react-dnd',
-    'react-dnd-html5-backend'
+    'react-dnd-html5-backend',
+    'yargs',
+    '@puppeteer/browsers'
   ],
   
   // Configuración para paquetes que necesitan Node.js
@@ -59,8 +61,10 @@ const nextConfig = {
     optimizePackageImports: [
       'firebase',
       '@tanstack/react-table',
-      'date-fns'
-    ]
+      'date-fns',
+      'react-dnd'
+    ],
+    esmExternals: true
   },
   
   // Configuración de output
@@ -68,7 +72,8 @@ const nextConfig = {
 
   serverExternalPackages: [
     '@sparticuz/chromium',
-    'puppeteer-core'
+    'puppeteer-core',
+    'yargs'
   ],
 
   webpack: (config, { isServer }) => {
@@ -82,7 +87,7 @@ const nextConfig = {
       };
     }
 
-    // Node.js 22 optimizations
+    // Configuración específica para módulos ESM
     config.module = {
       ...config.module,
       parser: {
@@ -91,7 +96,29 @@ const nextConfig = {
           ...config.module.parser?.javascript,
           dynamicImportMode: 'eager'
         }
-      }
+      },
+      rules: [
+        ...config.module.rules || [],
+        {
+          test: /\.m?js$/,
+          type: 'javascript/auto',
+          resolve: {
+            fullySpecified: false
+          }
+        }
+      ]
+    };
+
+    // Configuración para yargs
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'yargs': require.resolve('yargs')
+    };
+
+    // Asegurar que los módulos ESM se manejen correctamente
+    config.resolve.extensionAlias = {
+      '.js': ['.js', '.ts', '.tsx'],
+      '.mjs': ['.mjs', '.mts', '.mtsx']
     };
 
     return config;
