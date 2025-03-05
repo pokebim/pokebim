@@ -47,15 +47,16 @@ const nextConfig = {
   
   // Configuración para paquetes que necesitan Node.js
   experimental: {
-    serverActions: true,
+    serverActions: {
+      bodySizeLimit: '2mb'
+    },
     serverComponentsExternalPackages: [
       '@sparticuz/chromium',
-      'puppeteer-core',
-      'yargs',
-      '@grpc/grpc-js',
-      '@grpc/proto-loader'
+      'puppeteer-core'
     ],
-    esmExternals: 'loose'
+    optimizePackageImports: ['firebase'],
+    typedRoutes: true,
+    webpackBuildWorker: true
   },
   
   // Configuración de output
@@ -72,10 +73,16 @@ const nextConfig = {
       };
     }
 
-    // Configuración específica para módulos ESM
+    // Node.js 22 optimizations
     config.module = {
       ...config.module,
-      exprContextCritical: false,
+      parser: {
+        ...config.module.parser,
+        javascript: {
+          ...config.module.parser?.javascript,
+          dynamicImportMode: 'eager'
+        }
+      }
     };
 
     return config;
