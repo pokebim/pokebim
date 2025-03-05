@@ -61,7 +61,7 @@ function isValidCardmarketUrl(url: string): boolean {
  */
 export async function fetchCardmarketPrice(url: string): Promise<{price: number, success: boolean, error?: string}> {
   if (!isValidCardmarketUrl(url)) {
-    console.error(`💔 URL no válida para Cardmarket: ${url}`);
+    console.error(`Error: URL no válida para Cardmarket: ${url}`);
     return { 
       success: false, 
       price: 0, 
@@ -70,35 +70,81 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
   }
 
   try {
-    console.log(`🔍 Obteniendo precio de Cardmarket para URL: ${url}`);
+    console.log(`🔍 Obteniendo precio directamente de: ${url}`);
     
-    // Llamar a nuestra API interna que maneja el scraping
-    const apiUrl = `/api/cardmarket-price?url=${encodeURIComponent(url)}`;
-    const response = await fetch(apiUrl);
+    // Scraping directo de la URL de Cardmarket - NO usamos nuestra API
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.159 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Referer': 'https://www.google.com/'
+      }
+    });
     
     if (!response.ok) {
-      // Obtener el mensaje de error detallado de la respuesta API
-      const errorData = await response.json();
-      throw new Error(`API respondió con error ${response.status}: ${errorData.error || 'Sin detalles'}`);
+      throw new Error(`Error al acceder a Cardmarket: ${response.status} ${response.statusText}`);
     }
     
-    const data = await response.json();
+    const html = await response.text();
+    console.log(`✅ HTML obtenido de Cardmarket, longitud: ${html.length} caracteres`);
     
-    if (!data.success || !data.price || data.price <= 0) {
-      throw new Error(`No se pudo obtener un precio válido: ${data.error || 'Sin detalles del error'}`);
+    // Usar cheerio para analizar el HTML
+    const cheerio = require('cheerio');
+    const $ = cheerio.load(html);
+    
+    // Buscar elementos article-row como en el ejemplo proporcionado
+    const articleRows = $('.article-row');
+    console.log(`Encontradas ${articleRows.length} filas con clase article-row`);
+    
+    if (articleRows.length === 0) {
+      throw new Error('No se encontraron ofertas en la página');
     }
     
-    console.log(`✅ Precio obtenido correctamente: ${data.price}€ (fuente: ${data.source || 'desconocida'})`);
+    // Extraer todos los precios de las ofertas
+    const prices: number[] = [];
+    
+    articleRows.each((_, row) => {
+      // Buscar específicamente elementos color-primary que contienen precios
+      const priceElements = $(row).find('.color-primary');
+      
+      priceElements.each((_, element) => {
+        const text = $(element).text().trim();
+        console.log(`Texto encontrado: "${text}"`);
+        
+        // Regex para extraer precios en formato 100,00 €
+        const priceMatch = text.match(/(\d+,\d+)\s*€/);
+        if (priceMatch && priceMatch[1]) {
+          // Convertir de formato europeo (coma como separador decimal) a número
+          const price = parseFloat(priceMatch[1].replace(',', '.'));
+          if (price > 0) {
+            prices.push(price);
+            console.log(`Precio extraído: ${price}€`);
+          }
+        }
+      });
+    });
+    
+    if (prices.length === 0) {
+      throw new Error('No se pudieron extraer precios de la página');
+    }
+    
+    // Ordenar los precios y obtener el más bajo
+    prices.sort((a, b) => a - b);
+    const lowestPrice = prices[0];
+    
+    console.log(`✅ Precio más bajo encontrado: ${lowestPrice}€`);
     
     return {
       success: true,
-      price: data.price
+      price: lowestPrice
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`💔 Error obteniendo precio de Cardmarket: ${errorMessage}`);
+    console.error(`❌ Error obteniendo precio de Cardmarket: ${errorMessage}`);
     
-    // No devolvemos un precio fijo, sino precio 0 con indicación de error
     return { 
       success: false, 
       price: 0, 
@@ -207,14 +253,11 @@ export async function deleteCardmarketPrice(productId: string): Promise<boolean>
     console.log(`ℹ️ No se encontraron precios para producto ${productId}`);
     return false;
   } catch (error) {
-    console.error(`❌ Error al eliminar precio para producto ${productId}:`, error);
+    console.error(`💔 Error al eliminar precio para producto ${productId}: ${error}`);
     return false;
   }
 }
 
-/**
- * Actualiza el precio de un producto con datos de Cardmarket
- */
 export async function updateCardmarketPriceForProduct(
   productId: string, 
   productName: string,
@@ -242,7 +285,7 @@ export async function updateCardmarketPriceForProduct(
       await deleteCardmarketPrice(productId);
     }
 
-    // Obtener el precio actualizado de Cardmarket
+    // SCRAPING DIRECTO - Obtener el precio actualizado directamente de Cardmarket
     console.log(`🔍 Obteniendo precio actualizado para ${productName} desde ${cardmarketUrl}`);
     const cardmarketData = await fetchCardmarketPrice(cardmarketUrl);
 
@@ -290,7 +333,7 @@ export async function updateCardmarketPriceForProduct(
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`💔 Error en actualización de precio para ${productName}: ${errorMessage}`);
+    console.error(`❌ Error en actualización de precio para ${productName}: ${errorMessage}`);
     
     return {
       success: false,
@@ -367,4 +410,4 @@ export async function updateAllCardmarketPrices(
   
   console.log(`Actualización completada: ${result.updated} actualizados, ${result.failed} fallidos`);
   return result;
-} 
+}
