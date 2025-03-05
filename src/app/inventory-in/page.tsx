@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import { collection, getDocs, addDoc, Timestamp } from 'firebase/firestore/lite';
 import { db } from '@/lib/firebase';
 import MainLayout from '@/components/layout/MainLayout';
@@ -122,7 +122,7 @@ export default function InventoryInPage() {
     }
   };
 
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
