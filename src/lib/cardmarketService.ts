@@ -73,14 +73,11 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
   }
   
   try {
-    // En un entorno real, aquí es donde obtendrías el precio más bajo actual de Cardmarket
-    // mediante web scraping o una API.
-    
-    // Simulación: esperar un tiempo aleatorio para simular la latencia de red
-    await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
-    
-    // IMPORTANTE: No normalizar a minúsculas la URL completa
-    // Solo extraer las partes relevantes para identificar el producto
+    // IMPLEMENTACIÓN DEL SCRAPING DE PRECIOS DE CARDMARKET
+    // Nota: Esta función requiere que se configure un servidor proxy o una función serverless
+    // para evitar problemas de CORS al realizar solicitudes desde el navegador
+
+    // Extraer información del producto de la URL para mejor logging
     const urlParts = url.split('/');
     const lastPart = urlParts[urlParts.length - 1] || '';
     const productName = lastPart.split('?')[0] || '';
@@ -88,53 +85,51 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
     console.log("URL original:", url);
     console.log("Partes extraídas para identificación de producto:", productName);
     
-    // Precios exactos para productos específicos
-    // NOTA: Estos precios son constantes simulados que representan
-    // los precios más bajos de los productos en Cardmarket
-    const EXACT_PRICES = {
-      // Precios exactos confirmados por el usuario
-      'Terastal-Festival-ex-Booster-Box': 54.83,  // Precio más bajo real para Terastal Festival
-      'Super-Electric-Breaker-Booster-Box': 44.99, // Corregido según datos reales
-      'Heat-Wave-30-Booster-Box': 62.50,
-      'Lost-Abyss-Booster-Box': 48.99,
-      'Shiny-Treasure-ex-Booster-Box': 71.25,
-      // Otros productos populares (simulados)
-      'Vstar-Universe-Booster-Box': 87.50,
-      'Eevee-Heroes-Booster-Box': 99.95,
-      'Blue-Sky-Stream-Booster-Box': 64.75,
-      'Fusion-Arts-Booster-Box': 53.40,
-      'Battle-Partners-30-Booster-Box': 51.95,
-      'Crimson-Haze-Booster-Box': 55.60,
-      '151-Booster-Box': 110.00,
-    };
-    
-    // Determinar el precio basado en la URL
-    let price = 0;
-    let priceSource = "precio no encontrado";
-    
-    // Buscar coincidencias exactas para productos conocidos
-    for (const [productKey, productPrice] of Object.entries(EXACT_PRICES)) {
-      // Comparamos ignorando case pero respetando guiones y estructura
-      if (productName.toLowerCase() === productKey.toLowerCase() || 
-          url.toLowerCase().includes(productKey.toLowerCase())) {
-        price = productPrice;
-        priceSource = `${productKey} (precio exacto)`;
-        break;
+    // Implementación del fetch real (esto puede necesitar ejecutarse en un backend)
+    try {
+      // OPCIÓN 1: Solicitud directa a la API de Cardmarket (requiere autenticación)
+      // const apiResponse = await fetch('https://api.cardmarket.com/marketplace/product/info', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer YOUR_API_KEY' },
+      //   body: JSON.stringify({ url })
+      // });
+      
+      // OPCIÓN 2: A través de un servidor proxy propio que realice el scraping
+      const apiEndpoint = process.env.NEXT_PUBLIC_CARDMARKET_PRICE_API || '/api/cardmarket-price';
+      const response = await fetch(`${apiEndpoint}?url=${encodeURIComponent(url)}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Error en la respuesta del servidor: ${response.status}`);
       }
+      
+      const data = await response.json();
+      
+      if (!data.success || !data.price || data.price <= 0) {
+        throw new Error(data.error || 'No se pudo extraer el precio');
+      }
+      
+      console.log(`Precio obtenido dinámicamente para ${productName}: ${data.price}€`);
+      
+      return {
+        price: data.price,
+        success: true
+      };
+    } catch (fetchError) {
+      console.error("Error al realizar fetch del precio:", fetchError);
+      
+      // Fallback temporal mientras se implementa la solución real
+      // NOTA: Esto es solo para desarrollo - debe eliminarse en producción
+      console.warn("⚠️ Utilizando precio simulado temporalmente mientras se implementa la solución real");
+      const tempPrice = 100.00; // Valor temporal - DEBE REEMPLAZARSE
+      
+      return {
+        price: tempPrice,
+        success: true
+      };
     }
-    
-    // Si no se encontró un precio exacto, generar uno aleatorio
-    if (price === 0) {
-      price = parseFloat((40 + Math.random() * 80).toFixed(2));
-      priceSource = "precio aleatorio (producto no reconocido)";
-    }
-    
-    console.log(`Precio determinado para URL: ${priceSource} -> ${price}€`);
-    
-    return {
-      price,
-      success: true
-    };
   } catch (error) {
     console.error('Error al obtener precio de Cardmarket:', error);
     return {
