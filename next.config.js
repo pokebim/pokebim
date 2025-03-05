@@ -22,9 +22,6 @@ const nextConfig = {
       },
     ],
     unoptimized: true,
-    dangerouslyAllowSVG: true,
-    contentDispositionType: 'attachment',
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   reactStrictMode: true,
   
@@ -42,8 +39,17 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  // Configuración especial de transpilación para excluir problemas con firebase y dependencias
-  transpilePackages: ['firebase', '@firebase/firestore', '@grpc/grpc-js', '@grpc/proto-loader', 'long'],
+  // Configuración de transpilación
+  transpilePackages: ['firebase', '@firebase/firestore'],
+  
+  // Optimizaciones para Vercel
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: ['@heroicons/react'],
+  },
+  
+  // Configuración de output
+  output: 'standalone',
 };
 
 module.exports = nextConfig; 
