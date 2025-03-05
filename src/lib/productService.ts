@@ -13,16 +13,16 @@ import { db } from "./firebase";
 
 // Interfaz para el producto
 export interface Product {
-  id?: string;
-  name?: string;
-  language?: string;
+  id: string;
+  name: string;
+  language: string;
+  type: string;
   imageUrl?: string;
-  description?: string;
+  cardmarketUrl?: string;
+  cardmarketPrice?: number;
   notes?: string;
-  type?: string;  // Tipo de producto para facilitar clasificación
-  cardmarketUrl?: string; // Enlace a Cardmarket
-  cardmarketPrice?: number; // Precio más barato de Cardmarket
-  lastPriceUpdate?: any; // Fecha de la última actualización del precio
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 // Obtener todos los productos
@@ -61,7 +61,7 @@ export const getAllProducts = async (): Promise<Product[]> => {
             notes: data.notes || '',
             cardmarketUrl: data.cardmarketUrl || '',
             cardmarketPrice: data.cardmarketPrice || 0,
-            lastPriceUpdate: data.lastPriceUpdate || null
+            lastPriceUpdate: data.lastPriceUpdate || new Date()
           };
           result.push(product);
         } catch (itemError) {
@@ -169,4 +169,12 @@ export const checkProductsExist = async (): Promise<{ exists: boolean, count: nu
     console.error("Error checking products collection:", error);
     return { exists: false, count: 0 };
   }
-}; 
+};
+
+export async function updateProductPrice(productId: string, price: number): Promise<void> {
+  const productRef = doc(db, 'products', productId);
+  await updateDoc(productRef, {
+    cardmarketPrice: price,
+    lastPriceUpdate: new Date()
+  });
+} 

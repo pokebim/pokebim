@@ -1,273 +1,197 @@
-import { useState, useEffect } from 'react';
+'use client';
 
-interface Supplier {
-  id?: string;
-  name?: string;
-  contact?: string;
-  website?: string;
-  origin?: string;
-  region?: string;
-  notes?: string;
-  shippingCost?: number;
-}
+import React, { useState } from 'react';
+import { Supplier } from '@/lib/supplierService';
 
 interface SupplierFormProps {
+  supplier?: Supplier;
   onSubmit: (data: any) => void;
   onCancel: () => void;
-  initialData?: any;
 }
 
-export default function SupplierForm({ onSubmit, onCancel, initialData }: SupplierFormProps) {
-  // Define default form data - all fields must have default values
-  const defaultFormData = {
-    name: '',
-    website: '',
-    country: '',
-    email: '',
-    phone: '',
-    contactName: '',
-    origin: '',
-    region: 'asian',
-    notes: '',
-    shippingCost: 0
-  };
-  
-  // Initialize with default values - this ensures no undefined values
-  const [formData, setFormData] = useState(defaultFormData);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  // When initialData changes, merge with default data
-  useEffect(() => {
-    if (initialData) {
-      console.log('FORM: Initializing with data:', initialData);
-      
-      // Create a clean version with defaults for any missing fields
-      const cleanData = {
-        ...defaultFormData,  // Start with all defaults
-        ...Object.fromEntries(  // Only include defined values from initialData
-          Object.entries(initialData).filter(([_, v]) => v !== undefined)
-        ),
-        // Ensure region is always valid
-        region: initialData.region || defaultFormData.region
-      };
-      
-      console.log('FORM: Clean initialization data:', cleanData);
-      setFormData(cleanData);
-    } else {
-      // Reset to defaults if no initialData
-      console.log('FORM: Resetting to defaults');
-      setFormData(defaultFormData);
-    }
-  }, [initialData]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    console.log(`FORM: Field ${name} changed to:`, value);
-  };
+export default function SupplierForm({ supplier, onSubmit, onCancel }: SupplierFormProps) {
+  const [name, setName] = useState(supplier?.name || '');
+  const [origin, setOrigin] = useState(supplier?.origin || '');
+  const [country, setCountry] = useState(supplier?.country || '');
+  const [contactName, setContactName] = useState(supplier?.contactName || '');
+  const [email, setEmail] = useState(supplier?.email || '');
+  const [phone, setPhone] = useState(supplier?.phone || '');
+  const [website, setWebsite] = useState(supplier?.website || '');
+  const [notes, setNotes] = useState(supplier?.notes || '');
+  const [region, setRegion] = useState(supplier?.region || 'other');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-    setError('');
     
-    try {
-      // Ensure all fields are defined (not undefined)
-      const dataToSubmit = {
-        ...formData,
-        region: formData.region || 'asian', // Fallback to asian if somehow region is empty
-      };
-      
-      console.log('FORM: Submitting data:', dataToSubmit);
-      onSubmit(dataToSubmit);
-    } catch (err) {
-      setError('Ocurrió un error al guardar el proveedor. Por favor, inténtalo de nuevo.');
-      console.error('FORM: Error submitting form:', err);
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Solo incluir el ID si estamos editando un proveedor existente
+    const supplierData = supplier?.id 
+      ? {
+          id: supplier.id,
+          name,
+          origin,
+          country,
+          contactName,
+          email,
+          phone,
+          website,
+          notes,
+          region,
+          isFavorite: supplier.isFavorite || false,
+          hasPendingOrder: supplier.hasPendingOrder || false
+        }
+      : {
+          name,
+          origin,
+          country,
+          contactName,
+          email,
+          phone,
+          website,
+          notes,
+          region,
+          isFavorite: false,
+          hasPendingOrder: false
+        };
+
+    onSubmit(supplierData);
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="bg-red-900 border-l-4 border-red-500 p-4 mb-4">
-          <p className="text-white">{error}</p>
-        </div>
-      )}
-      
       <div>
-        <label htmlFor="name" className="block text-sm font-bold text-white">
+        <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
           Nombre
         </label>
         <input
           type="text"
           id="name"
-          name="name"
-          value={formData.name || ''}
-          onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder-gray-400 text-white"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="region" className="block text-sm font-bold text-white">
-            Región
-          </label>
-          <select
-            id="region"
-            name="region"
-            value={formData.region || 'asian'}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
-          >
-            <option value="asian" className="text-white">Asiático (Japonés/Chino/Coreano)</option>
-            <option value="european" className="text-white">Europeo</option>
-            <option value="other" className="text-white">Otro</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="origin" className="block text-sm font-bold text-white">
-            Origen
-          </label>
-          <select
-            id="origin"
-            name="origin"
-            value={formData.origin || ''}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
-          >
-            <option value="" className="text-gray-400">Selecciona un origen</option>
-            <option value="Alibaba" className="text-white">Alibaba</option>
-            <option value="Instagram" className="text-white">Instagram</option>
-            <option value="Facebook" className="text-white">Facebook</option>
-            <option value="Website" className="text-white">Sitio Web</option>
-            <option value="Direct Contact" className="text-white">Contacto Directo</option>
-            <option value="Other" className="text-white">Otro</option>
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <label htmlFor="email" className="block text-sm font-bold text-white">
-          Email
-        </label>
-        <input
-          type="email"
-          id="email"
-          name="email"
-          value={formData.email || ''}
-          onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder-gray-400 text-white"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
       </div>
 
       <div>
-        <label htmlFor="phone" className="block text-sm font-bold text-white">
-          Teléfono
-        </label>
-        <input
-          type="tel"
-          id="phone"
-          name="phone"
-          value={formData.phone || ''}
-          onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder-gray-400 text-white"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="website" className="block text-sm font-bold text-white">
-          Sitio Web
-        </label>
-        <input
-          type="url"
-          id="website"
-          name="website"
-          value={formData.website || ''}
-          onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder-gray-400 text-white"
-          placeholder="https://ejemplo.com"
-        />
-      </div>
-
-      <div>
-        <label htmlFor="contactName" className="block text-sm font-bold text-white">
-          Nombre de Contacto
+        <label htmlFor="origin" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          Origen
         </label>
         <input
           type="text"
-          id="contactName"
-          name="contactName"
-          value={formData.contactName || ''}
-          onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder-gray-400 text-white"
+          id="origin"
+          value={origin}
+          onChange={(e) => setOrigin(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
       </div>
 
       <div>
-        <label htmlFor="country" className="block text-sm font-bold text-white">
+        <label htmlFor="country" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
           País
         </label>
         <input
           type="text"
           id="country"
-          name="country"
-          value={formData.country || ''}
-          onChange={handleChange}
-          className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder-gray-400 text-white"
+          value={country}
+          onChange={(e) => setCountry(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
       </div>
 
       <div>
-        <label htmlFor="shippingCost" className="block text-sm font-bold text-white">
-          Precio de envío aproximado (EUR)
+        <label htmlFor="contactName" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          Nombre de Contacto
         </label>
         <input
-          type="number"
-          id="shippingCost"
-          name="shippingCost"
-          value={formData.shippingCost || 0}
-          onChange={handleChange}
-          min="0"
-          step="0.01"
-          className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder-gray-400 text-white"
+          type="text"
+          id="contactName"
+          value={contactName}
+          onChange={(e) => setContactName(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
         />
       </div>
 
       <div>
-        <label htmlFor="notes" className="block text-sm font-bold text-white">
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          Email
+        </label>
+        <input
+          type="email"
+          id="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="phone" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          Teléfono
+        </label>
+        <input
+          type="tel"
+          id="phone"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="website" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          Sitio Web
+        </label>
+        <input
+          type="url"
+          id="website"
+          value={website}
+          onChange={(e) => setWebsite(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="region" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          Región
+        </label>
+        <select
+          id="region"
+          value={region}
+          onChange={(e) => setRegion(e.target.value)}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        >
+          <option value="asian">Asia</option>
+          <option value="european">Europa</option>
+          <option value="other">Otra</option>
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
           Notas
         </label>
         <textarea
           id="notes"
-          name="notes"
-          value={formData.notes || ''}
-          onChange={handleChange}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
           rows={3}
-          className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 placeholder-gray-400 text-white"
-          placeholder="Información adicional sobre el proveedor"
-        ></textarea>
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        />
       </div>
 
-      <div className="flex justify-end space-x-3 pt-4">
+      <div className="flex justify-end space-x-3">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md border border-gray-700 bg-gray-800 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-700"
-          disabled={isSubmitting}
+          className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600"
         >
           Cancelar
         </button>
         <button
           type="submit"
-          className="rounded-md bg-green-700 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-600 disabled:opacity-50"
-          disabled={isSubmitting}
+          className="px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-md shadow-sm hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
         >
-          {isSubmitting ? 'Guardando...' : 'Guardar'}
+          {supplier ? 'Actualizar' : 'Crear'}
         </button>
       </div>
     </form>

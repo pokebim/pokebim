@@ -1,93 +1,42 @@
+import React, { useState } from 'react';
 import Image from 'next/image';
-import { useState, useEffect } from 'react';
-import DefaultProductImage from './DefaultProductImage';
 
 interface ProductImageProps {
-  src?: string;
-  alt?: string;
-  size?: 'small' | 'medium' | 'large';
+  src: string;
+  alt: string;
   className?: string;
-  onClick?: () => void;
 }
 
 /**
  * Componente reutilizable para mostrar imágenes de productos
  * con soporte para diferentes tamaños y fallback para imágenes no disponibles
  */
-export default function ProductImage({ 
-  src, 
-  alt = 'Product', 
-  size = 'small',
-  className = '',
-  onClick
-}: ProductImageProps) {
+export default function ProductImage({ src, alt, className = '' }: ProductImageProps) {
   const [error, setError] = useState(false);
-  const [isLoading, setIsLoading] = useState(!!src);
-  
-  // Determinar dimensiones basadas en el tamaño
-  const dimensions = {
-    small: { width: 60, height: 60 },
-    medium: { width: 120, height: 120 },
-    large: { width: 240, height: 240 }
-  }[size];
-  
-  // Resetear el error si cambia la URL
-  useEffect(() => {
-    if (src) {
-      setError(false);
-      setIsLoading(true);
-    } else {
-      setIsLoading(false);
-    }
-  }, [src]);
-  
-  const handleImageLoad = () => {
-    setIsLoading(false);
-  };
-  
-  const handleImageError = () => {
-    setError(true);
-    setIsLoading(false);
-  };
-  
-  const cursorStyle = onClick ? 'cursor-pointer hover:shadow-lg' : '';
-  
-  // Si no hay src o hay un error, mostrar imagen por defecto
-  if (!src || error) {
-    return (
-      <div 
-        className={`relative ${className}`}
-        onClick={onClick}
-        title={onClick ? "Haz clic para ampliar" : alt}
-      >
-        <DefaultProductImage 
-          productName={alt} 
-          className="w-full h-full"
-          showName={false}
-        />
-      </div>
-    );
-  }
-  
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fallbackImage = `https://via.placeholder.com/400x400?text=${encodeURIComponent(alt || 'Imagen no disponible')}`;
+
   return (
-    <div 
-      className={`relative flex items-center justify-center ${className} ${cursorStyle}`}
-      onClick={onClick}
-      title={onClick ? "Haz clic para ampliar" : alt}
-    >
+    <div className={`relative min-h-[200px] w-full ${className}`} style={{ aspectRatio: '1/1' }}>
+      <Image
+        src={error ? fallbackImage : src}
+        alt={alt}
+        fill
+        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+        priority
+        className={`object-contain transition-opacity duration-300 ${
+          isLoading ? 'opacity-0' : 'opacity-100'
+        }`}
+        onError={() => setError(true)}
+        onLoad={() => setIsLoading(false)}
+        unoptimized
+      />
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
-          <div className="animate-pulse h-6 w-6 rounded-full bg-gray-400"></div>
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500"></div>
         </div>
       )}
-      
-      <img 
-        src={src}
-        alt={alt}
-        className={`w-full h-full object-contain transition-all duration-300 ${onClick ? 'hover:scale-105' : ''} ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-        onError={handleImageError}
-        onLoad={handleImageLoad}
-      />
     </div>
   );
 } 

@@ -2,13 +2,29 @@
 const nextConfig = {
   images: {
     domains: [
+      'i.ebayimg.com',
+      'firebasestorage.googleapis.com',
       'via.placeholder.com',
       'picsum.photos',
-      'images.unsplash.com',
-      'firebasestorage.googleapis.com',
-      'source.unsplash.com',
-      'flashstore.es'
-    ]
+      'images.pokellector.com',
+      'product-images.tcgplayer.com',
+      'crystal-cdn3.crystalcommerce.com',
+      'crystal-cdn4.crystalcommerce.com',
+      'cdn.shopify.com',
+      'media.karousell.com',
+      'flashstore.es',
+      'krystalkollectz.com'
+    ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+    unoptimized: true,
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'attachment',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
   reactStrictMode: true,
   

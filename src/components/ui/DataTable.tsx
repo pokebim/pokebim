@@ -53,21 +53,16 @@ export default function DataTable<T extends object>({
   }, [itemsPerPage, table]);
 
   return (
-    <div className="w-full">
-      {/* Search bar y info de resultados - responsive */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
-        <div className="relative w-full sm:w-64">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-              <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
-            </svg>
-          </div>
+    <div className="w-full h-full flex flex-col">
+      {/* Barra de búsqueda */}
+      <div className="p-4 flex items-center justify-between bg-gray-900">
+        <div className="flex-1 max-w-sm">
           <input
             type="text"
-            className="block w-full p-2 pl-10 text-sm border rounded-lg bg-gray-800 border-gray-700 placeholder-gray-400 text-white focus:ring-green-500 focus:border-green-500"
-            placeholder={searchPlaceholder}
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
+            value={globalFilter ?? ''}
+            onChange={e => setGlobalFilter(e.target.value)}
+            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-md text-white placeholder-gray-400"
+            placeholder="Buscar..."
           />
         </div>
         <div className="text-white text-sm">
@@ -77,123 +72,108 @@ export default function DataTable<T extends object>({
         </div>
       </div>
 
-      {/* Table - con scroll horizontal en dispositivos pequeños */}
-      <div className="overflow-x-auto shadow-md rounded-lg">
-        <table className="w-full text-sm text-left rtl:text-right text-gray-400">
-          <thead className="text-xs uppercase bg-gray-700 text-white">
+      {/* Tabla */}
+      <div className="flex-1 overflow-auto">
+        <table className="w-full text-left text-sm text-gray-300">
+          <thead className="sticky top-0 bg-gray-800 text-xs uppercase text-gray-400">
             {table.getHeaderGroups().map(headerGroup => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map(header => (
                   <th 
-                    key={header.id} 
-                    scope="col" 
-                    className="px-3 sm:px-6 py-3 cursor-pointer hover:bg-gray-600 transition-colors"
-                    onClick={header.column.getToggleSortingHandler()}
+                    key={header.id}
+                    className="px-4 py-3 font-medium"
+                    style={{ width: header.getSize() }}
                   >
-                    <div className="flex items-center whitespace-nowrap">
-                      {flexRender(
-                        header.column.columnDef.header,
-                        header.getContext()
-                      )}
-                      {{
-                        asc: <svg className="w-3 h-3 ml-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M8.574 11.024h6.852a2.075 2.075 0 0 0 1.847-1.086 1.9 1.9 0 0 0-.11-1.986L13.736 2.9a2.12 2.12 0 0 0-3.472 0L6.837 7.952a1.9 1.9 0 0 0-.11 1.986 2.074 2.074 0 0 0 1.847 1.086Zm6.852 1.952H8.574a2.072 2.072 0 0 0-1.847 1.087 1.9 1.9 0 0 0 .11 1.985l3.426 5.05a2.123 2.123 0 0 0 3.472 0l3.427-5.05a1.9 1.9 0 0 0 .11-1.985 2.074 2.074 0 0 0-1.846-1.087Z"/>
-                            </svg>,
-                        desc: <svg className="w-3 h-3 ml-1" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
-                               <path d="M15.426 12.026a2.078 2.078 0 0 0-1.846-1.086H6.727c-.837 0-1.587.373-1.946 1.086a1.9 1.9 0 0 0 .11 1.986l3.426 5.05a2.123 2.123 0 0 0 3.472 0l3.427-5.05a1.9 1.9 0 0 0 .11-1.986Zm-6.852-.052h6.852a2.075 2.075 0 0 0 1.847-1.086 1.9 1.9 0 0 0-.11-1.986L13.736 3.85a2.12 2.12 0 0 0-3.472 0L6.837 8.902a1.9 1.9 0 0 0-.11 1.986 2.074 2.074 0 0 0 1.847 1.086Z"/>
-                             </svg>,
-                        false: '',
-                      }[header.column.getIsSorted() as string ?? 'false']}
-                    </div>
+                    {header.isPlaceholder ? null : (
+                      <div
+                        {...{
+                          className: header.column.getCanSort()
+                            ? 'cursor-pointer select-none flex items-center gap-2'
+                            : '',
+                          onClick: header.column.getToggleSortingHandler(),
+                        }}
+                      >
+                        {flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                        {{
+                          asc: ' 🔼',
+                          desc: ' 🔽',
+                        }[header.column.getIsSorted() as string] ?? null}
+                      </div>
+                    )}
                   </th>
                 ))}
               </tr>
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.length > 0 ? (
-              table.getRowModel().rows.map(row => (
-                <tr key={row.id} className="border-b border-gray-700 bg-gray-800 hover:bg-gray-700">
-                  {row.getVisibleCells().map(cell => (
-                    <td key={cell.id} className="px-3 sm:px-6 py-3 sm:py-4">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={columns.length} className="px-6 py-4 text-center text-white">
-                  No hay datos disponibles
-                </td>
+            {table.getRowModel().rows.map(row => (
+              <tr 
+                key={row.id}
+                className="border-b border-gray-700 hover:bg-gray-700"
+              >
+                {row.getVisibleCells().map(cell => (
+                  <td key={cell.id} className="px-4 py-3 whitespace-nowrap">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </td>
+                ))}
               </tr>
-            )}
+            ))}
           </tbody>
         </table>
       </div>
-      
-      {/* Pagination - ajustado para móviles */}
-      <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-3">
-        <div className="flex space-x-2 order-2 sm:order-1">
+
+      {/* Paginación */}
+      <div className="p-4 bg-gray-900 border-t border-gray-700 flex items-center justify-between">
+        <div className="flex items-center gap-2">
           <button
-            className="p-2 rounded bg-gray-800 text-white disabled:opacity-50 hover:bg-gray-700"
+            className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-50"
             onClick={() => table.setPageIndex(0)}
             disabled={!table.getCanPreviousPage()}
-            aria-label="Primera página"
           >
-            {"<<"}
+            {'<<'}
           </button>
           <button
-            className="p-2 rounded bg-gray-800 text-white disabled:opacity-50 hover:bg-gray-700"
+            className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-50"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
-            aria-label="Página anterior"
           >
-            {"<"}
+            {'<'}
           </button>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-2 text-white text-sm order-1 sm:order-2">
-          <span className="whitespace-nowrap">
-            Página {table.getState().pagination.pageIndex + 1} de {table.getPageCount()}
+          <span className="text-white">
+            Página {table.getState().pagination.pageIndex + 1} de{' '}
+            {table.getPageCount()}
           </span>
-          <select
-            value={table.getState().pagination.pageSize}
-            onChange={e => {
-              table.setPageSize(Number(e.target.value));
-            }}
-            className="px-2 py-1 bg-gray-800 border border-gray-700 rounded text-white"
-            aria-label="Elementos por página"
-          >
-            {[5, 10, 25, 50].map(pageSize => (
-              <option key={pageSize} value={pageSize}>
-                Mostrar {pageSize}
-              </option>
-            ))}
-          </select>
-        </div>
-        
-        <div className="flex space-x-2 order-3">
           <button
-            className="p-2 rounded bg-gray-800 text-white disabled:opacity-50 hover:bg-gray-700"
+            className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-50"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
-            aria-label="Página siguiente"
           >
-            {">"}
+            {'>'}
           </button>
           <button
-            className="p-2 rounded bg-gray-800 text-white disabled:opacity-50 hover:bg-gray-700"
+            className="px-3 py-1 bg-gray-800 text-white rounded hover:bg-gray-700 disabled:opacity-50"
             onClick={() => table.setPageIndex(table.getPageCount() - 1)}
             disabled={!table.getCanNextPage()}
-            aria-label="Última página"
           >
-            {">>"}
+            {'>>'}
           </button>
         </div>
+        <select
+          value={table.getState().pagination.pageSize}
+          onChange={e => {
+            table.setPageSize(Number(e.target.value));
+          }}
+          className="px-3 py-1 bg-gray-800 text-white rounded border border-gray-700"
+        >
+          {[10, 20, 30, 40, 50].map(pageSize => (
+            <option key={pageSize} value={pageSize}>
+              Mostrar {pageSize}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );

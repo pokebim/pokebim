@@ -13,78 +13,41 @@ import { db } from "./firebase";
 
 // Interfaz para el proveedor
 export interface Supplier {
-  id?: string;
-  name?: string;
-  website?: string;
-  country?: string;
-  email?: string;
-  phone?: string;
-  contactName?: string;
-  origin?: string;
-  region?: string;
+  id: string;
+  name: string;
+  origin: string;
+  country: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  website: string;
   notes?: string;
+  isFavorite?: boolean;
+  hasPendingOrder?: boolean;
+  region: 'asia' | 'europe' | 'other';
 }
 
 // Obtener todos los proveedores
 export const getAllSuppliers = async (): Promise<Supplier[]> => {
-  let retryCount = 0;
-  const maxRetries = 3;
-  
-  while (retryCount <= maxRetries) {
-    try {
-      console.log(`FIREBASE: Intentando cargar proveedores (intento ${retryCount + 1}/${maxRetries + 1})`);
-      
-      // Intentar un enfoque alternativo para cargar proveedores
-      const suppliersCol = collection(db, "suppliers");
-      const suppliersSnapshot = await getDocs(suppliersCol);
-      
-      if (suppliersSnapshot.empty) {
-        console.warn('FIREBASE: No se encontraron documentos en la colección "suppliers"');
-        retryCount++;
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount)));
-        continue;
-      }
-      
-      const result: Supplier[] = [];
-      
-      // Procesar cada documento manualmente
-      suppliersSnapshot.forEach((doc) => {
-        try {
-          const data = doc.data();
-          const supplier: Supplier = {
-            id: doc.id,
-            name: data.name || 'Sin nombre',
-            email: data.email || '',
-            phone: data.phone || '',
-            notes: data.notes || '',
-          };
-          result.push(supplier);
-        } catch (itemError) {
-          console.error(`FIREBASE: Error al procesar proveedor ${doc.id}:`, itemError);
-        }
-      });
-      
-      console.log(`FIREBASE: Carga de proveedores exitosa. ${result.length} proveedores cargados.`);
-      return result;
-    } catch (error) {
-      console.error(`FIREBASE: Error al cargar proveedores (intento ${retryCount + 1}):`, error);
-      
-      if (retryCount >= maxRetries) {
-        console.error('FIREBASE: Se agotaron los intentos de carga de proveedores.');
-        return [];
-      }
-      
-      retryCount++;
-      // Esperar un tiempo incremental antes de reintentar
-      const delayMs = 1000 * retryCount;
-      console.log(`FIREBASE: Reintentando en ${delayMs / 1000} segundos...`);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
+  try {
+    const suppliersCol = collection(db, "suppliers");
+    const suppliersSnapshot = await getDocs(suppliersCol);
+    return suppliersSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data() as Omit<Supplier, 'id'>,
+      // Asegurar valores por defecto
+      origin: doc.data().origin || '-',
+      country: doc.data().country || '-',
+      contactName: doc.data().contactName || '-',
+      email: doc.data().email || '-',
+      phone: doc.data().phone || '-',
+      website: doc.data().website || '-',
+      region: doc.data().region || 'other'
+    }));
+  } catch (error) {
+    console.error("Error getting suppliers:", error);
+    throw error;
   }
-  
-  // Este punto no debería alcanzarse debido al manejo de errores anterior
-  console.error('FIREBASE: Fallo al cargar proveedores después de múltiples intentos');
-  return [];
 };
 
 // Obtener proveedores por región
@@ -219,5 +182,74 @@ export const checkSuppliersExist = async (): Promise<{ exists: boolean, count: n
   } catch (error) {
     console.error("Error checking suppliers collection:", error);
     return { exists: false, count: 0 };
+  }
+};
+
+export const toggleFavorite = async (id: string, isFavorite: boolean): Promise<void> => {
+  await updateSupplier(id, { isFavorite });
+};
+
+export const togglePendingOrder = async (id: string, hasPendingOrder: boolean): Promise<void> => {
+  await updateSupplier(id, { hasPendingOrder });
+};
+
+// Obtener conteo de proveedores por región
+export const getSupplierCountsByRegion = async (): Promise<{
+  asia: number;
+  europe: number;
+  pending: number;
+}> => {
+  try {
+    const suppliersCol = collection(db, "suppliers");
+    const suppliersSnapshot = await getDocs(suppliersCol);
+    
+    const counts = {
+      asia: 0,
+      europe: 0,
+      pending: 0
+    };
+
+    suppliersSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      // Contar por región
+      if (data.region === 'asian') counts.asia++;
+      if (data.region === 'european') counts.europe++;
+      // Contar pendientes (sin email o teléfono)
+      if (!data.email || data.email.trim() === '' || !data.phone || data.phone.trim() === '') {
+        counts.pending++;
+      }
+    });
+
+    return counts;
+  } catch (error) {
+    console.error("Error getting supplier counts:", error);
+    return { asia: 0, europe: 0, pending: 0 };
+  }
+};
+
+// Obtener un proveedor por su ID
+export const getSupplierById = async (id: string): Promise<Supplier | null> => {
+  try {
+    const supplierRef = doc(db, "suppliers", id);
+    const supplierDoc = await getDoc(supplierRef);
+    
+    if (supplierDoc.exists()) {
+      return {
+        id: supplierDoc.id,
+        ...supplierDoc.data() as Omit<Supplier, 'id'>,
+        // Asegurar valores por defecto
+        origin: supplierDoc.data().origin || '-',
+        country: supplierDoc.data().country || '-',
+        contactName: supplierDoc.data().contactName || '-',
+        email: supplierDoc.data().email || '-',
+        phone: supplierDoc.data().phone || '-',
+        website: supplierDoc.data().website || '-',
+        region: supplierDoc.data().region || 'other'
+      };
+    }
+    return null;
+  } catch (error) {
+    console.error(`Error getting supplier ${id}:`, error);
+    throw error;
   }
 }; 
