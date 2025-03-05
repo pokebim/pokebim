@@ -54,8 +54,5 @@
       "maxDuration": 60
     }
   },
-  "crons": [],
-  "typescript": {
-    "ignoreBuildErrors": true
-  }
+  "crons": []
 } 
