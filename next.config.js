@@ -44,7 +44,9 @@ const nextConfig = {
     'firebase', 
     '@firebase/firestore',
     '@tanstack/react-table',
-    'date-fns'
+    'date-fns',
+    'react-dnd',
+    'react-dnd-html5-backend'
   ],
   
   // Configuración para paquetes que necesitan Node.js
