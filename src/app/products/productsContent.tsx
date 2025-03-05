@@ -176,8 +176,13 @@ export default function ProductsContent() {
 
   // Nueva función para actualizar el precio de Cardmarket
   const handleUpdateCardmarketPrice = async (productId: string, cardmarketUrl: string) => {
-    if (!productId || !cardmarketUrl) {
-      showNotification('No se puede actualizar el precio. Falta ID del producto o URL de Cardmarket.', 'error');
+    if (!productId) {
+      showNotification('No se puede actualizar el precio. Falta ID del producto.', 'error');
+      return;
+    }
+    
+    if (!cardmarketUrl) {
+      showNotification('No se puede actualizar el precio. Primero añade un enlace a Cardmarket en la información del producto.', 'error');
       return;
     }
     
@@ -193,13 +198,15 @@ export default function ProductsContent() {
       const result = await updateCardmarketPriceForProduct(productId, cardmarketUrl);
       
       if (result.success && result.price) {
+        const now = new Date();
+        
         // Actualizar el producto en el estado local
         setProducts(prev => prev.map(product => {
           if (product.id === productId) {
             return {
               ...product,
               cardmarketPrice: result.price,
-              lastPriceUpdate: new Date()
+              lastPriceUpdate: now
             };
           }
           return product;
@@ -210,17 +217,17 @@ export default function ProductsContent() {
           setSelectedProduct({
             ...selectedProduct,
             cardmarketPrice: result.price,
-            lastPriceUpdate: new Date()
+            lastPriceUpdate: now
           });
         }
         
-        showNotification(`Precio actualizado: ${result.price.toFixed(2)} €`);
+        showNotification(`Precio actualizado correctamente: ${result.price.toFixed(2)} €`);
       } else {
-        showNotification(result.error || 'Error al actualizar el precio', 'error');
+        showNotification(result.error || 'Error al actualizar el precio. Inténtalo de nuevo más tarde.', 'error');
       }
     } catch (error) {
       console.error('Error al actualizar precio:', error);
-      showNotification('Error al actualizar el precio de Cardmarket', 'error');
+      showNotification('Error al conectar con Cardmarket. Verifica el enlace e inténtalo de nuevo.', 'error');
     }
   };
 
@@ -279,7 +286,7 @@ export default function ProductsContent() {
         {filteredProducts.map(product => (
           <div key={product.id} className="bg-gray-800 rounded-md shadow overflow-hidden flex flex-col border border-gray-700 hover:border-gray-500 transition-colors">
             {/* Contenedor de imagen con tamaño fijo y mejor aprovechamiento del espacio */}
-            <div className="h-48 flex items-center justify-center bg-gray-900">
+            <div className="h-48 flex items-center justify-center bg-gray-900 relative">
               <ProductImage 
                 src={product.imageUrl} 
                 alt={product.name}
@@ -287,7 +294,15 @@ export default function ProductsContent() {
                 className="w-full h-full object-contain p-2"
                 onClick={() => product.imageUrl && handleImageClick(product.imageUrl)}
               />
+              
+              {/* Badge para el precio de Cardmarket */}
+              {product.cardmarketPrice > 0 && (
+                <div className="absolute top-2 right-2 bg-green-700 text-white px-2 py-1 rounded-md font-medium text-sm shadow-md">
+                  {product.cardmarketPrice.toFixed(2)} €
+                </div>
+              )}
             </div>
+            
             <div className="p-2 flex-grow flex flex-col">
               <div className="flex justify-between items-start gap-1">
                 <h3 className="text-sm font-medium text-white line-clamp-1">{product.name}</h3>
@@ -301,13 +316,17 @@ export default function ProductsContent() {
                   <p className="line-clamp-1">{product.description}</p>
                 )}
                 
-                {/* Precio de Cardmarket */}
+                {/* Precio de Cardmarket como texto normal también */}
                 {product.cardmarketPrice > 0 && (
                   <p className="mt-1 text-green-500 font-semibold">
-                    Precio: {product.cardmarketPrice.toFixed(2)} €
+                    Precio CM: {product.cardmarketPrice.toFixed(2)} €
                     {product.lastPriceUpdate && (
                       <span className="text-gray-500 text-xs ml-1">
-                        ({new Date(product.lastPriceUpdate.toDate()).toLocaleDateString()})
+                        {typeof product.lastPriceUpdate === 'object' && product.lastPriceUpdate && product.lastPriceUpdate.toDate 
+                          ? `(${new Date(product.lastPriceUpdate.toDate()).toLocaleDateString()})` 
+                          : product.lastPriceUpdate instanceof Date 
+                            ? `(${product.lastPriceUpdate.toLocaleDateString()})` 
+                            : ''}
                       </span>
                     )}
                   </p>
@@ -471,27 +490,49 @@ export default function ProductsContent() {
               )}
               
               {/* Precio de Cardmarket */}
-              {selectedProduct.cardmarketPrice > 0 && (
-                <div className="mt-4">
-                  <h4 className="text-sm font-medium text-white">Precio en Cardmarket:</h4>
-                  <div className="flex items-center">
-                    <span className="text-xl font-bold text-green-500">
+              {selectedProduct.cardmarketPrice > 0 ? (
+                <div className="mt-6 p-4 bg-gray-850 rounded-lg border border-gray-700">
+                  <h4 className="text-sm font-medium text-white mb-2">Precio en Cardmarket:</h4>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <span className="text-3xl font-bold text-green-500">
                       {selectedProduct.cardmarketPrice.toFixed(2)} €
                     </span>
-                    {selectedProduct.lastPriceUpdate && (
-                      <span className="ml-2 text-xs text-gray-400">
-                        Última actualización: {new Date(selectedProduct.lastPriceUpdate.toDate()).toLocaleString()}
-                      </span>
-                    )}
+                    <div className="flex-1 flex flex-col sm:flex-row sm:items-center gap-2">
+                      {selectedProduct.lastPriceUpdate && (
+                        <span className="text-xs text-gray-400">
+                          Última actualización: {
+                            typeof selectedProduct.lastPriceUpdate === 'object' && selectedProduct.lastPriceUpdate && selectedProduct.lastPriceUpdate.toDate 
+                              ? new Date(selectedProduct.lastPriceUpdate.toDate()).toLocaleString()
+                              : selectedProduct.lastPriceUpdate instanceof Date
+                                ? selectedProduct.lastPriceUpdate.toLocaleString()
+                                : ''
+                          }
+                        </span>
+                      )}
+                      <div className="flex-grow"></div>
+                      <button 
+                        onClick={() => handleUpdateCardmarketPrice(selectedProduct.id, selectedProduct.cardmarketUrl)}
+                        className="px-3 py-1.5 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600"
+                      >
+                        Actualizar precio
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : selectedProduct.cardmarketUrl ? (
+                <div className="mt-6 p-4 bg-gray-850 rounded-lg border border-gray-700">
+                  <h4 className="text-sm font-medium text-white mb-2">Precio en Cardmarket:</h4>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400">No hay datos de precio disponibles</span>
                     <button 
                       onClick={() => handleUpdateCardmarketPrice(selectedProduct.id, selectedProduct.cardmarketUrl)}
-                      className="ml-4 px-2 py-1 bg-indigo-700 text-white text-xs rounded hover:bg-indigo-600"
+                      className="px-3 py-1.5 bg-indigo-700 text-white text-sm rounded hover:bg-indigo-600"
                     >
-                      Actualizar precio
+                      Obtener precio
                     </button>
                   </div>
                 </div>
-              )}
+              ) : null}
             </DetailSection>
             
             {/* Imagen del producto */}
@@ -544,7 +585,24 @@ export default function ProductsContent() {
           </div>
         </div>
         
-        {/* Buscador */}
+        {/* Banner informativo sobre precios de Cardmarket */}
+        <div className="mb-6 p-4 bg-blue-900 bg-opacity-40 rounded-lg border border-blue-800">
+          <h2 className="text-lg font-semibold text-white mb-2">Precios de Cardmarket</h2>
+          <p className="text-gray-300 text-sm mb-2">
+            Ahora puedes vincular tus productos con Cardmarket para obtener información de precios. 
+            Sigue estos pasos:
+          </p>
+          <ol className="text-gray-300 text-sm list-decimal list-inside space-y-1 ml-2">
+            <li>Edita un producto y añade la URL de su página en Cardmarket</li>
+            <li>Haz clic en "Actualizar precio" para obtener el precio más reciente</li>
+            <li>Los precios se mostrarán con una etiqueta verde en cada producto</li>
+          </ol>
+          <p className="text-gray-400 text-xs mt-2">
+            Nota: Los precios se actualizan manualmente. Para actualizar todos los precios a la vez, usa el botón "Actualizar precios de Cardmarket".
+          </p>
+        </div>
+        
+        {/* Buscador de productos */}
         <div className="relative w-full max-w-md mb-6">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
             <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">

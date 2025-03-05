@@ -4,6 +4,22 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore/lite';
 import { updateProduct } from './productService';
 
 /**
+ * Valida si una URL es de Cardmarket
+ * @param url URL a validar
+ * @returns true si es una URL válida de Cardmarket
+ */
+function isValidCardmarketUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  
+  try {
+    const urlObj = new URL(url);
+    return urlObj.hostname.includes('cardmarket.com');
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
  * Esta función simula la obtención de datos de precios de Cardmarket.
  * En un entorno real, debería implementarse usando la API oficial de Cardmarket
  * o un servicio de web scraping.
@@ -13,7 +29,7 @@ import { updateProduct } from './productService';
  */
 export async function fetchCardmarketPrice(url: string): Promise<{price: number, success: boolean, error?: string}> {
   // Validar que la URL es de Cardmarket
-  if (!url || !url.includes('cardmarket.com')) {
+  if (!isValidCardmarketUrl(url)) {
     return {
       price: 0,
       success: false,
@@ -25,16 +41,6 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
     // NOTA: En un entorno real, aquí haríamos una llamada a un servicio de backend
     // que se encargue de hacer scraping o usar la API de Cardmarket.
     // Por motivos de demostración, generamos un precio aleatorio entre 1 y 300€
-    
-    // En producción, esto debería reemplazarse por código real que obtenga el precio
-    // de Cardmarket, por ejemplo:
-    //
-    // const response = await fetch(`https://tu-api-backend.com/cardmarket-prices?url=${encodeURIComponent(url)}`);
-    // const data = await response.json();
-    // return {
-    //   price: data.lowestPrice,
-    //   success: true
-    // };
     
     // Simulación: esperar un tiempo aleatorio para simular la latencia de red
     await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
@@ -67,6 +73,20 @@ export async function updateCardmarketPriceForProduct(
   productId: string, 
   cardmarketUrl: string
 ): Promise<{success: boolean, price?: number, error?: string}> {
+  if (!productId) {
+    return {
+      success: false,
+      error: 'ID de producto no válido'
+    };
+  }
+  
+  if (!isValidCardmarketUrl(cardmarketUrl)) {
+    return {
+      success: false,
+      error: 'URL de Cardmarket no válida. Asegúrate de que es una URL de cardmarket.com'
+    };
+  }
+  
   try {
     // Obtener el precio actual de Cardmarket
     const priceData = await fetchCardmarketPrice(cardmarketUrl);
