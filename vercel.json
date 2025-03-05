@@ -49,9 +49,10 @@
       "memory": 1024,
       "maxDuration": 10
     },
-    "src/app/api/cardmarket-puppeteer/route.ts": {
+    "src/app/api/cardmarket-puppeteer/**": {
       "memory": 1024,
       "maxDuration": 60
     }
-  }
+  },
+  "crons": []
 } 

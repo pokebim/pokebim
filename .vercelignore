@@ -1,0 +1,11 @@
+# Ignorar archivos específicos de puppeteer/yargs que causan problemas
+node_modules/yargs/build/lib/utils/maybe-async-result.js
+node_modules/yargs/build/lib/yargs-factory.js
+
+# Ignorar archivos innecesarios para el despliegue
+.git
+.github
+.vscode
+README.md
+**/*.test.js
+**/*.spec.js 

@@ -55,10 +55,9 @@ const nextConfig = {
     serverActions: {
       allowedOrigins: ['localhost:3000', 'pokebimapp-git-master-pokebims-projects.vercel.app'],
     },
-    serverComponentsExternalPackages: [
-      '@sparticuz/chromium',
-      'puppeteer-core'
-    ]
+    // La clave es que estamos usando chromium-min, así que no necesitamos especificar estos paquetes
+    // como externos. Chromium se descargará en tiempo de ejecución desde GitHub.
+    serverComponentsExternalPackages: []
   },
 };
 

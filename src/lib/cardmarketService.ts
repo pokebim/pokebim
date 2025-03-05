@@ -54,90 +54,72 @@ function isValidCardmarketUrl(url: string): boolean {
  * @returns Objeto con el precio o error
  */
 export async function fetchCardmarketPrice(url: string): Promise<{ success: boolean; price?: number; error?: string }> {
-  // Validar URL
-  if (!url || !url.includes('cardmarket.com')) {
-    console.error('❌ URL inválida para CardMarket:', url);
-    return { success: false, error: 'URL inválida. Debe ser de cardmarket.com' };
+  if (!isValidCardmarketUrl(url)) {
+    console.error('URL inválida:', url);
+    return { success: false, error: 'URL inválida' };
   }
-
-  console.log(`🔍 Obteniendo precio para URL: ${url}`);
   
-  // Implementación de reintentos
+  console.log(`🔍 Obteniendo precio para: ${url}`);
+  
+  // Máximo de intentos
   const MAX_RETRIES = 2;
+  let currentRetry = 0;
   let lastError = '';
   
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+  while (currentRetry <= MAX_RETRIES) {
     try {
-      // Si no es el primer intento, mostrar información de reintento
-      if (attempt > 0) {
-        console.log(`🔄 Reintento ${attempt}/${MAX_RETRIES} para obtener precio...`);
-        // Esperar un tiempo incremental entre reintentos
-        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
-      }
+      // Agregar parámetro de reintento para seguimiento
+      const apiUrl = `/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}&retry=${currentRetry}`;
+      console.log(`🔄 ${currentRetry > 0 ? `Reintento ${currentRetry}/${MAX_RETRIES}` : 'Intento inicial'} para obtener precio...`);
       
-      // Llamar a la API con el intento actual
-      const response = await fetch(`/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}&retry=${attempt}`, {
-        // Asegurarnos de no usar caché
-        headers: {
-          'Cache-Control': 'no-cache', 
-          'Pragma': 'no-cache'
-        }
-      });
+      const response = await fetch(apiUrl);
       
-      // Analizar la respuesta
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `Error ${response.status}` }));
-        const errorMessage = errorData.error || `Error ${response.status} - ${response.statusText}`;
+        const errorText = await response.text();
+        lastError = `${response.status} - ${errorText}`;
+        console.error(`❌ Error en API: ${lastError}`);
         
-        console.error(`❌ Error en API: ${response.status} - ${errorMessage}`);
-        
-        // Determinar si debemos reintentar basado en el código de error y si hay intentos restantes
-        if ((response.status === 503 || response.status === 429) && attempt < MAX_RETRIES) {
-          lastError = errorMessage;
-          // El API sugiere reintentar, continuamos al siguiente intento
-          if (errorData.retryAfter) {
-            await new Promise(resolve => setTimeout(resolve, errorData.retryAfter));
+        // Determinar si se debe reintentar basado en el código de error
+        if (response.status === 503 || response.status === 429) {
+          currentRetry++;
+          if (currentRetry <= MAX_RETRIES) {
+            console.log(`🔄 Reintento ${currentRetry}/${MAX_RETRIES} para obtener precio...`);
+            // Esperar antes de reintentar (backoff exponencial)
+            await new Promise(resolve => setTimeout(resolve, 2000 * Math.pow(2, currentRetry - 1)));
+            continue;
           }
-          continue;
         }
         
-        lastError = errorMessage;
-        throw new Error(`Error en API: ${response.status} - ${errorMessage}`);
+        return { success: false, error: `Error en API: ${lastError}` };
       }
       
-      // Procesar respuesta exitosa
       const data = await response.json();
       
-      if (!data.success) {
-        throw new Error(data.error || 'Error desconocido en la respuesta');
+      if (data.success && typeof data.price === 'number') {
+        console.log(`✅ Precio obtenido: ${data.price}€`);
+        return { success: true, price: data.price };
+      } else {
+        lastError = data.error || 'Respuesta inválida del API';
+        console.error(`❌ Error: ${lastError}`);
+        return { success: false, error: lastError };
+      }
+    } catch (error: any) {
+      lastError = `Error de red: ${error.message || 'Error desconocido'}`;
+      console.error(`❌ ${lastError}`);
+      
+      currentRetry++;
+      if (currentRetry <= MAX_RETRIES) {
+        console.log(`🔄 Reintento ${currentRetry}/${MAX_RETRIES} para obtener precio...`);
+        // Esperar antes de reintentar
+        await new Promise(resolve => setTimeout(resolve, 2000 * Math.pow(2, currentRetry - 1)));
+        continue;
       }
       
-      console.log(`✅ Precio obtenido: ${data.price}${data.currency}`);
-      return {
-        success: true,
-        price: data.price
-      };
-      
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-      console.error(`❌ Error obteniendo precio:`, lastError);
-      
-      // Si es el último intento, fallar definitivamente
-      if (attempt === MAX_RETRIES) {
-        return { 
-          success: false, 
-          error: lastError
-        };
-      }
-      // De lo contrario, continuamos al siguiente intento
+      return { success: false, error: lastError };
     }
   }
   
-  // Este código no debería alcanzarse, pero por seguridad:
-  return { 
-    success: false, 
-    error: lastError || 'Error desconocido obteniendo precio' 
-  };
+  return { success: false, error: lastError || 'Fallaron todos los intentos' };
 }
 
 /**
