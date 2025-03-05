@@ -13,8 +13,8 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.8.23",
-    "@grpc/proto-loader": "^0.7.9",
+    "@grpc/grpc-js": "^1.12.6",
+    "@grpc/proto-loader": "^0.7.13",
     "@headlessui/react": "^2.2.0",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^4.1.2",
@@ -38,6 +38,7 @@
     "react-hook-form": "^7.54.2",
     "react-hot-toast": "^2.5.2",
     "react-select": "^5.10.0",
+    "yargs": "^17.7.2",
     "zod": "^3.24.2"
   },
   "devDependencies": {

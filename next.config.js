@@ -50,8 +50,12 @@ const nextConfig = {
     serverActions: true,
     serverComponentsExternalPackages: [
       '@sparticuz/chromium',
-      'puppeteer-core'
-    ]
+      'puppeteer-core',
+      'yargs',
+      '@grpc/grpc-js',
+      '@grpc/proto-loader'
+    ],
+    esmExternals: 'loose'
   },
   
   // Configuración de output
@@ -67,6 +71,13 @@ const nextConfig = {
         child_process: false,
       };
     }
+
+    // Configuración específica para módulos ESM
+    config.module = {
+      ...config.module,
+      exprContextCritical: false,
+    };
+
     return config;
   },
 };
