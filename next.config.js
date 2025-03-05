@@ -47,7 +47,14 @@ const nextConfig = {
   
   // Configuración para paquetes que necesitan Node.js
   experimental: {
-    serverComponentsExternalPackages: ['puppeteer', '@grpc/grpc-js', '@grpc/proto-loader', 'long'],
+    serverActions: true,
+    serverComponentsExternalPackages: [
+      'puppeteer',
+      '@grpc/grpc-js',
+      '@grpc/proto-loader',
+      'long',
+      'yargs'
+    ],
     esmExternals: 'loose'
   },
   
@@ -62,8 +69,17 @@ const nextConfig = {
         net: false,
         tls: false,
         child_process: false,
+        async_hooks: false,
+        'yargs/build/lib/utils/maybe-async-result': false
       };
     }
+
+    // Forzar resolución de yargs a CommonJS
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'yargs': require.resolve('yargs')
+    };
+
     return config;
   },
 };
