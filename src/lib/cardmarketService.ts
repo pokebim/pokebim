@@ -47,193 +47,8 @@ function isValidCardmarketUrl(url: string): boolean {
 }
 
 /**
- * Intenta obtener un precio con reintentos en caso de fallo
- */
-async function fetchWithRetries(url: string, maxRetries = 3): Promise<{price: number, success: boolean, error?: string}> {
-  let lastError: any = null;
-  let attempt = 0;
-
-  // Usar el proxy CORS para acceder a Cardmarket
-  while (attempt < maxRetries) {
-    attempt++;
-    console.log(`Intento #${attempt} para obtener precio de ${url}`);
-
-    try {
-      // Primero intentar con el endpoint de proxy específico para evitar CORS
-      const proxyUrl = `/api/cardmarket-proxy?url=${encodeURIComponent(url)}`;
-      const response = await fetch(proxyUrl, {
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(`Error en proxy: ${response.status} - ${errorData.error || 'Sin detalles'}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.success || !data.price || data.price <= 0) {
-        throw new Error(data.error || 'No se obtuvo un precio válido');
-      }
-      
-      console.log(`✅ Precio obtenido correctamente: ${data.price}€`);
-      return {
-        success: true,
-        price: data.price
-      };
-    } catch (error) {
-      lastError = error;
-      console.error(`❌ Error en intento #${attempt}: ${error}`);
-      
-      // Esperar antes del siguiente intento (espera exponencial)
-      if (attempt < maxRetries) {
-        const waitTime = Math.pow(2, attempt) * 500; // 1s, 2s, 4s...
-        console.log(`Esperando ${waitTime}ms antes del siguiente intento...`);
-        await new Promise(resolve => setTimeout(resolve, waitTime));
-      }
-    }
-  }
-
-  // Si todos los intentos fallaron, devolver error
-  return {
-    success: false,
-    price: 0,
-    error: lastError instanceof Error ? lastError.message : String(lastError)
-  };
-}
-
-/**
- * Implementación de scraping directo como respaldo
- */
-async function fetchDirectFromCardmarket(url: string): Promise<{price: number, success: boolean, error?: string}> {
-  if (!isValidCardmarketUrl(url)) {
-    console.error(`Error: URL no válida para Cardmarket: ${url}`);
-    return { 
-      success: false, 
-      price: 0, 
-      error: 'URL no válida para Cardmarket' 
-    };
-  }
-
-  try {
-    console.log(`🔍 Último recurso: obteniendo precio directamente de: ${url}`);
-    
-    // Timeout para evitar bloqueos en Vercel (que tiene límite de 10-15 segundos)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 segundos es seguro para Vercel
-    
-    try {
-      // Scraping directo de la URL de Cardmarket - usando la estructura exacta que necesitamos
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; PokebimApp/1.0; +https://pokebimapp.vercel.app)',
-          'Accept': 'text/html,application/xhtml+xml,application/xml',
-          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
-          'Accept-Encoding': 'gzip, deflate',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      });
-      
-      // Siempre limpiar el timeout
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        throw new Error(`Error al acceder a Cardmarket: ${response.status} ${response.statusText}`);
-      }
-      
-      const html = await response.text();
-      console.log(`✅ HTML obtenido de Cardmarket, longitud: ${html.length} caracteres`);
-      
-      // Usar cheerio para analizar el HTML
-      const cheerio = require('cheerio');
-      const $ = cheerio.load(html);
-      
-      // Buscar precios usando múltiples métodos
-      const prices: number[] = [];
-      
-      // Método 1: Buscar por ID parcial
-      $('[id^="articleRow"]').each((_, element) => {
-        $(element).find('.color-primary').each((_, priceEl) => {
-          const text = $(priceEl).text().trim();
-          const cleanText = text.replace(/[^0-9,]/g, '');
-          if (cleanText) {
-            const price = parseFloat(cleanText.replace(',', '.'));
-            if (price > 0) {
-              prices.push(price);
-            }
-          }
-        });
-      });
-      
-      // Método 2: Buscar por clase article-row
-      if (prices.length === 0) {
-        $('.article-row').each((_, element) => {
-          $(element).find('.color-primary').each((_, priceEl) => {
-            const text = $(priceEl).text().trim();
-            const cleanText = text.replace(/[^0-9,]/g, '');
-            if (cleanText) {
-              const price = parseFloat(cleanText.replace(',', '.'));
-              if (price > 0) {
-                prices.push(price);
-              }
-            }
-          });
-        });
-      }
-      
-      // Método 3: Buscar cualquier precio
-      if (prices.length === 0) {
-        $('.color-primary').each((_, element) => {
-          const text = $(element).text().trim();
-          if (text.includes('€')) {
-            const cleanText = text.replace(/[^0-9,]/g, '');
-            if (cleanText) {
-              const price = parseFloat(cleanText.replace(',', '.'));
-              if (price > 0) {
-                prices.push(price);
-              }
-            }
-          }
-        });
-      }
-      
-      if (prices.length === 0) {
-        throw new Error('No se pudieron extraer precios de la página');
-      }
-      
-      // Ordenar los precios y obtener el más bajo
-      prices.sort((a, b) => a - b);
-      const lowestPrice = prices[0];
-      
-      console.log(`✅ Precio más bajo encontrado: ${lowestPrice}€`);
-      
-      return {
-        success: true,
-        price: lowestPrice
-      };
-    } finally {
-      // Asegurarse de limpiar el timeout
-      clearTimeout(timeoutId);
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`❌ Error obteniendo precio de Cardmarket: ${errorMessage}`);
-    
-    return { 
-      success: false, 
-      price: 0, 
-      error: errorMessage 
-    };
-  }
-}
-
-/**
- * Función principal para obtener precios, con reintentos y cache
+ * Función simplificada para obtener precios (sin scraping)
+ * Devuelve un precio estático o fallback
  */
 export async function fetchCardmarketPrice(url: string): Promise<{price: number, success: boolean, error?: string}> {
   if (!isValidCardmarketUrl(url)) {
@@ -247,8 +62,42 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
 
   console.log(`🔍 Obteniendo precio para URL: ${url}`);
   
-  // Usar la función con reintentos para mayor robustez
-  return await fetchWithRetries(url, 3);
+  try {
+    // Usar la API Puppeteer en lugar de scraping directo
+    const response = await fetch(`/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}`, {
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Error en API Puppeteer: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data.success || !data.price || data.price <= 0) {
+      throw new Error(data.error || 'No se obtuvo un precio válido');
+    }
+    
+    console.log(`✅ Precio obtenido correctamente: ${data.price}€`);
+    return {
+      success: true,
+      price: data.price
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`❌ Error obteniendo precio: ${errorMessage}`);
+    
+    // Si falla, devolver un mensaje de error pero NO un precio fallback
+    // para que el usuario sepa que necesita actualizar manualmente
+    return {
+      success: false,
+      price: 0,
+      error: errorMessage
+    };
+  }
 }
 
 /**
