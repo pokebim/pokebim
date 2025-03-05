@@ -20,6 +20,13 @@
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Cache-Control", "value": "s-maxage=3600, stale-while-revalidate=1800" }
       ]
+    },
+    {
+      "source": "/api/cardmarket-proxy",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Cache-Control", "value": "s-maxage=3600, stale-while-revalidate=1800" }
+      ]
     }
   ],
   "functions": {
@@ -28,6 +35,10 @@
       "maxDuration": 10
     },
     "src/app/api/cardmarket-scraper/route.ts": {
+      "memory": 1024,
+      "maxDuration": 10
+    },
+    "src/app/api/cardmarket-proxy/route.ts": {
       "memory": 1024,
       "maxDuration": 10
     }

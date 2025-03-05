@@ -53,15 +53,15 @@ async function fetchWithRetries(url: string, maxRetries = 3): Promise<{price: nu
   let lastError: any = null;
   let attempt = 0;
 
-  // Primero, intentar con el scraper directo optimizado para Vercel
+  // Usar el proxy CORS para acceder a Cardmarket
   while (attempt < maxRetries) {
     attempt++;
     console.log(`Intento #${attempt} para obtener precio de ${url}`);
 
     try {
-      // Usar el endpoint optimizado para Vercel
-      const scraperUrl = `/api/cardmarket-scraper?url=${encodeURIComponent(url)}`;
-      const response = await fetch(scraperUrl, {
+      // Primero intentar con el endpoint de proxy específico para evitar CORS
+      const proxyUrl = `/api/cardmarket-proxy?url=${encodeURIComponent(url)}`;
+      const response = await fetch(proxyUrl, {
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
@@ -70,7 +70,7 @@ async function fetchWithRetries(url: string, maxRetries = 3): Promise<{price: nu
       
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(`Error en API: ${response.status} - ${errorData.error || 'Sin detalles'}`);
+        throw new Error(`Error en proxy: ${response.status} - ${errorData.error || 'Sin detalles'}`);
       }
       
       const data = await response.json();
@@ -97,19 +97,12 @@ async function fetchWithRetries(url: string, maxRetries = 3): Promise<{price: nu
     }
   }
 
-  // Si falló con la API optimizada, intentar con scraping directo como último recurso
-  try {
-    return await fetchDirectFromCardmarket(url);
-  } catch (fallbackError) {
-    console.error('❌ Error en fallback de scraping directo:', fallbackError);
-    
-    // Devolver el error original
-    return {
-      success: false,
-      price: 0,
-      error: lastError instanceof Error ? lastError.message : String(lastError)
-    };
-  }
+  // Si todos los intentos fallaron, devolver error
+  return {
+    success: false,
+    price: 0,
+    error: lastError instanceof Error ? lastError.message : String(lastError)
+  };
 }
 
 /**
