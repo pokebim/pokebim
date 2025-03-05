@@ -8,6 +8,15 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Product, Supplier, InventoryEntry } from '@/types';
 
+// Define interfaces for the maps
+interface ProductsMap {
+  [key: string]: Product;
+}
+
+interface SuppliersMap {
+  [key: string]: Supplier;
+}
+
 export default function InventoryInPage() {
   const [inventoryEntries, setInventoryEntries] = useState<InventoryEntry[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -45,8 +54,8 @@ export default function InventoryInPage() {
       const productsSnapshot = await getDocs(collection(db, 'products'));
       const suppliersSnapshot = await getDocs(collection(db, 'suppliers'));
       
-      const productsMap = {};
-      const suppliersMap = {};
+      const productsMap: ProductsMap = {};
+      const suppliersMap: SuppliersMap = {};
       
       productsSnapshot.forEach(doc => {
         const product = { id: doc.id, ...doc.data() } as Product;
