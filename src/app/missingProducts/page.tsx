@@ -13,7 +13,11 @@ import {
 import MissingProductForm from '@/components/forms/MissingProductForm';
 import DataTable from '@/components/ui/DataTable';
 import { createColumnHelper } from '@tanstack/react-table';
-import { ExternalLinkIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { 
+  ArrowTopRightOnSquareIcon as ExternalLinkIcon, 
+  PencilIcon, 
+  TrashIcon 
+} from '@heroicons/react/24/outline';
 
 interface Notification {
   show: boolean;
