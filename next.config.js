@@ -35,19 +35,6 @@ const nextConfig = {
     'long'
   ],
   
-  // Aumentar el tiempo de espera para las API routes
-  experimental: {
-    // Indicar que estos paquetes son externos (no transpilados)
-    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
-    outputFileTracingExcludes: {
-      '*': [
-        'node_modules/puppeteer-core/**/*',
-        'node_modules/@sparticuz/chromium/**/*',
-        'node_modules/chrome-aws-lambda/**/*'
-      ],
-    },
-  },
-  
   // Configuración específica para Vercel
   webpack: (config, { isServer }) => {
     // Evitar problemas con algunos módulos en el cliente

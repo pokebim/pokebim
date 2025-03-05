@@ -47,8 +47,8 @@ function isValidCardmarketUrl(url: string): boolean {
 }
 
 /**
- * Función simplificada para obtener precios (sin scraping)
- * Devuelve un precio estático o fallback
+ * Función simplificada para obtener precios 
+ * Usa la API optimizada que implementa fetch en lugar de Puppeteer
  */
 export async function fetchCardmarketPrice(url: string): Promise<{price: number, success: boolean, error?: string}> {
   if (!isValidCardmarketUrl(url)) {
@@ -63,7 +63,7 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
   console.log(`🔍 Obteniendo precio para URL: ${url}`);
   
   try {
-    // Usar la API Puppeteer en lugar de scraping directo
+    // Usar la API optimizada 
     const response = await fetch(`/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}`, {
       headers: {
         'Cache-Control': 'no-cache',
@@ -72,7 +72,8 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
     });
     
     if (!response.ok) {
-      throw new Error(`Error en API Puppeteer: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(`Error en API: ${response.status}${errorData.error ? ` - ${errorData.error}` : ''}`);
     }
     
     const data = await response.json();
@@ -105,29 +106,25 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
  */
 export async function saveCardmarketPrice(data: Omit<CardmarketPrice, 'id' | 'updatedAt'>): Promise<string> {
   try {
-    // Validar los datos antes de guardar
-    if (!data.productId || !data.price || data.price <= 0) {
-      const errorMsg = `Datos de precio inválidos: productId=${data.productId}, price=${data.price}`;
-      console.error(`❌ ${errorMsg}`);
-      throw new Error(errorMsg);
+    // Comprobar si ya existe un precio para este producto
+    const querySnapshot = await getDocs(
+      query(pricesCollection, where("productId", "==", data.productId))
+    );
+    
+    // Si existe, eliminar el anterior
+    if (!querySnapshot.empty) {
+      await deleteCardmarketPrice(data.productId);
     }
-
-    console.log(`💾 Guardando precio para ${data.productName}: ${data.price}€`);
     
-    // Eliminar cualquier precio existente para este producto
-    await deleteCardmarketPrice(data.productId);
-    
-    // Guardar el nuevo precio
+    // Añadir el nuevo precio
     const docRef = await addDoc(pricesCollection, {
       ...data,
       updatedAt: serverTimestamp()
     });
     
-    console.log(`✅ Precio guardado correctamente para ${data.productName}: ${data.price}€ (ID: ${docRef.id})`);
     return docRef.id;
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    console.error(`💔 Error al guardar precio para ${data.productName}: ${errorMsg}`);
+    console.error("Error al guardar precio:", error);
     throw error;
   }
 }
@@ -136,24 +133,21 @@ export async function saveCardmarketPrice(data: Omit<CardmarketPrice, 'id' | 'up
  * Obtiene el precio de Cardmarket para un producto
  */
 export async function getCardmarketPriceForProduct(productId: string): Promise<CardmarketPrice | null> {
-  console.log("Buscando precio para producto:", productId);
-  
   try {
-    const q = query(pricesCollection, where("productId", "==", productId));
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(
+      query(pricesCollection, where("productId", "==", productId))
+    );
     
-    if (!querySnapshot.empty) {
-      const data = querySnapshot.docs[0].data() as Omit<CardmarketPrice, 'id'>;
-      console.log(`Precio encontrado para ${productId}:`, data);
-      
-      return {
-        id: querySnapshot.docs[0].id,
-        ...data
-      };
+    if (querySnapshot.empty) {
+      return null;
     }
     
-    console.log(`No se encontró precio para ${productId}`);
-    return null;
+    const data = querySnapshot.docs[0].data() as Omit<CardmarketPrice, 'id'>;
+    return {
+      ...data,
+      id: querySnapshot.docs[0].id,
+      updatedAt: data.updatedAt ? data.updatedAt : null
+    } as CardmarketPrice;
   } catch (error) {
     console.error("Error al obtener precio de Cardmarket:", error);
     return null;
@@ -162,49 +156,36 @@ export async function getCardmarketPriceForProduct(productId: string): Promise<C
 
 /**
  * Elimina un precio de Cardmarket de la base de datos
- * @param productId ID del producto cuyo precio se eliminará
- * @returns true si se eliminó correctamente, false en caso contrario
  */
 export async function deleteCardmarketPrice(productId: string): Promise<boolean> {
-  console.log(`🗑️ Eliminando precio existente para producto ${productId}...`);
-  
-  if (!productId) {
-    console.warn("⚠️ ID de producto no válido");
-    return false;
-  }
-  
   try {
-    // Buscar si existe un registro para este producto
-    console.log(`🔍 Buscando precios existentes para producto ${productId}...`);
-    const q = query(pricesCollection, where("productId", "==", productId));
-    const querySnapshot = await getDocs(q);
+    // Buscar el documento por productId
+    const querySnapshot = await getDocs(
+      query(pricesCollection, where("productId", "==", productId))
+    );
     
-    if (!querySnapshot.empty) {
-      // Procesar todos los registros encontrados (debería ser solo uno, pero por si acaso)
-      let deletedCount = 0;
-      
-      for (const document of querySnapshot.docs) {
-        // Eliminar el registro
-        const docId = document.id;
-        const priceRef = doc(db, "cardmarketPrices", docId);
-        
-        console.log(`🗑️ Eliminando documento de precio ${docId} para producto ${productId}`);
-        await deleteDoc(priceRef);
-        deletedCount++;
-      }
-      
-      console.log(`✅ Eliminados ${deletedCount} precios para producto ${productId}`);
-      return true;
+    if (querySnapshot.empty) {
+      console.log(`No se encontró precio para producto ${productId}`);
+      return true; // No hay nada que eliminar
     }
     
-    console.log(`ℹ️ No se encontraron precios para producto ${productId}`);
-    return false;
+    // Eliminar todos los documentos encontrados (debería ser solo uno)
+    for (const docSnapshot of querySnapshot.docs) {
+      const docId = docSnapshot.id;
+      await deleteDoc(doc(db, "cardmarketPrices", docId));
+      console.log(`Precio eliminado para producto ${productId}`);
+    }
+    
+    return true;
   } catch (error) {
-    console.error(`💔 Error al eliminar precio para producto ${productId}: ${error}`);
+    console.error(`Error al eliminar precio para producto ${productId}: ${error}`);
     return false;
   }
 }
 
+/**
+ * Actualiza el precio de un producto desde Cardmarket
+ */
 export async function updateCardmarketPriceForProduct(
   productId: string, 
   productName: string,
@@ -232,7 +213,7 @@ export async function updateCardmarketPriceForProduct(
       await deleteCardmarketPrice(productId);
     }
 
-    // SCRAPING DIRECTO - Obtener el precio actualizado directamente de Cardmarket
+    // Obtener el precio actualizado
     console.log(`🔍 Obteniendo precio actualizado para ${productName} desde ${cardmarketUrl}`);
     const cardmarketData = await fetchCardmarketPrice(cardmarketUrl);
 

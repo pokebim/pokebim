@@ -7,8 +7,8 @@ import { NextRequest, NextResponse } from 'next/server';
 const SAFE_TIMEOUT = 8000; // 8 segundos (menos del límite de Vercel)
 
 /**
- * API optimizada para uso mínimo de memoria que utiliza Puppeteer 
- * para obtener precios de Cardmarket
+ * API optimizada para uso mínimo de memoria que utiliza fetch simple
+ * en lugar de Puppeteer completo para obtener precios de Cardmarket
  * 
  * Optimizado para el plan Hobby de Vercel (1024MB de memoria)
  * 
@@ -27,174 +27,162 @@ export async function GET(request: NextRequest) {
     );
   }
   
-  console.log(`Puppeteer: Procesando URL: ${cardmarketUrl}`);
-  
-  let browser;
+  console.log(`API: Procesando URL: ${cardmarketUrl}`);
   
   try {
-    // Importar las dependencias dinámicamente para evitar problemas en build time
-    const puppeteer = (await import('puppeteer-core')).default;
-    const chromium = (await import('@sparticuz/chromium')).default;
+    // Enfoque más ligero - Usar fetch directo para obtener el HTML
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), SAFE_TIMEOUT);
     
-    // Configurar Puppeteer para entorno serverless con memoria limitada
-    browser = await puppeteer.launch({
-      args: [
-        ...chromium.args, 
-        '--hide-scrollbars', 
-        '--disable-web-security',
-        '--disable-gpu',
-        '--disable-dev-shm-usage',
-        '--disable-setuid-sandbox',
-        '--no-first-run',
-        '--no-sandbox',
-        '--no-zygote',
-        '--single-process', // <- Esta opción reduce drásticamente el uso de memoria
-        '--disable-extensions'
-      ],
-      defaultViewport: {
-        width: 800,
-        height: 600,
-        deviceScaleFactor: 1,
-        isMobile: false,
-        hasTouch: false,
-        isLandscape: true
-      },
-      executablePath: await chromium.executablePath(),
-      headless: true,
-      ignoreHTTPSErrors: true,
-    });
-    
-    const page = await browser.newPage();
-    
-    // Configuración agresiva para reducir memoria
-    await page.setCacheEnabled(false);
-    
-    // Configurar navegador para parecer más humano
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
-    
-    // Configurar timeout para evitar bloqueos en Vercel
-    await page.setDefaultNavigationTimeout(SAFE_TIMEOUT);
-    
-    // Intercepción agresiva de solicitudes para minimizar uso de memoria
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
-      const resourceType = req.resourceType();
-      // Bloquear recursos innecesarios para agilizar la carga y reducir memoria
-      if (['image', 'stylesheet', 'font', 'media', 'script', 'xhr', 'fetch', 'websocket', 'other'].includes(resourceType)) {
-        if (resourceType === 'script' && Math.random() < 0.8) {
-          // Permitir algunos scripts (20%) para que la página funcione
-          req.continue();
-        } else if (resourceType === 'xhr' && Math.random() < 0.5) {
-          // Permitir algunos XHR (50%) para que la página funcione
-          req.continue();
-        } else {
-          req.abort();
-        }
-      } else {
-        req.continue();
-      }
-    });
-    
-    // Navegar a la URL de Cardmarket
-    console.log(`Puppeteer: Navegando a: ${cardmarketUrl}`);
-    await page.goto(cardmarketUrl, { 
-      waitUntil: 'domcontentloaded', // Menos exigente que 'networkidle2'
-      timeout: SAFE_TIMEOUT 
-    });
-    
-    // Esperar solo lo mínimo necesario
-    await page.waitForTimeout(800);
-    
-    // Simplificar la extracción - Usar una sola estrategia para reducir carga
-    const prices = await page.evaluate(() => {
-      // Buscar elementos con precios en la página
-      const elements = document.querySelectorAll('.col-price, .price-container, .color-primary');
-      const prices = [];
+    try {
+      console.log(`API: Realizando fetch a ${cardmarketUrl}`);
       
-      elements.forEach(el => {
-        const text = el.textContent || '';
-        if (text.includes('€')) {
-          // Extraer solo números y coma decimal
-          const matches = text.match(/(\d+,\d+)/g);
-          if (matches && matches.length) {
-            for (const match of matches) {
-              // Convertir al formato decimal con punto
-              const price = parseFloat(match.replace(',', '.'));
-              if (price > 0) {
-                prices.push(price);
-              }
-            }
-          }
+      // Usando un enfoque más ligero con fetch en lugar de Puppeteer
+      const response = await fetch(cardmarketUrl, {
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml',
+          'Accept-Language': 'es-ES,es;q=0.9,en;q=0.8',
+          'Cache-Control': 'no-cache'
         }
       });
       
-      return prices;
-    });
-    
-    // Cerrar el navegador lo antes posible para liberar memoria
-    await browser.close();
-    browser = null;
-    
-    if (!prices.length) {
-      console.log('Puppeteer: No se encontraron precios en la página');
-      return NextResponse.json(
-        { success: false, error: 'No se encontraron precios en la página' },
-        { status: 404 }
-      );
-    }
-    
-    // Ordenar precios y obtener el más bajo
-    prices.sort((a, b) => a - b);
-    const lowestPrice = prices[0];
-    
-    console.log(`Puppeteer: Precio más bajo encontrado: ${lowestPrice}€`);
-    
-    // Devolver respuesta con cache para reducir carga en Vercel
-    return new NextResponse(
-      JSON.stringify({
-        success: true,
-        price: lowestPrice,
-        url: cardmarketUrl,
-        timestamp: new Date().toISOString()
-      }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 's-maxage=3600, stale-while-revalidate=1800'
+      // Limpiar el timeout
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`Error HTTP: ${response.status} ${response.statusText}`);
+      }
+      
+      const html = await response.text();
+      console.log(`API: HTML obtenido, longitud: ${html.length} caracteres`);
+      
+      if (html.length < 1000) {
+        console.log(`API: HTML demasiado corto, posible bloqueo. Contenido: ${html.substring(0, 200)}...`);
+        throw new Error('Respuesta HTML incompleta o bloqueo por parte de CardMarket');
+      }
+      
+      // Extraer precios usando expresiones regulares (más eficiente que HTML parsing)
+      const prices = extractPricesWithRegex(html);
+      
+      if (!prices || prices.length === 0) {
+        console.log(`API: No se encontraron precios en el HTML`);
+        
+        // Intentar con un método alternativo
+        const altPrices = extractPricesAlternative(html);
+        
+        if (!altPrices || altPrices.length === 0) {
+          throw new Error('No se encontraron precios en la página');
         }
+        
+        prices.push(...altPrices);
       }
-    );
-  } catch (error) {
-    console.error('Error en Puppeteer:', error);
-    
-    // Cerrar el navegador si sigue abierto
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (e) {
-        console.error('Error al cerrar el navegador:', e);
-      }
+      
+      // Ordenar precios y obtener el más bajo
+      prices.sort((a, b) => a - b);
+      const lowestPrice = prices[0];
+      
+      console.log(`API: Precio más bajo encontrado: ${lowestPrice}€`);
+      
+      // Devolver respuesta con cache para reducir carga en Vercel
+      return new NextResponse(
+        JSON.stringify({
+          success: true,
+          price: lowestPrice,
+          url: cardmarketUrl,
+          timestamp: new Date().toISOString()
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 's-maxage=3600, stale-while-revalidate=1800'
+          }
+        }
+      );
+    } finally {
+      clearTimeout(timeoutId);
     }
+  } catch (error) {
+    console.error('Error en API:', error);
     
     // Mensajes específicos según el tipo de error
-    let errorMessage = 'Error al obtener datos con Puppeteer';
+    let errorMessage = error instanceof Error ? error.message : String(error);
     let statusCode = 500;
     
-    if (error instanceof Error) {
-      errorMessage = error.message;
-      
-      // Errores específicos de timeout
-      if (errorMessage.includes('Navigation timeout')) {
-        errorMessage = 'Timeout: La página tardó demasiado en cargar';
-      } else if (errorMessage.includes('out of memory')) {
-        errorMessage = 'Error: Se superó el límite de memoria de Vercel';
-      }
-    }
+    // Log detallado para diagnóstico
+    console.error(`API ERROR DETALLADO: ${JSON.stringify({
+      message: errorMessage,
+      url: cardmarketUrl,
+      timestamp: new Date().toISOString()
+    })}`);
     
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { 
+        success: false, 
+        error: errorMessage,
+        timestamp: new Date().toISOString()
+      },
       { status: statusCode }
     );
   }
+}
+
+/**
+ * Extrae precios usando expresiones regulares
+ * Más eficiente para entornos serverless que parser HTML
+ */
+function extractPricesWithRegex(html: string): number[] {
+  const prices: number[] = [];
+  
+  // Patrones para encontrar precios en el HTML
+  const patterns = [
+    // Patrón para precios con formato X,XX €
+    /(\d+,\d+)\s*€/g,
+    // Patrón para precios en elementos price-container
+    /price-container[^>]*>([^<]*\d+,\d+[^<]*)</g,
+    // Patrón para precios en elementos color-primary
+    /color-primary[^>]*>([^<]*\d+,\d+[^<]*)</g
+  ];
+  
+  for (const pattern of patterns) {
+    const matches = Array.from(html.matchAll(pattern));
+    for (const match of matches) {
+      let priceText = match[1] || match[0];
+      
+      // Extraer solo números y comas del texto
+      const priceMatches = priceText.match(/(\d+,\d+)/);
+      if (priceMatches && priceMatches[1]) {
+        const price = parseFloat(priceMatches[1].replace(',', '.'));
+        if (!isNaN(price) && price > 0) {
+          prices.push(price);
+        }
+      }
+    }
+  }
+  
+  return prices;
+}
+
+/**
+ * Método alternativo de extracción de precios con patrones más generales
+ */
+function extractPricesAlternative(html: string): number[] {
+  // Buscar cualquier número con formato decimal en el HTML cerca de símbolo €
+  const prices: number[] = [];
+  const regex = /(\d+[.,]\d+)/g;
+  const matches = html.match(regex);
+  
+  if (matches) {
+    for (const match of matches) {
+      // Validar que es un número y convertir a formato con punto decimal
+      const price = parseFloat(match.replace(',', '.'));
+      if (!isNaN(price) && price > 0 && price < 1000) { // Filtrar precios no realistas
+        prices.push(price);
+      }
+    }
+  }
+  
+  return prices;
 } 
