@@ -1,23 +1,18 @@
 import puppeteer from 'puppeteer-core';
-import chrome from '@sparticuz/chromium';
+import chromium from '@sparticuz/chromium';
 
 let browser: any = null;
 
 async function getBrowser() {
   if (!browser) {
+    // Desactivar WebGL ya que no lo necesitamos para scraping
+    chromium.setGraphicsMode = false;
+
     browser = await puppeteer.launch({
-      args: [
-        ...chrome.args,
-        '--hide-scrollbars',
-        '--disable-web-security',
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--single-process'
-      ],
-      defaultViewport: chrome.defaultViewport,
-      executablePath: await chrome.executablePath(),
-      headless: true,
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
       ignoreHTTPSErrors: true
     });
   }

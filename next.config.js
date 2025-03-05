@@ -49,13 +49,9 @@ const nextConfig = {
   experimental: {
     serverActions: true,
     serverComponentsExternalPackages: [
-      'puppeteer',
-      '@grpc/grpc-js',
-      '@grpc/proto-loader',
-      'long',
-      'yargs'
-    ],
-    esmExternals: 'loose'
+      '@sparticuz/chromium',
+      'puppeteer-core'
+    ]
   },
   
   // Configuración de output
@@ -69,8 +65,6 @@ const nextConfig = {
         net: false,
         tls: false,
         child_process: false,
-        async_hooks: false,
-        'yargs/build/lib/utils/maybe-async-result': false
       };
     }
 
