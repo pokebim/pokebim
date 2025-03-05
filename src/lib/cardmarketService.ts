@@ -17,6 +17,7 @@ import { db } from "./firebase";
 import { updateProduct } from "./productService";
 import axios from 'axios';
 import { logToConsole } from './serverLogging';
+import { PrismaClient } from '@prisma/client';
 
 // Referencia a la colección de precios de Cardmarket
 const pricesCollection = collection(db, "cardmarketPrices");
@@ -31,116 +32,117 @@ export interface CardmarketPrice {
   updatedAt: any;
 }
 
+// Inicializa el cliente Prisma fuera de la función
+const prisma = new PrismaClient();
+
+interface CardmarketPriceResult {
+  success: boolean;
+  price?: number;
+  currency?: string;
+  method?: string;
+  error?: string;
+}
+
 /**
  * Valida si la URL de CardMarket proporcionada es válida
  */
 function isValidCardmarketUrl(url: string): boolean {
-  // Verificar que la URL es de cardmarket.com y tiene un formato válido
-  return url.includes('cardmarket.com') && url.match(/^https?:\/\/[^\s]+\.[^\s]+$/i) !== null;
+  return url?.includes('cardmarket.com');
 }
 
 /**
  * Obtiene el precio de un producto de CardMarket a través de la API de Puppeteer
  */
-export async function fetchCardmarketPrice(url: string) {
-  logToConsole("CardmarketService", `Iniciando obtención de precio para URL: ${url}`);
-  
-  // Validar URL
-  if (!isValidCardmarketUrl(url)) {
-    const errorMsg = `URL inválida: ${url}`;
-    logToConsole("CardmarketService", `Error: ${errorMsg}`);
-    return { success: false, error: errorMsg };
-  }
-  
-  // Configurar para reintentos en caso de error
-  const maxRetries = 3;
-  let currentRetry = 0;
-  let lastError = null;
-  
-  // Exponential backoff para reintentos
-  const getBackoffTime = (retry: number) => Math.min(Math.pow(2, retry) * 1000, 10000);
-  
-  while (currentRetry <= maxRetries) {
-    try {
-      // Si es un reintento, esperar antes de volver a intentar
-      if (currentRetry > 0) {
-        const backoffTime = getBackoffTime(currentRetry);
-        logToConsole("CardmarketService", `Reintento ${currentRetry}/${maxRetries} después de ${backoffTime}ms`);
-        await new Promise(resolve => setTimeout(resolve, backoffTime));
-      }
+export async function fetchCardmarketPrice(url: string): Promise<CardmarketPriceResult> {
+  try {
+    if (!isValidCardmarketUrl(url)) {
+      return { 
+        success: false, 
+        error: 'La URL proporcionada no es de CardMarket' 
+      };
+    }
+
+    console.log(`Obteniendo precio para: ${url}`);
+    
+    // Llamar a nuestro endpoint de puppeteer
+    const puppeteerPath = `/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}`;
+    
+    // Construir URL absoluta (funciona tanto en desarrollo como en producción)
+    let baseUrl = '';
+    
+    // En servidor
+    if (typeof window === 'undefined') {
+      baseUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}` 
+        : 'http://localhost:3000';
+    } 
+    // En cliente
+    else {
+      baseUrl = window.location.origin;
+    }
+    
+    const puppeteerUrl = `${baseUrl}${puppeteerPath}`;
+    console.log(`Llamando a: ${puppeteerUrl}`);
+    
+    // Usamos fetch con URL absoluta
+    const response = await fetch(puppeteerUrl);
+    
+    // Verificar la respuesta del API
+    if (response.ok) {
+      const data = await response.json();
       
-      // URL del endpoint con la URL del producto y número de reintento
-      const apiUrl = `/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}&retry=${currentRetry}`;
-      logToConsole("CardmarketService", `Llamando a: ${apiUrl}`);
-      
-      // Realizar solicitud
-      const response = await axios.get(apiUrl, {
-        timeout: 30000, // 30 segundos de timeout
-        headers: {
-          'Cache-Control': 'no-cache',
-          'User-Agent': 'Pokebim-Price-Agent'
-        }
-      });
-      
-      // Verificar respuesta
-      if (response.data && response.data.success === true && response.data.price) {
-        const price = response.data.price;
-        logToConsole("CardmarketService", `Precio obtenido exitosamente: ${price}€`);
-        return {
-          success: true,
-          price,
-          currency: response.data.currency || '€',
-          method: response.data.method || 'puppeteer'
-        };
-      } else {
-        // Respuesta sin precio válido
-        const errorMsg = response.data?.error || 'No se pudo extraer el precio (respuesta sin precio)';
-        logToConsole("CardmarketService", `Error en respuesta: ${errorMsg}`);
-        lastError = errorMsg;
+      if (data && data.success) {
+        // Extraer el precio más bajo
+        let lowestPrice = null;
         
-        if (response.status === 503 || response.status === 429) {
-          // Si el error es por límite de tasa o servicio no disponible, reintentar
-          currentRetry++;
-          continue;
+        if (data.data) {
+          // Primero intentamos usar priceFrom si está disponible
+          if (data.data.priceFrom && data.data.priceFrom > 0) {
+            lowestPrice = data.data.priceFrom;
+          } 
+          // Si no hay priceFrom, buscamos el precio más bajo en el array de precios
+          else if (data.data.prices && data.data.prices.length > 0) {
+            // Los precios ya vienen ordenados de menor a mayor
+            lowestPrice = data.data.prices[0].price;
+          }
+        }
+        
+        if (lowestPrice && lowestPrice > 0) {
+          console.log(`Precio obtenido correctamente: ${lowestPrice}€`);
+          return {
+            success: true,
+            price: lowestPrice,
+            currency: '€',
+            method: 'puppeteer'
+          };
         } else {
-          return { 
-            success: false, 
-            error: errorMsg,
-            response: {
-              status: response.status,
-              data: response.data
-            }
+          console.error('No se encontró un precio válido en los datos');
+          return {
+            success: false,
+            error: 'No se encontró un precio válido en los datos'
           };
         }
-      }
-    } catch (error: any) {
-      // Capturar cualquier error durante la solicitud
-      const errorMsg = error.response?.data?.error || error.message || 'Error desconocido';
-      const statusCode = error.response?.status || 0;
-      
-      logToConsole("CardmarketService", `Error (${statusCode}): ${errorMsg}`);
-      lastError = errorMsg;
-      
-      // Para errores 429 (rate limit) y 503 (servicio no disponible), reintentar
-      if (statusCode === 429 || statusCode === 503) {
-        currentRetry++;
-        continue;
       } else {
-        return { 
-          success: false, 
-          error: errorMsg,
-          response: error.response ? {
-            status: error.response.status,
-            data: error.response.data
-          } : null
+        console.error('Error en la respuesta del API:', data.error);
+        return {
+          success: false,
+          error: data.error || 'Error en la respuesta del API'
         };
       }
+    } else {
+      console.error('Error en la respuesta del API:', response.statusText);
+      return {
+        success: false,
+        error: response.statusText || 'Error en la respuesta del API'
+      };
     }
+  } catch (error) {
+    console.error('Error al obtener precio:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    };
   }
-  
-  // Si llegamos aquí, se agotaron los reintentos sin éxito
-  logToConsole("CardmarketService", `Se agotaron ${maxRetries} reintentos sin éxito. Último error: ${lastError}`);
-  return { success: false, error: `Agotados reintentos (${maxRetries}). Último error: ${lastError}` };
 }
 
 /**
