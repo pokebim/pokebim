@@ -62,43 +62,89 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
 
   console.log(`🔍 Obteniendo precio para URL: ${url}`);
   
-  try {
-    // Usar la API optimizada 
-    const response = await fetch(`/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}`, {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+  // Implementar reintentos (máximo 3 intentos)
+  const MAX_RETRIES = 2;
+  let retryCount = 0;
+  let lastError = null;
+  
+  while (retryCount <= MAX_RETRIES) {
+    try {
+      if (retryCount > 0) {
+        console.log(`🔄 Reintento ${retryCount}/${MAX_RETRIES} para obtener precio...`);
+        // Esperar entre reintentos (1s, 2s)
+        await new Promise(resolve => setTimeout(resolve, retryCount * 1000));
       }
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`Error en API: ${response.status}${errorData.error ? ` - ${errorData.error}` : ''}`);
+      
+      // Usar la API optimizada
+      const response = await fetch(`/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}&retry=${retryCount}`, {
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = `Error en API: ${response.status}${errorData.error ? ` - ${errorData.error}` : ''}`;
+        console.error(`❌ ${errorMsg}`);
+        
+        // Si es un error 429 (demasiadas solicitudes) o 403 (prohibido), podemos reintentar
+        if ((response.status === 429 || response.status === 403) && retryCount < MAX_RETRIES) {
+          lastError = new Error(errorMsg);
+          retryCount++;
+          continue;
+        }
+        
+        throw new Error(errorMsg);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success || !data.price || data.price <= 0) {
+        throw new Error(data.error || 'No se obtuvo un precio válido');
+      }
+      
+      console.log(`✅ Precio obtenido correctamente: ${data.price}€`);
+      return {
+        success: true,
+        price: data.price
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`❌ Error obteniendo precio: ${errorMessage}`);
+      
+      // Guardar el error para reportarlo si agotamos los reintentos
+      lastError = error;
+      
+      // Si incluye ciertos mensajes específicos, no reintentar
+      const noRetryMessages = [
+        'URL no válida', 
+        'No se encontraron precios',
+        'HTML incompleta'
+      ];
+      
+      const shouldRetry = !noRetryMessages.some(msg => errorMessage.includes(msg));
+      
+      if (shouldRetry && retryCount < MAX_RETRIES) {
+        retryCount++;
+        continue;
+      }
+      
+      // Si fallan todos los reintentos o no debemos reintentar, devolver el error
+      return {
+        success: false,
+        price: 0,
+        error: errorMessage
+      };
     }
-    
-    const data = await response.json();
-    
-    if (!data.success || !data.price || data.price <= 0) {
-      throw new Error(data.error || 'No se obtuvo un precio válido');
-    }
-    
-    console.log(`✅ Precio obtenido correctamente: ${data.price}€`);
-    return {
-      success: true,
-      price: data.price
-    };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`❌ Error obteniendo precio: ${errorMessage}`);
-    
-    // Si falla, devolver un mensaje de error pero NO un precio fallback
-    // para que el usuario sepa que necesita actualizar manualmente
-    return {
-      success: false,
-      price: 0,
-      error: errorMessage
-    };
   }
+  
+  // Este punto solo se alcanza si se agotaron los reintentos
+  return {
+    success: false,
+    price: 0,
+    error: lastError instanceof Error ? lastError.message : 'Error desconocido después de varios intentos'
+  };
 }
 
 /**

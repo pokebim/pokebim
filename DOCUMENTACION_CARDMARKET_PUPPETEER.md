@@ -16,27 +16,32 @@ Inicialmente implementamos Puppeteer como solución, pero encontramos que:
 2. Vercel Hobby limita las funciones serverless a 1024MB de memoria
 3. Incluso con optimizaciones extremas, Puppeteer daba errores 500 por límites de memoria
 
-## Nueva solución: Fetch con regexp
+## Nueva solución: Fetch avanzado con proxies y reintentos
 
-Hemos reemplazado Puppeteer por un enfoque más ligero:
+Hemos reemplazado Puppeteer por un enfoque más sofisticado pero ligero:
 
-1. **Fetch directo**: Utilizamos la API fetch estándar para obtener el HTML de CardMarket
-2. **Extracción con RegExp**: Usamos expresiones regulares para extraer los precios del HTML
-3. **Manejo de errores mejorado**: Detección y gestión más robusta de fallos
+1. **Fetch con headers optimizados**: Utilizamos headers que simulan un navegador real
+2. **Rotación de User-Agents**: Variamos los User-Agents para evitar detección
+3. **Sistema de proxies**: Si el fetch directo falla, intentamos a través de servicios proxy
+4. **Reintentos automáticos**: Implementamos reintentos con esperas incrementales
+5. **Extracción con RegExp mejorada**: Usamos múltiples patrones para capturar precios
 
 ### Ventajas de este enfoque
 
 1. **Mucho más ligero**: Funciona dentro del límite de 1024MB de Vercel Hobby
 2. **Más rápido**: La respuesta es casi inmediata en comparación con Puppeteer
-3. **Menos propenso a errores**: Menos componentes que pueden fallar
+3. **Mayor tasa de éxito**: Los múltiples métodos de acceso aumentan las probabilidades
+4. **Menor tasa de bloqueo**: La rotación de User-Agents y proxies evita restricciones
 
 ## Cómo funciona
 
 1. El cliente solicita un precio a través de la función `fetchCardmarketPrice` en `cardmarketService.ts`
-2. Esta función realiza una solicitud al endpoint `/api/cardmarket-puppeteer` (mantuvimos el nombre)
-3. El endpoint hace un fetch directo a CardMarket y utiliza RegExp para extraer los precios
-4. Se selecciona el precio más bajo y se devuelve al cliente
-5. El resultado se almacena en la base de datos para futuras referencias
+2. Esta función implementa un sistema de reintentos (hasta 3 intentos)
+3. Cada intento llama al endpoint `/api/cardmarket-puppeteer`
+4. El endpoint intenta primero un fetch directo con headers optimizados
+5. Si falla, intenta mediante un servicio proxy aleatorio
+6. Se extraen los precios usando expresiones regulares mejoradas
+7. El precio más bajo se devuelve al cliente y se almacena en la base de datos
 
 ## Configuración y uso
 
@@ -52,7 +57,7 @@ Se han eliminado las siguientes dependencias que ya no son necesarias:
 Se ha modificado:
 - `vercel.json`: Configurado con 1024MB de memoria (límite del plan Hobby)
 - `next.config.js`: Eliminadas referencias a Puppeteer y configuraciones especiales
-- `route.ts`: Reemplazado Puppeteer por fetch + RegExp
+- `route.ts`: Reemplazado Puppeteer por fetch + sistema de proxies
 
 ### Uso en código (sin cambios)
 
@@ -71,27 +76,49 @@ if (result.success) {
 }
 ```
 
+## Servicios de proxy utilizados
+
+Para evitar bloqueos por IP, el sistema utiliza los siguientes servicios de proxy de forma rotativa:
+- corsproxy.io
+- allorigins.win
+- codetabs.com
+- cors-anywhere.herokuapp.com
+
+Estos servicios actúan como intermediarios, haciendo que la solicitud parezca provenir de sus servidores en lugar de Vercel.
+
+## Sistema de reintentos
+
+El cardmarketService.ts implementa un sistema de reintentos inteligentes:
+
+1. Se intentan hasta 3 solicitudes en total
+2. Entre cada intento se añade un retraso incremental (1s, 2s)
+3. Ciertos errores no provocan reintentos (URLs inválidas, errores de formato)
+4. Los errores 403 y 429 (rate limiting) sí provocan reintentos
+
 ## Limitaciones y consideraciones
 
 1. **Robustez reducida**: Al no usar un navegador real, es más susceptible a cambios en la estructura de la página
 2. **Posibles falsos positivos**: Las expresiones regulares podrían extraer números que no son precios
 3. **Detección de bot**: CardMarket podría bloquear peticiones que no provengan de un navegador real
+4. **Disponibilidad de proxies**: Los servicios proxy gratuitos podrían tener limitaciones o dejar de funcionar
 
 ## Mantenimiento
 
 Si el scraping deja de funcionar en el futuro:
 
-1. Revisa los patrones RegExp en `cardmarket-puppeteer/route.ts` (podrían necesitar ajustes si CardMarket cambia)
-2. Prueba con diferentes configuraciones de User-Agent
-3. Considera implementar un sistema de proxy rotativo si CardMarket bloquea las peticiones
+1. Revisa los patrones RegExp en `cardmarket-puppeteer/route.ts`
+2. Verifica que los servicios proxy utilizados siguen operativos y actualízalos si es necesario
+3. Considera añadir más User-Agents o patrones de extracción
+4. Ajusta el número de reintentos o la lógica de espera si es necesario
 
 ## Alternativas si este enfoque falla
 
 Si este enfoque más ligero falla en el futuro, estas son las opciones:
 
 1. **Plan Pro de Vercel**: Actualizar a un plan Pro permitiría usar la solución completa con Puppeteer
-2. **Servicio externo**: Utilizar servicios como ScrapingBee, BrightData o similares
+2. **Servicio externo de scraping**: Utilizar servicios como ScrapingBee, BrightData o similarees
 3. **Auto-hosting**: Implementar un servicio separado especializado en scraping (en Railway, Render, etc.)
+4. **API oficial**: Considerar si CardMarket ofrece alguna API oficial pagada
 
 ---
 
