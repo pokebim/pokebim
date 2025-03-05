@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const TIMEOUT = 20000;
 
 // URL del paquete de Chromium en GitHub
-const CHROMIUM_URL = "https://github.com/Sparticuz/chromium/releases/download/v116.0.0/chromium-v116.0.0-pack.tar";
+const CHROMIUM_URL = "https://github.com/Sparticuz/chromium/releases/download/v119.0.0/chromium-v119.0.0-pack.tar";
 
 // Lista de User-Agents para simular diferentes navegadores
 const USER_AGENTS = [
@@ -20,17 +20,41 @@ function getRandomUserAgent(): string {
   return USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 }
 
-// Función para obtener el navegador
-async function getBrowser() {
+export async function GET(request: NextRequest) {
+  let browser = null;
+  const startTime = Date.now();
+  
   try {
-    // Importaciones dinámicas para evitar carga en tiempo de construcción
-    const chromium = (await import('@sparticuz/chromium-min')).default;
-    const puppeteer = (await import('puppeteer-core')).default;
-
-    console.log('API: Inicializando navegador con chromium-min...');
+    // Obtener parámetros de la URL
+    const { searchParams } = new URL(request.url);
+    const url = searchParams.get('url');
+    const retryParam = searchParams.get('retry');
+    const retry = retryParam ? parseInt(retryParam) : 0;
     
-    return puppeteer.launch({
-      args: [
+    // Validación de URL
+    if (!url) {
+      return NextResponse.json({ error: 'URL no proporcionada', success: false }, { status: 400 });
+    }
+    
+    if (!url.includes('cardmarket.com')) {
+      return NextResponse.json({ error: 'URL inválida. Debe ser de cardmarket.com', success: false }, { status: 400 });
+    }
+    
+    console.log(`API: Solicitud recibida para URL: ${url}, intento: ${retry}`);
+    
+    // En lugar de usar importaciones dinámicas, las hacemos explícitas con require
+    // Esto puede evitar problemas con yargs y otras dependencias
+    try {
+      console.log('API: Cargando dependencias...');
+      
+      // Importar chromium-min y puppeteer-core de forma explícita
+      const chromium = require('@sparticuz/chromium-min');
+      const puppeteer = require('puppeteer-core');
+      
+      console.log('API: Dependencias cargadas correctamente');
+      console.log('API: Lanzando navegador...');
+      
+      const browserArgs = [
         ...chromium.args,
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -42,59 +66,29 @@ async function getBrowser() {
         '--disable-gpu',
         '--hide-scrollbars',
         '--disable-web-security'
-      ],
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(CHROMIUM_URL),
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true,
-    });
-  } catch (error) {
-    console.error('Error al obtener el navegador:', error);
-    throw error;
-  }
-}
-
-export async function GET(request: NextRequest) {
-  let browser = null;
-  
-  try {
-    // Obtener parámetros de la URL
-    const { searchParams } = new URL(request.url);
-    const url = searchParams.get('url');
-    const retryParam = searchParams.get('retry');
-    const retry = retryParam ? parseInt(retryParam) : 0;
-    
-    // Validación de URL
-    if (!url) {
-      return NextResponse.json(
-        { error: 'Falta el parámetro url', success: false },
-        { status: 400 }
-      );
-    }
-    
-    if (!url.includes('cardmarket.com')) {
-      return NextResponse.json(
-        { error: 'URL inválida. Debe ser de cardmarket.com', success: false },
-        { status: 400 }
-      );
-    }
-    
-    console.log(`API: Solicitud recibida para URL: ${url}, intento: ${retry}`);
-    
-    try {
-      // Obtener el navegador
-      browser = await getBrowser();
+      ];
+      
+      const executablePath = await chromium.executablePath(CHROMIUM_URL);
+      console.log(`API: Ruta ejecutable: ${executablePath}`);
+      
+      // Lanzar navegador
+      browser = await puppeteer.launch({
+        args: browserArgs,
+        defaultViewport: chromium.defaultViewport,
+        executablePath,
+        headless: true,
+        ignoreHTTPSErrors: true,
+      });
+      
+      console.log('API: Navegador lanzado correctamente');
       
       // Crear una nueva página
       const page = await browser.newPage();
+      const userAgent = getRandomUserAgent();
+      await page.setUserAgent(userAgent);
+      console.log(`API: User-Agent configurado: ${userAgent.substring(0, 20)}...`);
       
-      // Configurar un User-Agent aleatorio para evitar detección
-      await page.setUserAgent(getRandomUserAgent());
-      
-      // Establecer timeout
-      await page.setDefaultNavigationTimeout(TIMEOUT);
-      
-      // Configurar interceptor para bloquear recursos no necesarios (mejora rendimiento)
+      // Bloquear recursos para mejorar rendimiento
       await page.setRequestInterception(true);
       page.on('request', (req) => {
         const resourceType = req.resourceType();
@@ -114,34 +108,30 @@ export async function GET(request: NextRequest) {
       });
       
       console.log(`API: Navegando a ${url}...`);
-      
-      // Navegar a la URL
-      await page.goto(url, {
+      const response = await page.goto(url, {
         waitUntil: 'domcontentloaded',
         timeout: TIMEOUT
       });
       
+      if (!response) {
+        throw new Error('No se recibió respuesta de la página');
+      }
+      
+      console.log(`API: Página cargada (status: ${response.status()})`);
+      
       // Esperar a que el contenido relevante se cargue
-      await page.waitForSelector('.color-primary', { timeout: TIMEOUT }).catch(() => {
-        console.log('API: No se encontró el selector .color-primary, continuando...');
-      });
+      await page.waitForSelector('.color-primary', { timeout: TIMEOUT })
+        .catch(() => console.log('API: No se encontró el selector .color-primary, continuando...'));
       
-      // Obtener HTML para debugging
-      const pageContent = await page.content();
-      console.log(`API: Contenido HTML obtenido (tamaño: ${pageContent.length} bytes)`);
+      console.log('API: Extrayendo precio mediante DOM...');
       
-      // Extraer el precio usando evaluación del DOM
-      console.log('API: Extrayendo precio...');
-      
-      // Intentar extraer con diferentes estrategias:
+      // Método 1: Extraer precios mediante evaluación del DOM
       let price = await page.evaluate(() => {
-        // Buscar cualquier elemento con la clase color-primary y extraer su texto
         const priceElements = document.querySelectorAll('.color-primary');
-        const prices: number[] = [];
+        const prices = [];
         
         priceElements.forEach(el => {
           const text = el.textContent?.trim() || '';
-          // Extraer el número del precio (ej. "69,90 €" -> 69.90)
           const match = text.match(/(\d+)[,\.](\d+)/);
           if (match) {
             const price = parseFloat(`${match[1]}.${match[2]}`);
@@ -160,73 +150,64 @@ export async function GET(request: NextRequest) {
             }
           }
           
-          // Ordenar precios y devolver el más bajo (que sea razonable, > 5€)
+          // Ordenar precios y devolver el más bajo que sea razonable (> 5€)
           return prices.filter(p => p > 5).sort((a, b) => a - b)[0] || 0;
         }
         
         return 0;
       });
       
-      // Si no se encontró precio con el primer método, intentar con regex
+      // Método 2: Si falla el método 1, usar expresiones regulares
       if (!price || price === 0) {
-        console.log('API: No se encontró precio con evaluación del DOM, intentando con regex...');
-        const html = await page.content();
-        price = extractPricesWithRegex(html);
+        console.log('API: DOM no encontró precios, intentando con regex...');
+        const content = await page.content();
+        price = extractPricesWithRegex(content, url);
+      }
+      
+      if (!price || price === 0) {
+        throw new Error('No se pudo extraer ningún precio de la página');
       }
       
       console.log(`API: Precio extraído: ${price}€`);
+      console.log(`API: Tiempo total: ${Date.now() - startTime}ms`);
       
-      if (!price || price === 0) {
-        throw new Error('No se pudo extraer el precio del producto');
-      }
-      
-      console.log(`API: Precio obtenido con éxito: ${price}€`);
-      return NextResponse.json(
-        { 
-          price, 
-          currency: '€',
-          success: true,
-          method: 'puppeteer' 
-        }, 
-        { 
-          status: 200,
-          headers: {
-            'Cache-Control': 'max-age=3600, s-maxage=3600',
-          }
+      return NextResponse.json({
+        price,
+        currency: '€',
+        success: true,
+        method: 'puppeteer',
+        timeMs: Date.now() - startTime
+      }, {
+        status: 200,
+        headers: {
+          'Cache-Control': 'max-age=3600, s-maxage=3600'
         }
-      );
+      });
       
-    } catch (error: any) {
-      console.error('API Error (Puppeteer):', error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`API Error: ${errorMessage}`);
       
-      // Determinar el código de estado y mensaje de error
-      let statusCode = 500;
-      let errorMessage = error.message || 'Error desconocido';
-      
-      return NextResponse.json(
-        { 
-          error: `Error al extraer precio con Puppeteer: ${errorMessage}`, 
-          success: false,
-          retry: retry
-        },
-        { 
-          status: statusCode 
-        }
-      );
-    }
-  } catch (error: any) {
-    console.error('API Error (General):', error);
-    return NextResponse.json(
-      { 
-        error: `Error general: ${error.message || 'Error desconocido'}`, 
-        success: false 
-      },
-      { 
+      return NextResponse.json({
+        error: `Error al extraer precio con Puppeteer: ${errorMessage}`,
+        success: false,
+        timeMs: Date.now() - startTime
+      }, { 
         status: 500 
-      }
-    );
+      });
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`API Error general: ${errorMessage}`);
+    
+    return NextResponse.json({
+      error: `Error general: ${errorMessage}`,
+      success: false,
+      timeMs: Date.now() - startTime
+    }, { 
+      status: 500 
+    });
   } finally {
-    // Asegurarse de que el navegador se cierre siempre
     if (browser) {
       console.log('API: Cerrando navegador...');
       await browser.close().catch(e => console.error('Error al cerrar el navegador:', e));
@@ -235,7 +216,7 @@ export async function GET(request: NextRequest) {
 }
 
 // Función auxiliar para extraer precios con regex
-function extractPricesWithRegex(html: string): number {
+function extractPricesWithRegex(html: string, url: string): number {
   console.log('API: Extrayendo precios con regex...');
   
   try {
@@ -275,7 +256,7 @@ function extractPricesWithRegex(html: string): number {
     }
     
     // Para Super Electric Breaker, buscar precios alrededor de 70€
-    if (html.includes('Super-Electric-Breaker')) {
+    if (url.includes('Super-Electric-Breaker')) {
       const targetPrices = prices.filter(p => p >= 65 && p <= 75);
       if (targetPrices.length > 0) {
         return targetPrices[0];

@@ -2,12 +2,10 @@
 const nextConfig = {
   images: {
     domains: [
-      'via.placeholder.com',
-      'picsum.photos',
-      'images.unsplash.com',
+      'dummyimage.com',
       'firebasestorage.googleapis.com',
-      'source.unsplash.com',
-      'flashstore.es'
+      'assets.pokemon.com',
+      'raw.githubusercontent.com'
     ]
   },
   reactStrictMode: true,
@@ -36,28 +34,28 @@ const nextConfig = {
   ],
   
   // Configuración específica para Vercel
-  webpack: (config, { isServer }) => {
-    // Evitar problemas con algunos módulos en el cliente
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
-        child_process: false,
-      };
-    }
-    
+  webpack: (config) => {
+    // Evitar que Webpack intente cargar ciertos módulos por el lado del cliente
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      child_process: false,
+      net: false,
+      tls: false,
+    };
     return config;
   },
 
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000', 'pokebimapp-git-master-pokebims-projects.vercel.app'],
+      allowedOrigins: [
+        'localhost:3000',
+        'pokebimapp-git-master-pokebims-projects.vercel.app',
+        'pokebimapp.vercel.app'
+      ],
     },
-    // La clave es que estamos usando chromium-min, así que no necesitamos especificar estos paquetes
-    // como externos. Chromium se descargará en tiempo de ejecución desde GitHub.
-    serverComponentsExternalPackages: []
+    // Ya no necesitamos especificar paquetes externos
+    serverComponentsExternalPackages: [],
   },
 };
 
