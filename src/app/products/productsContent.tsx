@@ -228,7 +228,8 @@ export default function ProductsContent() {
       });
       
       // Llamar al servicio actualizado para actualizar el precio
-      const result = await updateCardmarketPriceForProduct(productId, productName, cardmarketUrl);
+      // Pasamos true como último parámetro para forzar la actualización (elimina precio anterior)
+      const result = await updateCardmarketPriceForProduct(productId, productName, cardmarketUrl, true);
       
       if (result.success && result.price) {
         // Recargamos los productos para obtener los datos actualizados
@@ -313,8 +314,8 @@ export default function ProductsContent() {
         return;
       }
       
-      // Actualizar precios usando la nueva función
-      const result = await updateAllCardmarketPrices(productsWithUrl);
+      // Actualizar precios usando la nueva función con forceUpdate=true
+      const result = await updateAllCardmarketPrices(productsWithUrl, true);
       
       if (result.success) {
         // Recargar todos los productos para obtener los precios actualizados

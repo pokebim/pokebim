@@ -74,26 +74,42 @@ export async function fetchCardmarketPrice(url: string): Promise<{price: number,
     // Simulación: esperar un tiempo aleatorio para simular la latencia de red
     await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
     
-    // Extraemos el nombre del producto de la URL (simulado)
-    let productName = url.split('/').pop() || '';
+    // Normalizar la URL para mejor detección
+    const urlLower = url.toLowerCase();
+    console.log("URL normalizada para detección:", urlLower);
     
     // Simulación: diferentes precios según el producto
     let basePrice = 0;
+    let priceSource = "default";
     
-    if (url.includes('festival')) {
+    // Verificaciones más específicas para asegurar el precio correcto
+    if (urlLower.includes('/terastal-festival') || urlLower.includes('terastal-festival-ex')) {
       basePrice = 54.83; // El precio exacto que mencionaste
-    } else if (url.includes('heat')) {
+      priceSource = "terastal-festival (precio fijo)";
+    } 
+    else if (urlLower.includes('heat') && urlLower.includes('wave')) {
       basePrice = 62.5;
-    } else if (url.includes('abyss')) {
+      priceSource = "heat-wave (precio fijo)";
+    } 
+    else if (urlLower.includes('abyss') || urlLower.includes('lost-abyss')) {
       basePrice = 48.99;
-    } else if (url.includes('treasure')) {
+      priceSource = "lost-abyss (precio fijo)";
+    } 
+    else if (urlLower.includes('treasure') || urlLower.includes('shiny-treasure')) {
       basePrice = 71.25;
-    } else {
+      priceSource = "shiny-treasure (precio fijo)";
+    } 
+    else if (urlLower.includes('super-electric') || urlLower.includes('electric-breaker')) {
+      basePrice = 58.90;
+      priceSource = "super-electric (precio fijo)";
+    }
+    else {
       // Simulación: generar un precio aleatorio entre 40 y 120€
       basePrice = parseFloat((40 + Math.random() * 80).toFixed(2));
+      priceSource = "precio aleatorio";
     }
     
-    console.log(`Precio obtenido para ${productName}: ${basePrice}€`);
+    console.log(`Precio determinado para URL: ${priceSource} -> ${basePrice}€`);
     
     return {
       price: basePrice,
@@ -178,14 +194,45 @@ export async function getCardmarketPriceForProduct(productId: string): Promise<C
 }
 
 /**
+ * Elimina un precio de Cardmarket de la base de datos
+ */
+export async function deleteCardmarketPrice(productId: string): Promise<boolean> {
+  console.log(`Eliminando precio para producto ${productId}...`);
+  
+  try {
+    // Buscar si existe un registro para este producto
+    const q = query(pricesCollection, where("productId", "==", productId));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      // Eliminar el registro existente
+      const docId = querySnapshot.docs[0].id;
+      const priceRef = doc(db, "cardmarketPrices", docId);
+      
+      await deleteDoc(priceRef);
+      console.log(`Precio eliminado para producto ${productId}`);
+      return true;
+    }
+    
+    console.log(`No se encontró precio para producto ${productId}`);
+    return false;
+  } catch (error) {
+    console.error(`Error al eliminar precio para producto ${productId}:`, error);
+    return false;
+  }
+}
+
+/**
  * Actualiza el precio de un producto con datos de Cardmarket
  */
 export async function updateCardmarketPriceForProduct(
   productId: string, 
   productName: string,
-  cardmarketUrl: string
+  cardmarketUrl: string,
+  forceUpdate: boolean = true
 ): Promise<{success: boolean, price?: number, error?: string}> {
   console.log(`Actualizando precio para ${productName} (${productId}) con URL: ${cardmarketUrl}`);
+  console.log(`Forzar actualización: ${forceUpdate}`);
   
   if (!productId) {
     console.error("ID de producto no válido");
@@ -204,6 +251,11 @@ export async function updateCardmarketPriceForProduct(
   }
   
   try {
+    // Si forzamos la actualización, eliminamos el precio anterior
+    if (forceUpdate) {
+      await deleteCardmarketPrice(productId);
+    }
+    
     // 1. Obtener el precio actual de Cardmarket
     const priceData = await fetchCardmarketPrice(cardmarketUrl);
     
@@ -246,13 +298,17 @@ export async function updateCardmarketPriceForProduct(
 /**
  * Actualiza los precios de todos los productos que tienen URL de Cardmarket
  */
-export async function updateAllCardmarketPrices(products: any[]): Promise<{
+export async function updateAllCardmarketPrices(
+  products: any[], 
+  forceUpdate: boolean = true
+): Promise<{
   success: boolean, 
   updated: number, 
   failed: number,
   errors: string[]
 }> {
   console.log("Actualizando todos los precios de Cardmarket...");
+  console.log(`Forzar actualización: ${forceUpdate}`);
   
   const result = {
     success: true,
@@ -282,7 +338,8 @@ export async function updateAllCardmarketPrices(products: any[]): Promise<{
       const updateResult = await updateCardmarketPriceForProduct(
         product.id, 
         product.name || 'Producto sin nombre',
-        product.cardmarketUrl
+        product.cardmarketUrl,
+        forceUpdate
       );
       
       if (updateResult.success) {
