@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import Modal from '@/components/ui/Modal';
 import { formatCurrency, type Currency } from '@/lib/currencyConverter';
 import DataTable from '@/components/ui/DataTable';
 import { createColumnHelper } from '@tanstack/react-table';
 import Select2 from '@/components/ui/Select2';
-import { InventoryItem } from '@/types';
 import { 
+  InventoryItem,
   getAllInventoryItems,
   addInventoryItem,
   updateInventoryItem,
@@ -18,7 +18,6 @@ import {
   Product, 
   getAllProducts 
 } from '@/lib/productService';
-import { ChangeEvent, FormEvent } from 'react';
 
 interface Notification {
   show: boolean;
@@ -32,23 +31,8 @@ interface EnrichedInventoryItem extends InventoryItem {
     language: string;
     type?: string;
   };
-}
-
-interface InventoryFormData {
-  productId: string;
-  quantity: number;
-  location: string;
-  condition: string;
-  purchaseDate: string;
-  purchasePrice: number | string;
-  purchaseCurrency: string;
-  notes: string;
-}
-
-interface InventoryFormProps {
-  onSubmit: (data: InventoryFormData) => void;
-  onCancel: () => void;
-  initialData?: Partial<InventoryFormData>;
+  owner?: string;
+  purchasedBy?: string;
 }
 
 export default function InventoryPage() {
@@ -64,34 +48,11 @@ export default function InventoryPage() {
   const [editingItem, setEditingItem] = useState<EnrichedInventoryItem | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchInventory = useCallback(async () => {
-    try {
-      const inventoryData = await getAllInventoryItems();
-      
-      // Enriquecer los datos con información del producto
-      const enrichedInventory: EnrichedInventoryItem[] = inventoryData.map(item => {
-        const product = products.find(p => p.id === item.productId);
-        
-        return {
-          ...item,
-          product: product ? {
-            name: product.name,
-            language: product.language,
-            type: product.type
-          } : undefined
-        };
-      });
-      
-      setInventoryItems(enrichedInventory);
-    } catch (error) {
-      console.error('Error al cargar inventario:', error);
-      setError('Error al cargar los datos de inventario');
-    } finally {
-      setLoading(false);
-    }
-  }, [products]);
+  useEffect(() => {
+    fetchData();
+  }, []);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
       // Cargar productos primero
@@ -108,11 +69,36 @@ export default function InventoryPage() {
       setError('Error al cargar los datos. Por favor, inténtalo de nuevo más tarde.');
       setLoading(false);
     }
-  }, [fetchInventory]);
+  };
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  const fetchInventory = async () => {
+    try {
+      const inventoryData = await getAllInventoryItems();
+      
+      // Enriquecer los datos con información del producto
+      const enrichedInventory: EnrichedInventoryItem[] = inventoryData.map(item => {
+        const product = products.find(p => p.id === item.productId);
+        
+        return {
+          ...item,
+          product: product ? {
+            name: product.name,
+            language: product.language,
+            type: product.type
+          } : undefined,
+          owner: item.owner || 'No especificado',
+          purchasedBy: item.purchasedBy || 'No especificado'
+        };
+      });
+      
+      setInventoryItems(enrichedInventory);
+    } catch (error) {
+      console.error('Error al cargar inventario:', error);
+      setError('Error al cargar los datos de inventario');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEdit = (item: EnrichedInventoryItem) => {
     setEditingItem(item);
@@ -137,7 +123,7 @@ export default function InventoryPage() {
     }
   };
 
-  const handleSubmit = async (formData: InventoryFormData) => {
+  const handleSubmit = async (formData: any) => {
     try {
       if (editingItem) {
         // Actualizar elemento existente
@@ -149,7 +135,9 @@ export default function InventoryPage() {
           purchaseDate: formData.purchaseDate,
           purchasePrice: formData.purchasePrice,
           purchaseCurrency: formData.purchaseCurrency,
-          notes: formData.notes
+          notes: formData.notes,
+          owner: formData.owner,
+          purchasedBy: formData.purchasedBy
         });
         
         setInventoryItems(prev => 
@@ -165,6 +153,8 @@ export default function InventoryPage() {
                   purchasePrice: formData.purchasePrice,
                   purchaseCurrency: formData.purchaseCurrency,
                   notes: formData.notes,
+                  owner: formData.owner,
+                  purchasedBy: formData.purchasedBy,
                   product: products.find(p => p.id === formData.productId) 
                     ? {
                         name: products.find(p => p.id === formData.productId)!.name,
@@ -188,7 +178,9 @@ export default function InventoryPage() {
           purchaseDate: formData.purchaseDate,
           purchasePrice: formData.purchasePrice,
           purchaseCurrency: formData.purchaseCurrency,
-          notes: formData.notes
+          notes: formData.notes,
+          owner: formData.owner,
+          purchasedBy: formData.purchasedBy
         });
         
         const product = products.find(p => p.id === formData.productId);
@@ -199,7 +191,9 @@ export default function InventoryPage() {
             name: product.name,
             language: product.language,
             type: product.type
-          } : undefined
+          } : undefined,
+          owner: formData.owner || 'No especificado',
+          purchasedBy: formData.purchasedBy || 'No especificado'
         }]);
         
         showNotification('Elemento de inventario añadido con éxito');
@@ -307,6 +301,14 @@ export default function InventoryPage() {
       header: 'Notas',
       cell: info => <span className="text-gray-300 max-w-xs truncate">{info.getValue() || '-'}</span>
     }),
+    columnHelper.accessor('owner', {
+      header: 'Propietario',
+      cell: info => info.getValue() || 'No especificado'
+    }),
+    columnHelper.accessor('purchasedBy', {
+      header: 'Comprado por',
+      cell: info => info.getValue() || 'No especificado'
+    }),
     columnHelper.accessor('id', {
       header: 'Acciones',
       cell: info => (
@@ -329,8 +331,8 @@ export default function InventoryPage() {
   ], []);
 
   // Formulario para inventario
-  const InventoryForm = ({ onSubmit, onCancel, initialData }: InventoryFormProps) => {
-    const [formData, setFormData] = useState<InventoryFormData>({
+  const InventoryForm = ({ onSubmit, onCancel, initialData }) => {
+    const [formData, setFormData] = useState({
       productId: initialData?.productId || '',
       quantity: initialData?.quantity || 1,
       location: initialData?.location || '',
@@ -338,10 +340,12 @@ export default function InventoryPage() {
       purchaseDate: initialData?.purchaseDate || '',
       purchasePrice: initialData?.purchasePrice || '',
       purchaseCurrency: initialData?.purchaseCurrency || 'EUR',
-      notes: initialData?.notes || ''
+      notes: initialData?.notes || '',
+      owner: initialData?.owner || '',
+      purchasedBy: initialData?.purchasedBy || ''
     });
 
-    const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const handleChange = (e) => {
       const { name, value } = e.target;
       setFormData(prev => ({
         ...prev,
@@ -351,14 +355,14 @@ export default function InventoryPage() {
       }));
     };
 
-    const handleSelectChange = (name: string, value: string) => {
+    const handleSelectChange = (name, value) => {
       setFormData(prev => ({
         ...prev,
         [name]: value
       }));
     };
 
-    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = (e) => {
       e.preventDefault();
       onSubmit(formData);
     };
@@ -387,6 +391,38 @@ export default function InventoryPage() {
             required
             className="w-full"
           />
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="owner" className="block text-sm font-bold text-white mb-2">
+              Propietario
+            </label>
+            <input
+              type="text"
+              id="owner"
+              name="owner"
+              value={formData.owner}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-700 bg-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-white"
+              placeholder="¿Quién tiene el producto?"
+            />
+          </div>
+          
+          <div>
+            <label htmlFor="purchasedBy" className="block text-sm font-bold text-white mb-2">
+              Comprado por
+            </label>
+            <input
+              type="text"
+              id="purchasedBy"
+              name="purchasedBy"
+              value={formData.purchasedBy}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-700 bg-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-white"
+              placeholder="¿Quién compró el producto?"
+            />
+          </div>
         </div>
         
         <div>

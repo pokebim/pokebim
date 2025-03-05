@@ -1,28 +1,27 @@
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import puppeteer from 'puppeteer';
+import type { LaunchOptions } from 'puppeteer';
 
-const getBrowser = async () => {
-  chromium.setGraphicsMode = false;
-  
-  const options = {
-    args: [
-      ...chromium.args,
-      '--disable-web-security',
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-gpu',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-    ],
-    defaultViewport: chromium.defaultViewport,
-    executablePath: await chromium.executablePath(),
-    headless: chromium.headless,
-    ignoreHTTPSErrors: true
-  };
-
-  return await puppeteer.launch(options);
+const options: LaunchOptions = {
+  args: [
+    '--no-sandbox',
+    '--disable-setuid-sandbox',
+    '--disable-dev-shm-usage',
+    '--disable-accelerated-2d-canvas',
+    '--disable-gpu',
+    '--window-size=1920x1080'
+  ],
+  defaultViewport: {
+    width: 1920,
+    height: 1080
+  },
+  executablePath: process.env.CHROME_PATH,
+  headless: true,
+  ignoreHTTPSErrors: true
 };
+
+export async function launchBrowser() {
+  return await puppeteer.launch(options);
+}
 
 export async function getCardmarketPrice(url: string): Promise<number | null> {
   if (!url || !url.includes('cardmarket.com')) {
@@ -33,7 +32,7 @@ export async function getCardmarketPrice(url: string): Promise<number | null> {
   let page = null;
 
   try {
-    browser = await getBrowser();
+    browser = await launchBrowser();
     page = await browser.newPage();
 
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/115.0');

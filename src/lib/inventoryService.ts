@@ -10,7 +10,19 @@ import {
   where
 } from "firebase/firestore/lite";
 import { db } from "./firebase";
-import { InventoryItem } from "@/types";
+
+// Interfaz para el ítem de inventario
+export interface InventoryItem {
+  id?: string;
+  productId: string;
+  quantity: number;
+  location?: string;
+  condition?: string;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  purchaseCurrency?: string;
+  notes?: string;
+}
 
 // Obtener todos los ítems de inventario
 export const getAllInventoryItems = async (): Promise<InventoryItem[]> => {
@@ -50,14 +62,11 @@ export const getInventoryItemsByProduct = async (productId: string): Promise<Inv
 };
 
 // Añadir un nuevo ítem de inventario
-export const addInventoryItem = async (item: Omit<InventoryItem, 'id'>): Promise<InventoryItem> => {
+export const addInventoryItem = async (item: Omit<InventoryItem, 'id'>): Promise<string> => {
   try {
     const inventoryCol = collection(db, "inventory");
     const docRef = await addDoc(inventoryCol, item);
-    return {
-      id: docRef.id,
-      ...item
-    };
+    return docRef.id;
   } catch (error) {
     console.error("Error adding inventory item:", error);
     throw error;

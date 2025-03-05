@@ -211,7 +211,7 @@ export default function ExpensesPage() {
         </div>
       )
     })
-  ], [columnHelper]);
+  ], []);
 
   // Filtrar los gastos según el filtro seleccionado
   const filteredExpenses = useMemo(() => {

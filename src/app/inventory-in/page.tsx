@@ -1,36 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, ChangeEvent, FormEvent } from 'react';
+import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc, Timestamp } from 'firebase/firestore/lite';
 import { db } from '@/lib/firebase';
 import MainLayout from '@/components/layout/MainLayout';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Product, Supplier, InventoryEntry } from '@/types';
-
-// Define interfaces for the maps and state
-interface ProductsMap {
-  [key: string]: Product;
-}
-
-interface SuppliersMap {
-  [key: string]: Supplier;
-}
-
-interface FormData {
-  productId: string;
-  supplierId: string;
-  quantity: number;
-  cost: number;
-  entryDate: string;
-  notes: string;
-}
-
-interface NotificationState {
-  show: boolean;
-  message: string;
-  type: 'success' | 'error';
-}
 
 export default function InventoryInPage() {
   const [inventoryEntries, setInventoryEntries] = useState<InventoryEntry[]>([]);
@@ -39,12 +15,8 @@ export default function InventoryInPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [notification, setNotification] = useState<NotificationState>({ 
-    show: false, 
-    message: '', 
-    type: 'success' 
-  });
-  const [formData, setFormData] = useState<FormData>({
+  const [notification, setNotification] = useState({ show: false, message: '', type: 'success' });
+  const [formData, setFormData] = useState({
     productId: '',
     supplierId: '',
     quantity: 1,
@@ -73,8 +45,8 @@ export default function InventoryInPage() {
       const productsSnapshot = await getDocs(collection(db, 'products'));
       const suppliersSnapshot = await getDocs(collection(db, 'suppliers'));
       
-      const productsMap: ProductsMap = {};
-      const suppliersMap: SuppliersMap = {};
+      const productsMap = {};
+      const suppliersMap = {};
       
       productsSnapshot.forEach(doc => {
         const product = { id: doc.id, ...doc.data() } as Product;
@@ -141,7 +113,7 @@ export default function InventoryInPage() {
     }
   };
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
@@ -149,7 +121,7 @@ export default function InventoryInPage() {
     });
   };
 
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       await addDoc(collection(db, 'inventory_entries'), {

@@ -1,14 +1,23 @@
-'use client';
-
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Modal from '@/components/ui/Modal';
-import { Product } from '@/lib/productService';
+
+interface Product {
+  id?: string;
+  name?: string;
+  language?: string;
+  type?: string;
+  imageUrl?: string;
+  description?: string;
+  cardmarketUrl?: string;
+  cardmarketPrice?: number;
+  lastPriceUpdate?: any;
+}
 
 interface ProductFormProps {
-  product?: Product | null;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Product) => void;
   onCancel: () => void;
+  initialData?: Product;
 }
 
 // Función para validar URLs de imágenes - versión más permisiva
@@ -55,15 +64,15 @@ const validateImageUrl = async (url: string): Promise<boolean> => {
   }
 };
 
-export default function ProductForm({ product, onSubmit, onCancel }: ProductFormProps) {
+export default function ProductForm({ onSubmit, onCancel, initialData }: ProductFormProps) {
   const [formData, setFormData] = useState<Product>({
     name: '',
-    language: 'es',
-    type: 'regular',
-    description: '',
-    notes: '',
+    language: 'Japanese',
+    type: 'Booster Box',
     imageUrl: '',
-    cardmarketUrl: ''
+    description: '',
+    cardmarketUrl: '',
+    cardmarketPrice: 0,
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,47 +83,17 @@ export default function ProductForm({ product, onSubmit, onCancel }: ProductForm
   const [showFullPreview, setShowFullPreview] = useState(false);
 
   useEffect(() => {
-    if (product) {
-      console.log('ProductForm useEffect - Producto recibido:', product);
-      
-      // Normalizar el valor del idioma
-      let normalizedLanguage = product.language;
-      if (product.language === 'Japanese') normalizedLanguage = 'jp';
-      if (product.language === 'English') normalizedLanguage = 'en';
-      if (product.language === 'Chinese') normalizedLanguage = 'cn';
-      if (product.language === 'Korean') normalizedLanguage = 'kr';
-      if (product.language === 'Español') normalizedLanguage = 'es';
-
-      // Asegurarse de que los valores del producto existente se mantengan
-      const formDataToSet = {
-        id: product.id,
-        name: product.name || '',
-        language: normalizedLanguage || 'es',
-        type: product.type || 'regular',
-        description: product.description || '',
-        notes: product.notes || '',
-        imageUrl: product.imageUrl || '',
-        cardmarketUrl: product.cardmarketUrl || ''
-      };
-      console.log('ProductForm useEffect - Estableciendo formData:', formDataToSet);
-      setFormData(formDataToSet);
-      if (product.imageUrl) {
-        setImagePreviewUrl(product.imageUrl);
+    if (initialData) {
+      setFormData(initialData);
+      if (initialData.imageUrl) {
+        setImagePreviewUrl(initialData.imageUrl);
       }
     }
-  }, [product]);
+  }, [initialData]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    console.log('ProductForm handleChange -', name, ':', value);
-    setFormData(prev => {
-      const newData = {
-        ...prev,
-        [name]: value
-      };
-      console.log('ProductForm handleChange - Nuevo formData:', newData);
-      return newData;
-    });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   // Validar URL de imagen cuando cambia
@@ -148,12 +127,10 @@ export default function ProductForm({ product, onSubmit, onCancel }: ProductForm
     setIsSubmitting(true);
     setError('');
     
-    console.log('ProductForm handleSubmit - Estado actual del formulario:', formData);
     const submissionData = {
       ...formData,
       imageUrl: formData.imageUrl || 'https://via.placeholder.com/400x250?text=Product+Image'
     };
-    console.log('ProductForm handleSubmit - Datos a enviar:', submissionData);
     
     try {
       onSubmit(submissionData);
@@ -181,7 +158,7 @@ export default function ProductForm({ product, onSubmit, onCancel }: ProductForm
         )}
         
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          <label htmlFor="name" className="block text-sm font-bold text-white">
             Nombre
           </label>
           <input
@@ -190,13 +167,12 @@ export default function ProductForm({ product, onSubmit, onCancel }: ProductForm
             name="name"
             value={formData.name}
             onChange={handleChange}
-            required
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white sm:text-sm px-4 py-2"
+            className="mt-1 block w-full rounded-md border border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 text-white bg-gray-800 px-3 py-2"
           />
         </div>
         
         <div>
-          <label htmlFor="language" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          <label htmlFor="language" className="block text-sm font-bold text-white">
             Idioma
           </label>
           <select
@@ -204,78 +180,50 @@ export default function ProductForm({ product, onSubmit, onCancel }: ProductForm
             name="language"
             value={formData.language}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white sm:text-sm px-4 py-2"
+            className="mt-1 block w-full rounded-md border border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 text-white bg-gray-800 px-3 py-2"
           >
-            <option value="es">Español</option>
-            <option value="en">English</option>
-            <option value="jp">Japanese</option>
-            <option value="cn">Chinese</option>
-            <option value="kr">Korean</option>
+            <option value="Japanese">Japonés</option>
+            <option value="English">Inglés</option>
+            <option value="Spanish">Español</option>
+            <option value="Chinese">Chino</option>
+            <option value="Korean">Coreano</option>
           </select>
         </div>
         
         <div>
-          <label htmlFor="type" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Tipo
+          <label htmlFor="type" className="block text-sm font-bold text-white">
+            Tipo de Producto
           </label>
           <select
             id="type"
             name="type"
             value={formData.type}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white sm:text-sm px-4 py-2"
+            className="mt-1 block w-full rounded-md border border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 text-white bg-gray-800 px-3 py-2"
           >
-            <option value="regular">Regular</option>
-            <option value="special">Special</option>
-            <option value="promo">Promotional</option>
-            <option value="booster">Booster Box</option>
-            <option value="starter">Starter Deck</option>
-            <option value="collection">Collection Box</option>
-            <option value="gift">Gift Box</option>
+            <option value="Booster Box">Booster Box</option>
+            <option value="Elite Trainer Box">Elite Trainer Box</option>
+            <option value="Booster Pack">Booster Pack</option>
+            <option value="Single Card">Carta Individual</option>
+            <option value="Premium Collection">Colección Premium</option>
+            <option value="Special Set">Set Especial</option>
           </select>
         </div>
         
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Descripción
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            rows={3}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white sm:text-sm px-4 py-2"
-          />
-        </div>
-        
-        <div>
-          <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            Notas
-          </label>
-          <textarea
-            id="notes"
-            name="notes"
-            value={formData.notes}
-            onChange={handleChange}
-            rows={2}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white sm:text-sm px-4 py-2"
-          />
-        </div>
-        
         <div className="space-y-2">
-          <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+          <label htmlFor="imageUrl" className="block text-sm font-bold text-white">
             URL de la imagen
           </label>
           <input
-            type="url"
+            type="text"
             id="imageUrl"
             name="imageUrl"
             value={formData.imageUrl}
             onChange={handleImageUrlChange}
-            className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white sm:text-sm px-4 py-2 ${
+            className={`mt-1 block w-full rounded-md border border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 text-white bg-gray-800 px-3 py-2 ${
               imageError ? 'border-yellow-500' : ''
             }`}
+            placeholder="Introduce la URL de la imagen"
           />
           {isValidatingImage && (
             <p className="text-sm text-gray-400">Validando URL de imagen...</p>
@@ -312,35 +260,53 @@ export default function ProductForm({ product, onSubmit, onCancel }: ProductForm
           )}
         </div>
         
+        {/* Campo para URL de Cardmarket */}
         <div>
-          <label htmlFor="cardmarketUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-            URL de Cardmarket
+          <label htmlFor="cardmarketUrl" className="block text-sm font-bold text-white">
+            Enlace a Cardmarket
           </label>
           <input
-            type="url"
+            type="text"
             id="cardmarketUrl"
             name="cardmarketUrl"
-            value={formData.cardmarketUrl}
+            value={formData.cardmarketUrl || ''}
             onChange={handleChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white sm:text-sm px-4 py-2"
-            placeholder="https://www.cardmarket.com/..."
+            className="mt-1 block w-full rounded-md border border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 text-white bg-gray-800 px-3 py-2"
+            placeholder="https://www.cardmarket.com/es/Pokemon/Products/..."
           />
+          <p className="text-sm text-gray-400 mt-1">
+            Añade un enlace directo a la página del producto en Cardmarket para obtener los precios actualizados
+          </p>
         </div>
         
-        <div className="flex justify-end space-x-3 mt-6">
+        <div>
+          <label htmlFor="description" className="block text-sm font-bold text-white">
+            Descripción
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            value={formData.description || ''}
+            onChange={handleChange}
+            rows={4}
+            className="mt-1 block w-full rounded-md border border-gray-700 shadow-sm focus:border-green-500 focus:ring-green-500 text-white bg-gray-800 px-3 py-2"
+          ></textarea>
+        </div>
+        
+        <div className="flex justify-end space-x-3 pt-4">
           <button
             type="button"
             onClick={onCancel}
-            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+            className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
           >
             Cancelar
           </button>
           <button
             type="submit"
-            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500"
+            className="px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600 disabled:opacity-50"
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Guardando...' : product ? 'Actualizar' : 'Crear'}
+            {isSubmitting ? 'Guardando...' : initialData ? 'Actualizar' : 'Guardar'}
           </button>
         </div>
       </form>
