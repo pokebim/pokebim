@@ -32,7 +32,9 @@ const nextConfig = {
     '@firebase/firestore', 
     '@grpc/grpc-js', 
     '@grpc/proto-loader', 
-    'long'
+    'long',
+    '@sparticuz/chromium',
+    'puppeteer-core'
   ],
   
   // Configuración específica para Vercel
@@ -55,6 +57,10 @@ const nextConfig = {
     serverActions: {
       allowedOrigins: ['localhost:3000', 'pokebimapp-git-master-pokebims-projects.vercel.app'],
     },
+    serverComponentsExternalPackages: [
+      '@sparticuz/chromium',
+      'puppeteer-core'
+    ]
   },
 };
 

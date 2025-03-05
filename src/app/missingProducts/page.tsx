@@ -13,7 +13,8 @@ import {
 import MissingProductForm from '@/components/forms/MissingProductForm';
 import DataTable from '@/components/ui/DataTable';
 import { createColumnHelper } from '@tanstack/react-table';
-import { ExternalLinkIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { ArrowTopRightOnSquareIcon } from '@heroicons/react/24/outline';
 
 interface Notification {
   show: boolean;
@@ -193,7 +194,7 @@ export default function MissingProductsPage() {
             rel="noopener noreferrer"
             className="text-blue-400 hover:text-blue-300 flex items-center"
           >
-            <ExternalLinkIcon className="h-5 w-5 mr-1" />
+            <ArrowTopRightOnSquareIcon className="h-5 w-5 mr-1" />
             Ver enlace
           </a>
         ) : '-';

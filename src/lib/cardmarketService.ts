@@ -48,7 +48,7 @@ function isValidCardmarketUrl(url: string): boolean {
 
 /**
  * Obtiene el precio de un artículo en CardMarket
- * Utiliza la nueva API optimizada para extracción de precios
+ * Utiliza Puppeteer para un scraping más robusto
  * 
  * @param url URL de CardMarket
  * @returns Objeto con el precio o error
@@ -72,11 +72,17 @@ export async function fetchCardmarketPrice(url: string): Promise<{ success: bool
       if (attempt > 0) {
         console.log(`🔄 Reintento ${attempt}/${MAX_RETRIES} para obtener precio...`);
         // Esperar un tiempo incremental entre reintentos
-        await new Promise(resolve => setTimeout(resolve, attempt * 1500));
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
       }
       
       // Llamar a la API con el intento actual
-      const response = await fetch(`/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}&retry=${attempt}`);
+      const response = await fetch(`/api/cardmarket-puppeteer?url=${encodeURIComponent(url)}&retry=${attempt}`, {
+        // Asegurarnos de no usar caché
+        headers: {
+          'Cache-Control': 'no-cache', 
+          'Pragma': 'no-cache'
+        }
+      });
       
       // Analizar la respuesta
       if (!response.ok) {
@@ -86,7 +92,7 @@ export async function fetchCardmarketPrice(url: string): Promise<{ success: bool
         console.error(`❌ Error en API: ${response.status} - ${errorMessage}`);
         
         // Determinar si debemos reintentar basado en el código de error y si hay intentos restantes
-        if (response.status === 503 && errorData.shouldRetry && attempt < MAX_RETRIES) {
+        if ((response.status === 503 || response.status === 429) && attempt < MAX_RETRIES) {
           lastError = errorMessage;
           // El API sugiere reintentar, continuamos al siguiente intento
           if (errorData.retryAfter) {
