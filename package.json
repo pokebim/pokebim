@@ -10,7 +10,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "node -e \"const fs = require('fs'); const path = require('path'); const yargsDir = path.join(process.cwd(), 'node_modules/yargs'); if (fs.existsSync(yargsDir)) { try { fs.unlinkSync(path.join(yargsDir, 'yargs.mjs')); } catch (e) {} try { fs.symlinkSync(path.join(yargsDir, 'index.mjs'), path.join(yargsDir, 'yargs.mjs')); } catch (e) {} }\""
+    "postinstall": "node scripts/create-yargs-link.js"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.18",
