@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 
-// Configuración para entorno Vercel Serverless
+// Configuración para entorno Vercel Serverless con memoria limitada
 const SAFE_TIMEOUT = 8000; // 8 segundos (menos del límite de Vercel)
 
 /**
- * API que utiliza Puppeteer para obtener precios de Cardmarket
- * Diseñada para funcionar en entornos serverless como Vercel
+ * API optimizada para uso mínimo de memoria que utiliza Puppeteer 
+ * para obtener precios de Cardmarket
+ * 
+ * Optimizado para el plan Hobby de Vercel (1024MB de memoria)
  * 
  * Uso: /api/cardmarket-puppeteer?url=https://www.cardmarket.com/en/Pokemon/Products/...
  */
@@ -29,10 +31,29 @@ export async function GET(request: NextRequest) {
   let browser;
   
   try {
-    // Configurar Puppeteer para entorno serverless
+    // Configurar Puppeteer para entorno serverless con memoria limitada
     browser = await puppeteer.launch({
-      args: [...chromium.args, '--hide-scrollbars', '--disable-web-security'],
-      defaultViewport: chromium.defaultViewport,
+      args: [
+        ...chromium.args, 
+        '--hide-scrollbars', 
+        '--disable-web-security',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--disable-setuid-sandbox',
+        '--no-first-run',
+        '--no-sandbox',
+        '--no-zygote',
+        '--single-process', // <- Esta opción reduce drásticamente el uso de memoria
+        '--disable-extensions'
+      ],
+      defaultViewport: {
+        width: 800,
+        height: 600,
+        deviceScaleFactor: 1,
+        isMobile: false,
+        hasTouch: false,
+        isLandscape: true
+      },
       executablePath: await chromium.executablePath(),
       headless: true,
       ignoreHTTPSErrors: true,
@@ -40,19 +61,30 @@ export async function GET(request: NextRequest) {
     
     const page = await browser.newPage();
     
+    // Configuración agresiva para reducir memoria
+    await page.setCacheEnabled(false);
+    
     // Configurar navegador para parecer más humano
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
     
     // Configurar timeout para evitar bloqueos en Vercel
     await page.setDefaultNavigationTimeout(SAFE_TIMEOUT);
     
-    // Intercepción de solicitudes para optimizar y evitar recursos innecesarios
+    // Intercepción agresiva de solicitudes para minimizar uso de memoria
     await page.setRequestInterception(true);
     page.on('request', (req) => {
       const resourceType = req.resourceType();
-      // Bloquear recursos innecesarios para agilizar la carga
-      if (['image', 'stylesheet', 'font', 'media'].includes(resourceType)) {
-        req.abort();
+      // Bloquear recursos innecesarios para agilizar la carga y reducir memoria
+      if (['image', 'stylesheet', 'font', 'media', 'script', 'xhr', 'fetch', 'websocket', 'other'].includes(resourceType)) {
+        if (resourceType === 'script' && Math.random() < 0.8) {
+          // Permitir algunos scripts (20%) para que la página funcione
+          req.continue();
+        } else if (resourceType === 'xhr' && Math.random() < 0.5) {
+          // Permitir algunos XHR (50%) para que la página funcione
+          req.continue();
+        } else {
+          req.abort();
+        }
       } else {
         req.continue();
       }
@@ -60,52 +92,43 @@ export async function GET(request: NextRequest) {
     
     // Navegar a la URL de Cardmarket
     console.log(`Puppeteer: Navegando a: ${cardmarketUrl}`);
-    await page.goto(cardmarketUrl, { waitUntil: 'networkidle2' });
-    
-    // Esperar un poco para que cargue el contenido dinámico
-    await page.waitForTimeout(1000);
-    
-    // Obtener los precios disponibles en la página
-    const prices = await page.evaluate(() => {
-      const priceElements = Array.from(document.querySelectorAll('.col-price .price-container'));
-      return priceElements.map(el => {
-        const priceText = el.textContent || '';
-        // Limpiar el texto y extraer solo números y coma decimal
-        const cleanText = priceText.replace(/[^0-9,]/g, '');
-        if (cleanText) {
-          // Convertir al formato decimal con punto
-          return parseFloat(cleanText.replace(',', '.'));
-        }
-        return 0;
-      }).filter(price => price > 0);
+    await page.goto(cardmarketUrl, { 
+      waitUntil: 'domcontentloaded', // Menos exigente que 'networkidle2'
+      timeout: SAFE_TIMEOUT 
     });
     
-    // Si no se encuentra ningún precio con el selector principal, intentar con otros selectores
-    if (!prices.length) {
-      console.log('Puppeteer: Intentando selectores alternativos...');
+    // Esperar solo lo mínimo necesario
+    await page.waitForTimeout(800);
+    
+    // Simplificar la extracción - Usar una sola estrategia para reducir carga
+    const prices = await page.evaluate(() => {
+      // Buscar elementos con precios en la página
+      const elements = document.querySelectorAll('.col-price, .price-container, .color-primary');
+      const prices = [];
       
-      // Segunda estrategia de extracción con selectores más generales
-      const altPrices = await page.evaluate(() => {
-        // Buscar en cualquier elemento con clase color-primary (común en CardMarket)
-        const priceElements = Array.from(document.querySelectorAll('.color-primary'));
-        return priceElements.map(el => {
-          const priceText = el.textContent || '';
-          if (priceText.includes('€')) {
-            const cleanText = priceText.replace(/[^0-9,]/g, '');
-            if (cleanText) {
-              return parseFloat(cleanText.replace(',', '.'));
+      elements.forEach(el => {
+        const text = el.textContent || '';
+        if (text.includes('€')) {
+          // Extraer solo números y coma decimal
+          const matches = text.match(/(\d+,\d+)/g);
+          if (matches && matches.length) {
+            for (const match of matches) {
+              // Convertir al formato decimal con punto
+              const price = parseFloat(match.replace(',', '.'));
+              if (price > 0) {
+                prices.push(price);
+              }
             }
           }
-          return 0;
-        }).filter(price => price > 0);
+        }
       });
       
-      // Combinar resultados
-      prices.push(...altPrices);
-    }
+      return prices;
+    });
     
-    // Capturar una captura de pantalla para depuración (opcional)
-    // await page.screenshot({ path: '/tmp/cardmarket-debug.png' });
+    // Cerrar el navegador lo antes posible para liberar memoria
+    await browser.close();
+    browser = null;
     
     if (!prices.length) {
       console.log('Puppeteer: No se encontraron precios en la página');
@@ -120,9 +143,6 @@ export async function GET(request: NextRequest) {
     const lowestPrice = prices[0];
     
     console.log(`Puppeteer: Precio más bajo encontrado: ${lowestPrice}€`);
-    
-    // Cerrar el navegador
-    await browser.close();
     
     // Devolver respuesta con cache para reducir carga en Vercel
     return new NextResponse(
@@ -162,6 +182,8 @@ export async function GET(request: NextRequest) {
       // Errores específicos de timeout
       if (errorMessage.includes('Navigation timeout')) {
         errorMessage = 'Timeout: La página tardó demasiado en cargar';
+      } else if (errorMessage.includes('out of memory')) {
+        errorMessage = 'Error: Se superó el límite de memoria de Vercel';
       }
     }
     

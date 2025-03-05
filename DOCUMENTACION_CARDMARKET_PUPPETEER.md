@@ -9,9 +9,9 @@ El método anterior de scraping directo con fetch y/o proxy estaba siendo bloque
 - Errores 403 (Forbidden)
 - Respuestas incompletas o bloqueadas
 
-## Nueva solución: Puppeteer
+## Nueva solución: Puppeteer (Optimizado para Vercel Hobby)
 
-Hemos implementado una solución basada en Puppeteer, que utiliza un navegador real (headless) para acceder a CardMarket, simulando un usuario real y evitando detecciones de bots.
+Hemos implementado una solución basada en Puppeteer, que utiliza un navegador real (headless) para acceder a CardMarket, simulando un usuario real y evitando detecciones de bots. Esta implementación está especialmente optimizada para funcionar con las restricciones del plan Hobby de Vercel (1024MB de memoria).
 
 ### Ventajas de Puppeteer
 
@@ -19,18 +19,21 @@ Hemos implementado una solución basada en Puppeteer, que utiliza un navegador r
 2. **Ejecuta JavaScript**: A diferencia del scraping simple, puede ejecutar el JavaScript de la página, permitiendo acceder a contenido dinámico.
 3. **Control avanzado**: Permite esperar a que elementos específicos se carguen, interactuar con la página, etc.
 
-### Implementación en Vercel
+### Implementación en Vercel Hobby (1024MB)
 
-Para que funcione en Vercel (entorno serverless), utilizamos:
+Para que funcione en Vercel con limitaciones de memoria, utilizamos:
 - `@sparticuz/chromium`: Versión optimizada de Chromium para entornos serverless
-- Configuración específica para reducir el tamaño y memoria necesarios
-- Optimizaciones para evitar los límites de tiempo de ejecución de Vercel
+- Configuraciones agresivas para reducir uso de memoria:
+  - Modo `--single-process` para Chrome
+  - Bloqueo de recursos innecesarios (imágenes, CSS, scripts)
+  - Configuración mínima de viewport
+  - Cierre temprano del navegador
 
 ## Cómo funciona
 
 1. El cliente solicita un precio a través de la función `fetchCardmarketPrice` en `cardmarketService.ts`
 2. Esta función realiza una solicitud al endpoint `/api/cardmarket-puppeteer` con la URL de CardMarket
-3. El endpoint inicia Puppeteer, navega a la URL y extrae los precios
+3. El endpoint inicia Puppeteer con configuración de bajo consumo de memoria, navega a la URL y extrae los precios
 4. Se selecciona el precio más bajo y se devuelve al cliente
 5. El resultado se almacena en la base de datos para futuras referencias
 
@@ -46,7 +49,7 @@ Se han añadido las siguientes dependencias:
 ### Configuración adicional
 
 Se ha modificado:
-- `vercel.json`: Para aumentar los recursos disponibles para el endpoint de Puppeteer
+- `vercel.json`: Configurado con 1024MB de memoria (límite del plan Hobby)
 - `next.config.js`: Para garantizar la compatibilidad con las nuevas dependencias
 
 ### Uso en código
@@ -68,10 +71,10 @@ if (result.success) {
 
 ## Limitaciones y consideraciones
 
-1. **Tiempo de ejecución**: El scraping con Puppeteer es más lento que el scraping directo (2-5 segundos vs <1 segundo)
-2. **Recursos**: Consume más memoria y CPU en el servidor
-3. **Cuotas de Vercel**: Ten en cuenta que esto utiliza más recursos en Vercel (ejecuta un navegador completo)
-4. **Posibles bloqueos futuros**: Aunque mucho más robusto, CardMarket podría implementar métodos más avanzados de detección
+1. **Restricciones de memoria**: La implementación está optimizada para el límite de 1024MB del plan Hobby de Vercel
+2. **Tasa de éxito reducida**: Al limitar recursos, es posible que algunas páginas complejas no se procesen correctamente
+3. **Tiempo de ejecución**: Sigue siendo más lento que el scraping directo (2-5 segundos vs <1 segundo)
+4. **Posibles bloqueos futuros**: CardMarket podría implementar métodos más avanzados de detección
 
 ## Mantenimiento
 
@@ -79,14 +82,19 @@ Si el scraping deja de funcionar en el futuro:
 
 1. Revisa los selectores CSS en `cardmarket-puppeteer/route.ts` (podrían cambiar si CardMarket actualiza su web)
 2. Prueba con diferentes configuraciones de User-Agent
-3. Considera añadir captcha solving si CardMarket implementa captchas
+3. Si es posible, considera actualizar a un plan Pro de Vercel para obtener más memoria (3008MB)
 
-## Futuras mejoras
+## Opciones para mejorar el rendimiento
 
+### Plan Hobby (1024MB):
 - Implementar un sistema de caché más avanzado para reducir llamadas a CardMarket
-- Rotar User-Agents para parecer más natural
-- Añadir soporte para proxy rotativo (para cambiar IPs y evitar bloqueos)
+- Programar actualizaciones de precios en lotes pequeños durante la noche
+
+### Con plan Pro de Vercel:
+- Actualizar `vercel.json` para usar 3008MB de memoria
+- Eliminar las restricciones agresivas de `cardmarket-puppeteer/route.ts`
+- Usar navegación más completa y esperar por `networkidle2` para mejor precisión
 
 ---
 
-Documentación creada: [Fecha actual] 
+Documentación actualizada: [Fecha actual] 
