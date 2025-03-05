@@ -50,11 +50,14 @@ export const getInventoryItemsByProduct = async (productId: string): Promise<Inv
 };
 
 // Añadir un nuevo ítem de inventario
-export const addInventoryItem = async (item: Omit<InventoryItem, 'id'>): Promise<string> => {
+export const addInventoryItem = async (item: Omit<InventoryItem, 'id'>): Promise<InventoryItem> => {
   try {
     const inventoryCol = collection(db, "inventory");
     const docRef = await addDoc(inventoryCol, item);
-    return docRef.id;
+    return {
+      id: docRef.id,
+      ...item
+    };
   } catch (error) {
     console.error("Error adding inventory item:", error);
     throw error;
