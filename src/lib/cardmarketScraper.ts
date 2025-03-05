@@ -1,33 +1,39 @@
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
 
-let browser: any = null;
+const getBrowser = async () => {
+  chromium.setGraphicsMode = false;
+  
+  const options = {
+    args: [
+      ...chromium.args,
+      '--disable-web-security',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-gpu',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+    ],
+    defaultViewport: chromium.defaultViewport,
+    executablePath: await chromium.executablePath(),
+    headless: chromium.headless,
+    ignoreHTTPSErrors: true
+  };
 
-async function getBrowser() {
-  if (!browser) {
-    // Desactivar WebGL ya que no lo necesitamos para scraping
-    chromium.setGraphicsMode = false;
-
-    browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
-      ignoreHTTPSErrors: true
-    });
-  }
-  return browser;
-}
+  return await puppeteer.launch(options);
+};
 
 export async function getCardmarketPrice(url: string): Promise<number | null> {
   if (!url || !url.includes('cardmarket.com')) {
     return null;
   }
 
-  let page;
+  let browser = null;
+  let page = null;
 
   try {
-    const browser = await getBrowser();
+    browser = await getBrowser();
     page = await browser.newPage();
 
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Firefox/115.0');
@@ -63,6 +69,13 @@ export async function getCardmarketPrice(url: string): Promise<number | null> {
         await page.close();
       } catch (e) {
         console.error('Error cerrando la página:', e);
+      }
+    }
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (e) {
+        console.error('Error cerrando el navegador:', e);
       }
     }
   }

@@ -67,13 +67,6 @@ const nextConfig = {
         child_process: false,
       };
     }
-
-    // Forzar resolución de yargs a CommonJS
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      'yargs': require.resolve('yargs')
-    };
-
     return config;
   },
 };
