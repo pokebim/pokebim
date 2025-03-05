@@ -42,7 +42,9 @@ const nextConfig = {
   // Configuración de transpilación solo para paquetes del cliente
   transpilePackages: [
     'firebase', 
-    '@firebase/firestore'
+    '@firebase/firestore',
+    '@tanstack/react-table',
+    'date-fns'
   ],
   
   // Configuración para paquetes que necesitan Node.js
@@ -50,17 +52,22 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb'
     },
-    serverComponentsExternalPackages: [
-      '@sparticuz/chromium',
-      'puppeteer-core'
-    ],
-    optimizePackageImports: ['firebase'],
     typedRoutes: true,
-    webpackBuildWorker: true
+    webpackBuildWorker: true,
+    optimizePackageImports: [
+      'firebase',
+      '@tanstack/react-table',
+      'date-fns'
+    ]
   },
   
   // Configuración de output
   output: 'standalone',
+
+  serverExternalPackages: [
+    '@sparticuz/chromium',
+    'puppeteer-core'
+  ],
 
   webpack: (config, { isServer }) => {
     if (!isServer) {
