@@ -10,19 +10,7 @@ import {
   where
 } from "firebase/firestore/lite";
 import { db } from "./firebase";
-
-// Interfaz para el ítem de inventario
-export interface InventoryItem {
-  id?: string;
-  productId: string;
-  quantity: number;
-  location?: string;
-  condition?: string;
-  purchaseDate?: string;
-  purchasePrice?: number;
-  purchaseCurrency?: string;
-  notes?: string;
-}
+import { InventoryItem } from "@/types";
 
 // Obtener todos los ítems de inventario
 export const getAllInventoryItems = async (): Promise<InventoryItem[]> => {

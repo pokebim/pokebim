@@ -31,8 +31,6 @@ interface EnrichedInventoryItem extends InventoryItem {
     language: string;
     type?: string;
   };
-  owner?: string;
-  purchasedBy?: string;
 }
 
 export default function InventoryPage() {
@@ -62,9 +60,7 @@ export default function InventoryPage() {
             name: product.name,
             language: product.language,
             type: product.type
-          } : undefined,
-          owner: item.owner || 'No especificado',
-          purchasedBy: item.purchasedBy || 'No especificado'
+          } : undefined
         };
       });
       
@@ -135,9 +131,7 @@ export default function InventoryPage() {
           purchaseDate: formData.purchaseDate,
           purchasePrice: formData.purchasePrice,
           purchaseCurrency: formData.purchaseCurrency,
-          notes: formData.notes,
-          owner: formData.owner,
-          purchasedBy: formData.purchasedBy
+          notes: formData.notes
         });
         
         setInventoryItems(prev => 
@@ -153,8 +147,6 @@ export default function InventoryPage() {
                   purchasePrice: formData.purchasePrice,
                   purchaseCurrency: formData.purchaseCurrency,
                   notes: formData.notes,
-                  owner: formData.owner,
-                  purchasedBy: formData.purchasedBy,
                   product: products.find(p => p.id === formData.productId) 
                     ? {
                         name: products.find(p => p.id === formData.productId)!.name,
@@ -178,9 +170,7 @@ export default function InventoryPage() {
           purchaseDate: formData.purchaseDate,
           purchasePrice: formData.purchasePrice,
           purchaseCurrency: formData.purchaseCurrency,
-          notes: formData.notes,
-          owner: formData.owner,
-          purchasedBy: formData.purchasedBy
+          notes: formData.notes
         });
         
         const product = products.find(p => p.id === formData.productId);
@@ -191,9 +181,7 @@ export default function InventoryPage() {
             name: product.name,
             language: product.language,
             type: product.type
-          } : undefined,
-          owner: formData.owner || 'No especificado',
-          purchasedBy: formData.purchasedBy || 'No especificado'
+          } : undefined
         }]);
         
         showNotification('Elemento de inventario añadido con éxito');
@@ -301,14 +289,6 @@ export default function InventoryPage() {
       header: 'Notas',
       cell: info => <span className="text-gray-300 max-w-xs truncate">{info.getValue() || '-'}</span>
     }),
-    columnHelper.accessor('owner', {
-      header: 'Propietario',
-      cell: info => info.getValue() || 'No especificado'
-    }),
-    columnHelper.accessor('purchasedBy', {
-      header: 'Comprado por',
-      cell: info => info.getValue() || 'No especificado'
-    }),
     columnHelper.accessor('id', {
       header: 'Acciones',
       cell: info => (
@@ -341,8 +321,6 @@ export default function InventoryPage() {
       purchasePrice: initialData?.purchasePrice || '',
       purchaseCurrency: initialData?.purchaseCurrency || 'EUR',
       notes: initialData?.notes || '',
-      owner: initialData?.owner || '',
-      purchasedBy: initialData?.purchasedBy || ''
     });
 
     const handleChange = (e) => {
@@ -391,38 +369,6 @@ export default function InventoryPage() {
             required
             className="w-full"
           />
-        </div>
-        
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="owner" className="block text-sm font-bold text-white mb-2">
-              Propietario
-            </label>
-            <input
-              type="text"
-              id="owner"
-              name="owner"
-              value={formData.owner}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-700 bg-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-white"
-              placeholder="¿Quién tiene el producto?"
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="purchasedBy" className="block text-sm font-bold text-white mb-2">
-              Comprado por
-            </label>
-            <input
-              type="text"
-              id="purchasedBy"
-              name="purchasedBy"
-              value={formData.purchasedBy}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-700 bg-gray-800 rounded-md shadow-sm focus:outline-none focus:ring-green-500 focus:border-green-500 text-white"
-              placeholder="¿Quién compró el producto?"
-            />
-          </div>
         </div>
         
         <div>
