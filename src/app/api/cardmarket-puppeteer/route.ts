@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import chromium from '@sparticuz/chromium';
-import puppeteer from 'puppeteer-core';
+// Usamos import dinámico para evitar problemas de compilación
+// import chromium from '@sparticuz/chromium';
+// import puppeteer from 'puppeteer-core';
 
 // Configuración para entorno Vercel Serverless con memoria limitada
 const SAFE_TIMEOUT = 8000; // 8 segundos (menos del límite de Vercel)
@@ -31,6 +32,10 @@ export async function GET(request: NextRequest) {
   let browser;
   
   try {
+    // Importar las dependencias dinámicamente para evitar problemas en build time
+    const puppeteer = (await import('puppeteer-core')).default;
+    const chromium = (await import('@sparticuz/chromium')).default;
+    
     // Configurar Puppeteer para entorno serverless con memoria limitada
     browser = await puppeteer.launch({
       args: [

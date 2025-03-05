@@ -32,13 +32,12 @@ const nextConfig = {
     '@firebase/firestore', 
     '@grpc/grpc-js', 
     '@grpc/proto-loader', 
-    'long',
-    'puppeteer-core',
-    '@sparticuz/chromium'
+    'long'
   ],
   
   // Aumentar el tiempo de espera para las API routes
   experimental: {
+    // Indicar que estos paquetes son externos (no transpilados)
     serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
     outputFileTracingExcludes: {
       '*': [
