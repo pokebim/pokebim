@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Define interfaces for our data structures
+interface PriceData {
+  prices: Record<string, number>;
+  timestamp?: string;
+}
+
 // Token de seguridad para autorizar actualizaciones
 const API_TOKEN = process.env.PRICE_UPDATE_TOKEN || 'pokebim_secret_token';
 
@@ -16,8 +22,8 @@ export async function POST(request: NextRequest) {
       }, { status: 401 });
     }
     
-    // Obtener los datos de la solicitud
-    const data = await request.json();
+    // Obtener los datos de la solicitud y validar el tipo
+    const data = await request.json() as PriceData;
     const prices = data.prices;
     const timestamp = data.timestamp || new Date().toISOString();
     
@@ -82,7 +88,9 @@ export const REFERENCE_PRICES: {[key: string]: number} = {
     // Añadir cada precio ordenado alfabéticamente
     const sortedEntries = Object.entries(prices).sort(([a], [b]) => a.localeCompare(b));
     for (const [name, price] of sortedEntries) {
-      fileContent += `  '${name}': ${parseFloat(price.toString()).toFixed(2)},\n`;
+      // Asegurarnos de que price es un número
+      const numericPrice = typeof price === 'number' ? price : parseFloat(String(price));
+      fileContent += `  '${name}': ${numericPrice.toFixed(2)},\n`;
     }
     
     fileContent += "};";
