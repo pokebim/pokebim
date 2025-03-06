@@ -865,9 +865,9 @@ export default function PricesContent() {
           const priceAInEUR = convertCurrency(a.price, a.currency, 'EUR');
           const priceBInEUR = convertCurrency(b.price, b.currency, 'EUR');
           
-          // Calcular beneficios
-          const profitA = (productA?.cardmarketPrice || 0) - priceAInEUR;
-          const profitB = (productB?.cardmarketPrice || 0) - priceBInEUR;
+          // Calcular beneficios (descontando IVA del precio de Cardmarket)
+          const profitA = ((productA?.cardmarketPrice || 0) / 1.21) - priceAInEUR;
+          const profitB = ((productB?.cardmarketPrice || 0) / 1.21) - priceBInEUR;
           
           return profitB - profitA; // Ordenar de mayor a menor beneficio
         }))
@@ -879,9 +879,10 @@ export default function PricesContent() {
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
-          // Calcular precio en EUR
+          // Calcular precio en EUR y beneficio (descontando IVA del precio de Cardmarket)
           const priceInEUR = convertCurrency(price.price, price.currency, 'EUR');
-          const profit = product.cardmarketPrice - priceInEUR;
+          const cardmarketPriceWithoutVAT = product.cardmarketPrice / 1.21;
+          const profit = cardmarketPriceWithoutVAT - priceInEUR;
           
           // Aplicar estilo según si hay beneficio o pérdida
           const isProfit = profit > 0;
@@ -1017,8 +1018,9 @@ export default function PricesContent() {
           const productA = products.find(p => p.id === a.productId);
           const productB = products.find(p => p.id === b.productId);
           
-          const profitA = (productA?.cardmarketPrice || 0) - a.bestPriceInEUR;
-          const profitB = (productB?.cardmarketPrice || 0) - b.bestPriceInEUR;
+          // Calcular beneficios (descontando IVA del precio de Cardmarket)
+          const profitA = ((productA?.cardmarketPrice || 0) / 1.21) - a.bestPriceInEUR;
+          const profitB = ((productB?.cardmarketPrice || 0) / 1.21) - b.bestPriceInEUR;
           
           return profitB - profitA; // Mayor beneficio primero
         }))
@@ -1030,7 +1032,9 @@ export default function PricesContent() {
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
-          const profit = product.cardmarketPrice - price.bestPriceInEUR;
+          // Calcular beneficio (descontando IVA del precio de Cardmarket)
+          const cardmarketPriceWithoutVAT = product.cardmarketPrice / 1.21;
+          const profit = cardmarketPriceWithoutVAT - price.bestPriceInEUR;
           
           // Formato del beneficio
           if (profit > 0) {
