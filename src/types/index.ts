@@ -12,6 +12,7 @@ export interface Product {
   type?: string;
   barcode?: string;
   sku?: string;
+  cardmarketPrice?: number;
 }
 
 export interface Supplier {

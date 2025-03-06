@@ -169,4 +169,37 @@ export const checkProductsExist = async (): Promise<{ exists: boolean, count: nu
     console.error("Error checking products collection:", error);
     return { exists: false, count: 0 };
   }
+};
+
+// Actualizar el precio de Cardmarket para un producto
+export const updateCardmarketPrice = async (id: string, cardmarketPrice: number): Promise<void> => {
+  try {
+    const productRef = doc(db, "products", id);
+    await updateDoc(productRef, { 
+      cardmarketPrice, 
+      lastPriceUpdate: new Date() 
+    });
+    console.log(`FIREBASE: Precio de Cardmarket actualizado para el producto ${id}: ${cardmarketPrice}€`);
+  } catch (error) {
+    console.error(`Error updating Cardmarket price for product ${id}:`, error);
+    throw error;
+  }
+};
+
+// Actualizar el precio de Cardmarket para múltiples productos
+export const updateBulkCardmarketPrices = async (productPrices: {id: string, price: number}[]): Promise<void> => {
+  try {
+    // Crear un array de promesas para actualizar cada producto
+    const updatePromises = productPrices.map(item => 
+      updateCardmarketPrice(item.id, item.price)
+    );
+    
+    // Ejecutar todas las actualizaciones en paralelo
+    await Promise.all(updatePromises);
+    
+    console.log(`FIREBASE: Precios de Cardmarket actualizados para ${productPrices.length} productos`);
+  } catch (error) {
+    console.error(`Error updating bulk Cardmarket prices:`, error);
+    throw error;
+  }
 }; 

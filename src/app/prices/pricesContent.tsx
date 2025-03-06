@@ -595,6 +595,52 @@ export default function PricesContent() {
       header: 'Moneda',
       cell: info => info.getValue()
     }),
+    // Nueva columna para mostrar el Precio de Cardmarket
+    columnHelper.display({
+      id: 'cardmarketPrice',
+      header: 'Precio Cardmarket',
+      cell: info => {
+        const price = info.row.original;
+        const productId = price.productId;
+        const product = products.find(p => p.id === productId);
+        
+        // Verificar si el producto existe y tiene precio de Cardmarket
+        if (product && product.cardmarketPrice) {
+          return formatCurrency(product.cardmarketPrice, 'EUR');
+        }
+        
+        return 'No disponible';
+      }
+    }),
+    // Nueva columna para mostrar el Beneficio (Precio Cardmarket - Precio EUR)
+    columnHelper.display({
+      id: 'profit',
+      header: 'Beneficio',
+      cell: info => {
+        const price = info.row.original;
+        const productId = price.productId;
+        const product = products.find(p => p.id === productId);
+        
+        // Verificar si el producto existe y tiene precio de Cardmarket
+        if (product && product.cardmarketPrice) {
+          const priceInEUR = convertCurrency(price.price, price.currency, 'EUR');
+          const profit = product.cardmarketPrice - priceInEUR;
+          
+          // Aplicar estilo según si hay beneficio o pérdida
+          const isProfit = profit > 0;
+          const displayClass = isProfit ? 'text-green-600 font-medium' : 'text-red-600 font-medium';
+          
+          return (
+            <span className={displayClass}>
+              {formatCurrency(profit, 'EUR')}
+              {isProfit ? ' ▲' : ' ▼'}
+            </span>
+          );
+        }
+        
+        return 'No disponible';
+      }
+    }),
     columnHelper.display({
       id: 'shippingCostEUR',
       header: 'Envío (EUR)',
@@ -677,6 +723,63 @@ export default function PricesContent() {
       header: 'Mejor Precio',
       accessorFn: (row: BestPriceProduct) => 
         `${formatCurrency(row.bestPrice, row.bestPriceCurrency)} (${formatCurrency(row.bestPriceInEUR, 'EUR')})`,
+    },
+    // Nueva columna para mostrar el Precio de Cardmarket
+    {
+      header: 'Precio Cardmarket',
+      accessorFn: (row: BestPriceProduct) => {
+        const productId = row.productId;
+        const product = products.find(p => p.id === productId);
+        
+        // Verificar si el producto existe y tiene precio de Cardmarket
+        if (product && product.cardmarketPrice) {
+          return formatCurrency(product.cardmarketPrice, 'EUR');
+        }
+        
+        return 'No disponible';
+      },
+    },
+    // Nueva columna para mostrar el Beneficio (Precio Cardmarket - Mejor Precio EUR)
+    {
+      header: 'Beneficio',
+      accessorFn: (row: BestPriceProduct) => {
+        const productId = row.productId;
+        const product = products.find(p => p.id === productId);
+        
+        // Verificar si el producto existe y tiene precio de Cardmarket
+        if (product && product.cardmarketPrice) {
+          const profit = product.cardmarketPrice - row.bestPriceInEUR;
+          
+          // Formatear el beneficio con signo positivo o negativo
+          const isProfit = profit > 0;
+          return `${formatCurrency(profit, 'EUR')} ${isProfit ? '▲' : '▼'}`;
+        }
+        
+        return 'No disponible';
+      },
+      cell: info => {
+        const row = info.row.original as unknown as BestPriceProduct;
+        const productId = row.productId;
+        const product = products.find(p => p.id === productId);
+        
+        // Verificar si el producto existe y tiene precio de Cardmarket
+        if (product && product.cardmarketPrice) {
+          const profit = product.cardmarketPrice - row.bestPriceInEUR;
+          
+          // Aplicar estilo según si hay beneficio o pérdida
+          const isProfit = profit > 0;
+          const displayClass = isProfit ? 'text-green-600 font-medium' : 'text-red-600 font-medium';
+          
+          return (
+            <span className={displayClass}>
+              {formatCurrency(profit, 'EUR')}
+              {isProfit ? ' ▲' : ' ▼'}
+            </span>
+          );
+        }
+        
+        return 'No disponible';
+      },
     },
     {
       header: 'Proveedor',

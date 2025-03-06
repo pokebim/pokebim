@@ -81,6 +81,12 @@ const icons = {
       <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
     </svg>
   ),
+  cardmarket: (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
+      <path d="M9 4.5a1 1 0 11-2 0 1 1 0 012 0zm3 0a1 1 0 11-2 0 1 1 0 012 0z" />
+    </svg>
+  ),
 };
 
 const menuItems = [
@@ -88,6 +94,7 @@ const menuItems = [
   { name: 'Proveedores', path: '/suppliers', icon: icons.suppliers },
   { name: 'Productos', path: '/products', icon: icons.products },
   { name: 'Precios', path: '/prices', icon: icons.prices },
+  { name: 'Precios Cardmarket', path: '/cardmarket-prices', icon: icons.cardmarket },
   { name: 'Pedidos', path: '/stock', icon: icons.stock },
   { name: 'Productos que nos faltan', path: '/missingProducts', icon: icons.missingProducts },
   { name: 'Material', path: '/materials', icon: icons.materials },
