@@ -9,7 +9,7 @@ import {
   query, 
   where,
   Timestamp
-} from "firebase/firestore/lite";
+} from "firebase/firestore";
 import { db } from "./firebase";
 import { Currency } from "./currencyConverter";
 

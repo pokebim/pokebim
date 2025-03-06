@@ -27,7 +27,7 @@ import {
   addSupplier
 } from '@/lib/supplierService';
 import { toast } from 'react-hot-toast';
-import { collection, getDocs } from 'firebase/firestore/lite';
+import { collection, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
 import PriceInlineEdit from '@/components/ui/PriceInlineEdit';
