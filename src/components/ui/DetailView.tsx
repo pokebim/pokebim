@@ -108,7 +108,17 @@ export function DetailLink({ href, label, className = '' }: { href: string; labe
 /**
  * Componente para mostrar una imagen con leyenda
  */
-export function DetailImage({ src, alt, caption }: { src: string; alt: string; caption?: string }) {
+export function DetailImage({ 
+  src, 
+  alt, 
+  caption,
+  onClick 
+}: { 
+  src: string; 
+  alt: string; 
+  caption?: string;
+  onClick?: () => void 
+}) {
   return (
     <figure className="relative">
       <div className="overflow-hidden rounded-lg bg-gray-800 shadow-md">
@@ -116,7 +126,8 @@ export function DetailImage({ src, alt, caption }: { src: string; alt: string; c
           <img 
             src={src} 
             alt={alt}
-            className="w-full h-auto object-contain max-h-80"
+            className={`w-full h-auto object-contain max-h-80 ${onClick ? 'cursor-pointer' : ''}`}
+            onClick={onClick}
             onError={(e) => {
               (e.target as HTMLImageElement).src = '/placeholder-image.png';
               (e.target as HTMLImageElement).alt = 'Imagen no disponible';

@@ -34,6 +34,7 @@ import ProductImage from '@/components/ui/ProductImage';
 import ImageModal from '@/components/ui/ImageModal';
 import { flexRender } from '@tanstack/react-table';
 import DefaultProductImage from '@/components/ui/DefaultProductImage';
+import { getCardmarketPriceForProduct } from '@/lib/cardmarketService';
 
 interface EnrichedPrice extends Price {
   product: {
@@ -72,38 +73,38 @@ interface BestPriceProduct {
 // El componente real con toda la lógica
 export default function PricesContent() {
   const [prices, setPrices] = useState<EnrichedPrice[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [modalOpen, setModalOpen] = useState<boolean>(false);
-  const [notification, setNotification] = useState<Notification | null>({
-    show: false,
-    message: '',
-    type: 'success'
-  });
-  const [editingPrice, setEditingPrice] = useState<EnrichedPrice | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  
-  // Nuevos estados para la vista detallada
-  const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
-  const [selectedPrice, setSelectedPrice] = useState<EnrichedPrice | null>(null);
-
-  // Estado para la imagen modal
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  
-  // Estado para las pestañas
-  const [activeTab, setActiveTab] = useState<'allPrices' | 'bestPrices'>('allPrices');
-
-  // Estados para filtros
-  const [filters, setFilters] = useState({
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingPrice, setEditingPrice] = useState<EnrichedPrice | null>(null);
+  const [notification, setNotification] = useState<Notification>({ show: false, message: '', type: 'success' });
+  const [filters, setFilters] = useState<Filters>({
     productName: '',
-    productLanguage: '',
-    productType: '',
+    language: '',
+    type: '',
     supplierName: '',
-    supplierCountry: '',
+    country: '',
     minPrice: '',
     maxPrice: ''
   });
+  
+  // Estado para la vista detallada
+  const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
+  const [selectedPrice, setSelectedPrice] = useState<EnrichedPrice | null>(null);
+  
+  // Estado para el modal de imagen ampliada
+  const [imageModalOpen, setImageModalOpen] = useState(false);
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string>('');
+  
+  // Estado para la tabla de mejores precios
+  const [showBestPrices, setShowBestPrices] = useState(false);
+  const [bestPrices, setBestPrices] = useState<BestPriceProduct[]>([]);
+  
+  // Estado para tracking de carga de precios de Cardmarket
+  const [loadingCardmarketPrices, setLoadingCardmarketPrices] = useState(false);
+  const [cardmarketPricesStatus, setCardmarketPricesStatus] = useState({ loaded: 0, total: 0 });
   
   // Obtener valores únicos para los filtros
   const uniqueLanguages = useMemo(() => {
@@ -165,12 +166,12 @@ export default function PricesContent() {
       }
       
       // Filtro por idioma
-      if (filters.productLanguage && price.product?.language !== filters.productLanguage) {
+      if (filters.language && price.product?.language !== filters.language) {
         return false;
       }
       
       // Filtro por tipo
-      if (filters.productType && price.product?.type !== filters.productType) {
+      if (filters.type && price.product?.type !== filters.type) {
         return false;
       }
       
@@ -181,7 +182,7 @@ export default function PricesContent() {
       }
       
       // Filtro por país del proveedor
-      if (filters.supplierCountry && price.supplier?.country !== filters.supplierCountry) {
+      if (filters.country && price.supplier?.country !== filters.country) {
         return false;
       }
       
@@ -212,12 +213,12 @@ export default function PricesContent() {
       }
       
       // Filtro por idioma
-      if (filters.productLanguage && price.product?.language !== filters.productLanguage) {
+      if (filters.language && price.product?.language !== filters.language) {
         return false;
       }
       
       // Filtro por tipo
-      if (filters.productType && price.product?.type !== filters.productType) {
+      if (filters.type && price.product?.type !== filters.type) {
         return false;
       }
       
@@ -228,7 +229,7 @@ export default function PricesContent() {
       }
       
       // Filtro por país del proveedor
-      if (filters.supplierCountry && price.supplier?.country !== filters.supplierCountry) {
+      if (filters.country && price.supplier?.country !== filters.country) {
         return false;
       }
       
@@ -323,6 +324,149 @@ export default function PricesContent() {
     
     fetchPrices();
   }, []);
+  
+  // Efecto para cargar los precios de Cardmarket para cada producto
+  useEffect(() => {
+    const loadCardmarketPrices = async () => {
+      if (prices.length === 0 || !products.length) return;
+      
+      setLoadingCardmarketPrices(true);
+      const updatedProducts = [...products];
+      
+      try {
+        // Primero creamos un array de promesas para cada precio (máximo 5 a la vez para no sobrecargar)
+        const uniqueProductIds = [...new Set(prices.map(price => price.productId).filter(Boolean))];
+        
+        // Inicializar el estado de carga
+        setCardmarketPricesStatus({ loaded: 0, total: uniqueProductIds.length });
+        
+        // Definimos una función para procesar lotes de promesas
+        const processBatch = async (productIds: string[]) => {
+          console.log(`Cargando lote de ${productIds.length} precios de Cardmarket`);
+          
+          // Procesar uno por uno con un retraso entre cada uno para evitar exceder la cuota
+          for (const productId of productIds) {
+            try {
+              const cardmarketPrice = await getCardmarketPriceForProduct(productId);
+              
+              // Si encontramos un precio, actualizar el producto correspondiente
+              if (cardmarketPrice) {
+                const productIndex = updatedProducts.findIndex(p => p.id === productId);
+                if (productIndex !== -1) {
+                  updatedProducts[productIndex] = {
+                    ...updatedProducts[productIndex],
+                    cardmarketPrice: cardmarketPrice.price,
+                    lastPriceUpdate: cardmarketPrice.updatedAt,
+                    cardmarketUrl: cardmarketPrice.url
+                  };
+                }
+              }
+              
+              // Incrementar contador de precios cargados
+              setCardmarketPricesStatus(prev => ({ 
+                ...prev, 
+                loaded: prev.loaded + 1 
+              }));
+              
+              // Actualizar los productos después de cada carga para ver resultados inmediatos
+              setProducts([...updatedProducts]);
+              
+              // Esperar 300ms entre cada solicitud para no sobrecargar Firebase
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+            } catch (error) {
+              console.error(`Error al cargar precio para ${productId}:`, error);
+              // Incrementar contador aún en caso de error
+              setCardmarketPricesStatus(prev => ({ 
+                ...prev, 
+                loaded: prev.loaded + 1 
+              }));
+            }
+          }
+        };
+        
+        // Dividir los IDs en lotes más pequeños (5 en lugar de 20) para procesar
+        const batchSize = 5;
+        for (let i = 0; i < uniqueProductIds.length; i += batchSize) {
+          const batch = uniqueProductIds.slice(i, i + batchSize);
+          await processBatch(batch);
+          
+          // Pausa entre lotes para evitar sobrecargar Firebase
+          if (i + batchSize < uniqueProductIds.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+        
+        // Actualizar el estado final
+        setProducts(updatedProducts);
+      } catch (error) {
+        console.error("Error al cargar precios de Cardmarket:", error);
+      } finally {
+        setLoadingCardmarketPrices(false);
+      }
+    };
+    
+    loadCardmarketPrices();
+  }, [prices]);
+  
+  // Efecto para calcular los mejores precios
+  useEffect(() => {
+    // Solo calcular si tenemos precios
+    if (prices.length === 0) return;
+    
+    // Agrupar precios por producto
+    const pricesByProduct = {};
+    prices.forEach(price => {
+      if (!price.productId) return;
+      
+      if (!pricesByProduct[price.productId]) {
+        pricesByProduct[price.productId] = [];
+      }
+      pricesByProduct[price.productId].push(price);
+    });
+    
+    // Para cada producto, encontrar el precio más bajo
+    const bestPricesArray: BestPriceProduct[] = [];
+    
+    Object.keys(pricesByProduct).forEach(productId => {
+      const productPrices = pricesByProduct[productId];
+      if (productPrices.length === 0) return;
+      
+      // Ordenar por precio en EUR de menor a mayor
+      productPrices.sort((a, b) => {
+        const aEUR = convertCurrency(a.price, a.currency, 'EUR');
+        const bEUR = convertCurrency(b.price, b.currency, 'EUR');
+        return aEUR - bEUR;
+      });
+      
+      // Tomar el precio más bajo
+      const bestPrice = productPrices[0];
+      const product = products.find(p => p.id === productId);
+      const supplier = suppliers.find(s => s.id === bestPrice.supplierId);
+      
+      if (product && supplier) {
+        bestPricesArray.push({
+          productId: productId,
+          productName: product.name || 'Sin nombre',
+          productType: product.type || 'Desconocido',
+          productLanguage: product.language || 'Desconocido',
+          productImageUrl: product.imageUrl,
+          bestPrice: bestPrice.price,
+          bestPriceCurrency: bestPrice.currency,
+          bestPriceInEUR: convertCurrency(bestPrice.price, bestPrice.currency, 'EUR'),
+          supplierName: supplier.name || 'Desconocido',
+          supplierCountry: supplier.country || 'Desconocido',
+          supplierShippingCost: bestPrice.shippingCost || 0
+        });
+      }
+    });
+    
+    // Ordenar por precio en EUR
+    bestPricesArray.sort((a, b) => a.bestPriceInEUR - b.bestPriceInEUR);
+    
+    // Actualizar el estado
+    setBestPrices(bestPricesArray);
+  }, [prices, products, suppliers]);
   
   // Función para abrir el modal de edición
   const handleEdit = (price: EnrichedPrice) => {
@@ -480,7 +624,7 @@ export default function PricesContent() {
   
   // Función para ver imagen
   const handleImageClick = (imageUrl: string) => {
-    setSelectedImage(imageUrl);
+    setSelectedImageUrl(imageUrl);
   };
   
   // Definir columnas de la tabla
@@ -492,11 +636,17 @@ export default function PricesContent() {
       header: 'Imagen',
       cell: info => {
         const imageUrl = info.row.original.product?.imageUrl;
+        // Usar un key basado en el ID o URL para mantener el estado entre renderizaciones
+        const key = info.row.original.id || (imageUrl ? encodeURIComponent(imageUrl) : 'no-image');
+        
         return (
-          <div className="relative w-10 h-10 overflow-hidden flex-shrink-0" 
-               onClick={() => imageUrl && handleImageClick(imageUrl)}>
+          <div 
+            className="relative w-10 h-10 overflow-hidden flex-shrink-0" 
+            onClick={() => imageUrl && handleImageClick(imageUrl)}
+          >
             <div className={`absolute inset-0 flex items-center justify-center ${imageUrl ? 'cursor-pointer' : ''}`}>
               <ProductImage 
+                key={key}
                 src={imageUrl} 
                 alt={info.row.original.product?.name || 'Producto'} 
                 className="max-w-full max-h-full object-contain"
@@ -557,7 +707,13 @@ export default function PricesContent() {
     }),
     columnHelper.display({
       id: 'priceInEUR',
-      header: 'Precio (EUR)',
+      header: () => <div className="cursor-pointer" onClick={() => 
+        setPrices(prev => [...prev].sort((a, b) => {
+          const aEUR = convertCurrency(a.price, a.currency, 'EUR');
+          const bEUR = convertCurrency(b.price, b.currency, 'EUR');
+          return aEUR - bEUR;
+        }))
+      }>Precio (EUR) ↕</div>,
       cell: info => {
         const price = info.row.original;
         const priceInEUR = convertCurrency(price.price, price.currency, 'EUR');
@@ -591,21 +747,58 @@ export default function PricesContent() {
         );
       }
     }),
-    columnHelper.accessor('currency', {
-      header: 'Moneda',
-      cell: info => info.getValue()
-    }),
     // Nueva columna para mostrar el Precio de Cardmarket
     columnHelper.display({
       id: 'cardmarketPrice',
-      header: 'Precio Cardmarket',
+      header: () => <div className="cursor-pointer" onClick={() => 
+        setPrices(prev => [...prev].sort((a, b) => {
+          // Buscar los productos
+          const productA = products.find(p => p.id === a.productId);
+          const productB = products.find(p => p.id === b.productId);
+          
+          // Valores por defecto si no se encuentran
+          const priceA = productA?.cardmarketPrice || 0;
+          const priceB = productB?.cardmarketPrice || 0;
+          
+          return priceA - priceB;
+        }))
+      }>
+        <div className="flex items-center">
+          Precio Cardmarket ↕
+          {loadingCardmarketPrices && (
+            <div className="flex items-center ml-2 text-xs text-gray-400">
+              <svg className="w-4 h-4 animate-spin text-indigo-500 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              {cardmarketPricesStatus.loaded}/{cardmarketPricesStatus.total}
+            </div>
+          )}
+        </div>
+      </div>,
       cell: info => {
         const price = info.row.original;
-        const productId = price.productId;
-        const product = products.find(p => p.id === productId);
+        // Buscar el producto usando el productId de la entrada de precios
+        const product = products.find(p => p.id === price.productId);
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
+          // Si tiene URL, renderizar como enlace
+          if (product.cardmarketUrl) {
+            return (
+              <a 
+                href={product.cardmarketUrl} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-blue-400 hover:text-blue-300 hover:underline"
+                title="Ver en Cardmarket"
+              >
+                {formatCurrency(product.cardmarketPrice, 'EUR')}
+              </a>
+            );
+          }
+          
+          // Si no tiene URL, solo mostrar el precio
           return formatCurrency(product.cardmarketPrice, 'EUR');
         }
         
@@ -615,27 +808,35 @@ export default function PricesContent() {
     // Nueva columna para mostrar el Beneficio (Precio Cardmarket - Precio EUR)
     columnHelper.display({
       id: 'profit',
-      header: 'Beneficio',
+      header: () => <div className="cursor-pointer" onClick={() => 
+        setPrices(prev => [...prev].sort((a, b) => {
+          // Buscar los productos
+          const productA = products.find(p => p.id === a.productId);
+          const productB = products.find(p => p.id === b.productId);
+          
+          // Calcular precios en EUR
+          const priceAInEUR = convertCurrency(a.price, a.currency, 'EUR');
+          const priceBInEUR = convertCurrency(b.price, b.currency, 'EUR');
+          
+          // Calcular beneficios
+          const profitA = (productA?.cardmarketPrice || 0) - priceAInEUR;
+          const profitB = (productB?.cardmarketPrice || 0) - priceBInEUR;
+          
+          return profitB - profitA; // Ordenar de mayor a menor beneficio
+        }))
+      }>Beneficio ↕</div>,
       cell: info => {
-        const price = info.row.original;
-        const productId = price.productId;
+        const rowData = info.row.original as unknown as BestPriceProduct;
+        const productId = rowData.productId;
         const product = products.find(p => p.id === productId);
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
-          const priceInEUR = convertCurrency(price.price, price.currency, 'EUR');
-          const profit = product.cardmarketPrice - priceInEUR;
+          const profit = product.cardmarketPrice - rowData.bestPriceInEUR;
           
-          // Aplicar estilo según si hay beneficio o pérdida
+          // Formatear el beneficio con signo positivo o negativo
           const isProfit = profit > 0;
-          const displayClass = isProfit ? 'text-green-600 font-medium' : 'text-red-600 font-medium';
-          
-          return (
-            <span className={displayClass}>
-              {formatCurrency(profit, 'EUR')}
-              {isProfit ? ' ▲' : ' ▼'}
-            </span>
-          );
+          return `${formatCurrency(profit, 'EUR')} ${isProfit ? '▲' : '▼'}`;
         }
         
         return 'No disponible';
@@ -649,14 +850,6 @@ export default function PricesContent() {
         const shippingInEUR = convertCurrency(price.shippingCost || 0, price.currency, 'EUR');
         return formatCurrency(shippingInEUR, 'EUR');
       }
-    }),
-    columnHelper.accessor('inStock', {
-      header: 'Stock',
-      cell: info => (
-        <span className={`px-2 py-1 rounded-full text-xs ${info.getValue() ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          {info.getValue() ? 'Disponible' : 'No disponible'}
-        </span>
-      )
     }),
     columnHelper.display({
       id: 'actions',
@@ -692,14 +885,21 @@ export default function PricesContent() {
       id: 'image',
       header: 'Imagen',
       cell: info => {
-        const imageUrl = (info.row.original as unknown as BestPriceProduct).productImageUrl;
+        const product = info.row.original as unknown as BestPriceProduct;
+        const imageUrl = product.productImageUrl;
+        // Usar un key basado en el ID de producto o URL para mantener el estado entre renderizaciones
+        const key = product.productId || (imageUrl ? encodeURIComponent(imageUrl) : 'no-image');
+        
         return (
-          <div className="relative w-10 h-10 overflow-hidden flex-shrink-0" 
-               onClick={() => imageUrl && handleImageClick(imageUrl)}>
+          <div 
+            className="relative w-10 h-10 overflow-hidden flex-shrink-0" 
+            onClick={() => imageUrl && handleImageClick(imageUrl)}
+          >
             <div className={`absolute inset-0 flex items-center justify-center ${imageUrl ? 'cursor-pointer' : ''}`}>
               <ProductImage 
+                key={key}
                 src={imageUrl} 
-                alt={(info.row.original as unknown as BestPriceProduct).productName} 
+                alt={product.productName} 
                 className="max-w-full max-h-full object-contain"
               />
             </div>
@@ -708,31 +908,61 @@ export default function PricesContent() {
       }
     }),
     {
+      id: 'productName',
       header: 'Producto',
       accessorKey: 'productName',
     },
     {
+      id: 'productType',
       header: 'Tipo',
       accessorKey: 'productType',
     },
     {
+      id: 'productLanguage',
       header: 'Idioma',
       accessorKey: 'productLanguage',
     },
     {
-      header: 'Mejor Precio',
+      id: 'bestPrice',
+      header: () => <div className="cursor-pointer" onClick={() => 
+        setBestPrices(prev => [...prev].sort((a, b) => a.bestPriceInEUR - b.bestPriceInEUR))
+      }>Mejor Precio ↕</div>,
       accessorFn: (row: BestPriceProduct) => 
         `${formatCurrency(row.bestPrice, row.bestPriceCurrency)} (${formatCurrency(row.bestPriceInEUR, 'EUR')})`,
     },
     // Nueva columna para mostrar el Precio de Cardmarket
     {
-      header: 'Precio Cardmarket',
+      id: 'cardmarketPrice',
+      header: () => <div className="cursor-pointer" onClick={() => 
+        setBestPrices(prev => [...prev].sort((a, b) => {
+          const productA = products.find(p => p.id === a.productId);
+          const productB = products.find(p => p.id === b.productId);
+          return (productA?.cardmarketPrice || 0) - (productB?.cardmarketPrice || 0);
+        }))
+      }>Precio Cardmarket ↕</div>,
       accessorFn: (row: BestPriceProduct) => {
-        const productId = row.productId;
+        const rowData = row as unknown as BestPriceProduct;
+        const productId = rowData.productId;
         const product = products.find(p => p.id === productId);
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
+          // Si tiene URL, renderizar como enlace
+          if (product.cardmarketUrl) {
+            return (
+              <a 
+                href={product.cardmarketUrl} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="text-blue-400 hover:text-blue-300 hover:underline"
+                title="Ver en Cardmarket"
+              >
+                {formatCurrency(product.cardmarketPrice, 'EUR')}
+              </a>
+            );
+          }
+          
+          // Si no tiene URL, solo mostrar el precio
           return formatCurrency(product.cardmarketPrice, 'EUR');
         }
         
@@ -741,30 +971,26 @@ export default function PricesContent() {
     },
     // Nueva columna para mostrar el Beneficio (Precio Cardmarket - Mejor Precio EUR)
     {
-      header: 'Beneficio',
-      accessorFn: (row: BestPriceProduct) => {
-        const productId = row.productId;
-        const product = products.find(p => p.id === productId);
-        
-        // Verificar si el producto existe y tiene precio de Cardmarket
-        if (product && product.cardmarketPrice) {
-          const profit = product.cardmarketPrice - row.bestPriceInEUR;
+      id: 'profit',
+      header: () => <div className="cursor-pointer" onClick={() => 
+        setBestPrices(prev => [...prev].sort((a, b) => {
+          const productA = products.find(p => p.id === a.productId);
+          const productB = products.find(p => p.id === b.productId);
           
-          // Formatear el beneficio con signo positivo o negativo
-          const isProfit = profit > 0;
-          return `${formatCurrency(profit, 'EUR')} ${isProfit ? '▲' : '▼'}`;
-        }
-        
-        return 'No disponible';
-      },
-      cell: info => {
-        const row = info.row.original as unknown as BestPriceProduct;
-        const productId = row.productId;
+          const profitA = (productA?.cardmarketPrice || 0) - a.bestPriceInEUR;
+          const profitB = (productB?.cardmarketPrice || 0) - b.bestPriceInEUR;
+          
+          return profitB - profitA; // Mayor beneficio primero
+        }))
+      }>Beneficio ↕</div>,
+      accessorFn: (row: BestPriceProduct) => {
+        const rowData = row as unknown as BestPriceProduct;
+        const productId = rowData.productId;
         const product = products.find(p => p.id === productId);
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
-          const profit = product.cardmarketPrice - row.bestPriceInEUR;
+          const profit = product.cardmarketPrice - rowData.bestPriceInEUR;
           
           // Aplicar estilo según si hay beneficio o pérdida
           const isProfit = profit > 0;
@@ -782,10 +1008,12 @@ export default function PricesContent() {
       },
     },
     {
+      id: 'supplierName',
       header: 'Proveedor',
       accessorKey: 'supplierName',
     },
     {
+      id: 'shippingCost',
       header: 'Envío',
       accessorFn: (row: BestPriceProduct) => 
         `${formatCurrency(row.supplierShippingCost, row.bestPriceCurrency)}`,
@@ -799,11 +1027,17 @@ export default function PricesContent() {
     header: 'Imagen',
     cell: info => {
       const imageUrl = info.row.original.product?.imageUrl;
+      // Usar un key basado en el ID o URL para mantener el estado entre renderizaciones
+      const key = info.row.original.id || (imageUrl ? encodeURIComponent(imageUrl) : 'no-image');
+      
       return (
-        <div className="relative w-10 h-10 overflow-hidden flex-shrink-0" 
-             onClick={() => imageUrl && handleImageClick(imageUrl)}>
+        <div 
+          className="relative w-10 h-10 overflow-hidden flex-shrink-0" 
+          onClick={() => imageUrl && handleImageClick(imageUrl)}
+        >
           <div className={`absolute inset-0 flex items-center justify-center ${imageUrl ? 'cursor-pointer' : ''}`}>
             <ProductImage 
+              key={key}
               src={imageUrl} 
               alt={info.row.original.product?.name || 'Producto'} 
               className="max-w-full max-h-full object-contain"
@@ -851,8 +1085,8 @@ export default function PricesContent() {
             </label>
             <select
               id="productLanguage"
-              name="productLanguage"
-              value={filters.productLanguage}
+              name="language"
+              value={filters.language}
               onChange={handleFilterChange}
               className="w-full px-3 py-2 border border-gray-700 bg-gray-900 rounded-md text-white"
             >
@@ -869,8 +1103,8 @@ export default function PricesContent() {
             </label>
             <select
               id="productType"
-              name="productType"
-              value={filters.productType}
+              name="type"
+              value={filters.type}
               onChange={handleFilterChange}
               className="w-full px-3 py-2 border border-gray-700 bg-gray-900 rounded-md text-white"
             >
@@ -902,8 +1136,8 @@ export default function PricesContent() {
             </label>
             <select
               id="supplierCountry"
-              name="supplierCountry"
-              value={filters.supplierCountry}
+              name="country"
+              value={filters.country}
               onChange={handleFilterChange}
               className="w-full px-3 py-2 border border-gray-700 bg-gray-900 rounded-md text-white"
             >
@@ -965,21 +1199,19 @@ export default function PricesContent() {
         <div className="flex border-b border-gray-700">
           <button
             className={`py-2 px-4 font-medium rounded-t-lg ${
-              activeTab === 'allPrices' 
-                ? 'bg-gray-700 text-white border-t border-r border-l border-gray-600' 
+              showBestPrices ? 'bg-gray-700 text-white border-t border-r border-l border-gray-600' 
                 : 'text-gray-400 hover:text-white hover:bg-gray-800'
             }`}
-            onClick={() => setActiveTab('allPrices')}
+            onClick={() => setShowBestPrices(false)}
           >
             Todos los Precios
           </button>
           <button
             className={`py-2 px-4 font-medium rounded-t-lg ${
-              activeTab === 'bestPrices' 
-                ? 'bg-gray-700 text-white border-t border-r border-l border-gray-600' 
-                : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              showBestPrices ? 'text-gray-400 hover:text-white hover:bg-gray-800' 
+                : 'bg-gray-700 text-white border-t border-r border-l border-gray-600'
             }`}
-            onClick={() => setActiveTab('bestPrices')}
+            onClick={() => setShowBestPrices(true)}
           >
             Mejores Precios por Producto
           </button>
@@ -999,7 +1231,7 @@ export default function PricesContent() {
         ) : (
           <>
             {/* Tabla de todos los precios */}
-            {activeTab === 'allPrices' && (
+            {!showBestPrices && (
               <div>
                 <DataTable
                   data={filteredPrices}
@@ -1009,7 +1241,7 @@ export default function PricesContent() {
             )}
             
             {/* Tabla de mejores precios por producto */}
-            {activeTab === 'bestPrices' && (
+            {showBestPrices && (
               <div>
                 <DataTable
                   data={filteredBestPricesByProduct}
@@ -1140,9 +1372,9 @@ export default function PricesContent() {
       
       {/* Modal para ver imagen */}
       <ImageModal
-        isOpen={!!selectedImage}
-        onClose={() => setSelectedImage(null)}
-        imageUrl={selectedImage || ''}
+        isOpen={!!selectedImageUrl}
+        onClose={() => setSelectedImageUrl('')}
+        imageUrl={selectedImageUrl}
       />
     </div>
   );

@@ -5,7 +5,8 @@ const nextConfig = {
       'dummyimage.com',
       'firebasestorage.googleapis.com',
       'assets.pokemon.com',
-      'raw.githubusercontent.com'
+      'raw.githubusercontent.com',
+      'm.media-amazon.com'
     ]
   },
   reactStrictMode: true,

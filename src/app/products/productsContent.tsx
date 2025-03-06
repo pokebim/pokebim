@@ -527,31 +527,13 @@ export default function ProductsContent() {
       </Modal>
       
       {/* Vista detallada del producto */}
-      <Modal isOpen={detailViewOpen} onClose={() => setDetailViewOpen(false)}>
+      <Modal 
+        isOpen={detailViewOpen} 
+        onClose={() => setDetailViewOpen(false)}
+        title={selectedProduct?.name || 'Detalle de producto'}
+      >
         {selectedProduct && (
-          <DetailView 
-            title={selectedProduct.name || 'Producto'}
-            onClose={() => setDetailViewOpen(false)}
-            actions={
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => {
-                    setDetailViewOpen(false);
-                    handleEdit(selectedProduct);
-                  }}
-                  className="px-3 py-1.5 bg-green-700 text-white rounded hover:bg-green-600"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => setDetailViewOpen(false)}
-                  className="px-3 py-1.5 bg-gray-700 text-white rounded hover:bg-gray-600"
-                >
-                  Cerrar
-                </button>
-              </div>
-            }
-          >
+          <div className="space-y-6">
             {/* Información del producto */}
             <DetailSection title="Información del producto">
               <DetailGrid>
@@ -667,7 +649,26 @@ export default function ProductsContent() {
                 </div>
               </DetailSection>
             )}
-          </DetailView>
+            
+            {/* Botones de acción */}
+            <div className="mt-6 flex justify-end space-x-3 border-t border-gray-700 pt-4">
+              <button
+                onClick={() => {
+                  setDetailViewOpen(false);
+                  handleEdit(selectedProduct);
+                }}
+                className="px-3 py-1.5 bg-green-700 text-white rounded hover:bg-green-600"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => setDetailViewOpen(false)}
+                className="px-3 py-1.5 bg-gray-700 text-white rounded hover:bg-gray-600"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         )}
       </Modal>
       
