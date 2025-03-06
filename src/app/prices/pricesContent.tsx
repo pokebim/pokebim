@@ -34,7 +34,7 @@ import ProductImage from '@/components/ui/ProductImage';
 import ImageModal from '@/components/ui/ImageModal';
 import { flexRender } from '@tanstack/react-table';
 import DefaultProductImage from '@/components/ui/DefaultProductImage';
-import { getCardmarketPriceForProduct } from '@/lib/cardmarketService';
+import { getCardmarketPriceForProduct, getAllCardmarketPrices, invalidateCardmarketPricesCache } from '@/lib/cardmarketService';
 
 interface EnrichedPrice extends Price {
   product: {
@@ -331,74 +331,61 @@ export default function PricesContent() {
       if (prices.length === 0 || !products.length) return;
       
       setLoadingCardmarketPrices(true);
-      const updatedProducts = [...products];
+      setCardmarketPricesStatus({ loaded: 0, total: prices.length });
       
       try {
-        // Primero creamos un array de promesas para cada precio (máximo 5 a la vez para no sobrecargar)
-        const uniqueProductIds = [...new Set(prices.map(price => price.productId).filter(Boolean))];
+        console.log('Cargando precios de Cardmarket...');
         
-        // Inicializar el estado de carga
-        setCardmarketPricesStatus({ loaded: 0, total: uniqueProductIds.length });
+        // Cargar todos los precios de Cardmarket en una sola consulta
+        const cardmarketPrices = await getAllCardmarketPrices();
+        console.log(`Obtenidos ${cardmarketPrices.length} precios de Cardmarket`);
         
-        // Definimos una función para procesar lotes de promesas
-        const processBatch = async (productIds: string[]) => {
-          console.log(`Cargando lote de ${productIds.length} precios de Cardmarket`);
+        if (cardmarketPrices.length === 0) {
+          setLoadingCardmarketPrices(false);
+          return;
+        }
+        
+        // Actualizar los productos con sus precios de Cardmarket
+        const updatedProducts = [...products];
+        let updatedCount = 0;
+        
+        // Crear un mapa de precios para búsqueda rápida
+        const pricesMap = new Map();
+        cardmarketPrices.forEach(price => {
+          pricesMap.set(price.productId, price);
+        });
+        
+        // Actualizar productos con sus precios correspondientes
+        for (let i = 0; i < updatedProducts.length; i++) {
+          const product = updatedProducts[i];
+          const cardmarketPrice = pricesMap.get(product.id);
           
-          // Procesar uno por uno con un retraso entre cada uno para evitar exceder la cuota
-          for (const productId of productIds) {
-            try {
-              const cardmarketPrice = await getCardmarketPriceForProduct(productId);
-              
-              // Si encontramos un precio, actualizar el producto correspondiente
-              if (cardmarketPrice) {
-                const productIndex = updatedProducts.findIndex(p => p.id === productId);
-                if (productIndex !== -1) {
-                  updatedProducts[productIndex] = {
-                    ...updatedProducts[productIndex],
-                    cardmarketPrice: cardmarketPrice.price,
-                    lastPriceUpdate: cardmarketPrice.updatedAt,
-                    cardmarketUrl: cardmarketPrice.url
-                  };
-                }
-              }
-              
-              // Incrementar contador de precios cargados
-              setCardmarketPricesStatus(prev => ({ 
-                ...prev, 
-                loaded: prev.loaded + 1 
-              }));
-              
-              // Actualizar los productos después de cada carga para ver resultados inmediatos
-              setProducts([...updatedProducts]);
-              
-              // Esperar 300ms entre cada solicitud para no sobrecargar Firebase
-              await new Promise(resolve => setTimeout(resolve, 300));
-              
-            } catch (error) {
-              console.error(`Error al cargar precio para ${productId}:`, error);
-              // Incrementar contador aún en caso de error
-              setCardmarketPricesStatus(prev => ({ 
-                ...prev, 
-                loaded: prev.loaded + 1 
-              }));
-            }
+          if (cardmarketPrice) {
+            updatedProducts[i] = {
+              ...product,
+              cardmarketPrice: cardmarketPrice.price,
+              lastPriceUpdate: cardmarketPrice.updatedAt,
+              cardmarketUrl: cardmarketPrice.url
+            };
+            updatedCount++;
           }
-        };
-        
-        // Dividir los IDs en lotes más pequeños (5 en lugar de 20) para procesar
-        const batchSize = 5;
-        for (let i = 0; i < uniqueProductIds.length; i += batchSize) {
-          const batch = uniqueProductIds.slice(i, i + batchSize);
-          await processBatch(batch);
           
-          // Pausa entre lotes para evitar sobrecargar Firebase
-          if (i + batchSize < uniqueProductIds.length) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+          // Actualizar el progreso
+          setCardmarketPricesStatus(prev => ({
+            ...prev,
+            loaded: updatedCount
+          }));
+          
+          // Actualizar el estado cada 10 productos para mostrar progreso
+          if (i % 10 === 0) {
+            setProducts([...updatedProducts]);
           }
         }
         
-        // Actualizar el estado final
+        // Actualización final
         setProducts(updatedProducts);
+        console.log(`Actualizados ${updatedCount} productos con precios de Cardmarket`);
+        
       } catch (error) {
         console.error("Error al cargar precios de Cardmarket:", error);
       } finally {
@@ -512,14 +499,12 @@ export default function PricesContent() {
           supplierId: data.supplierId,
           price: data.price,
           currency: data.currency,
-          url: data.url,
-          shippingCost: data.shippingCost,
-          inStock: data.inStock,
-          notes: data.notes
+          shippingCost: data.shippingCost || 0,
+          updatedAt: new Date()
         });
         
-        setPrices(prev => 
-          prev.map(price => 
+        setPrices(prevPrices => 
+          prevPrices.map(price => 
             price.id === editingPrice.id 
               ? {
                   ...price,
@@ -527,79 +512,141 @@ export default function PricesContent() {
                   supplierId: data.supplierId,
                   price: data.price,
                   currency: data.currency,
-                  url: data.url,
-                  shippingCost: data.shippingCost,
-                  inStock: data.inStock,
-                  notes: data.notes,
-                  product: products.find(p => p.id === data.productId) 
-                    ? {
-                        name: products.find(p => p.id === data.productId)!.name,
-                        language: products.find(p => p.id === data.productId)!.language,
-                        type: products.find(p => p.id === data.productId)!.type,
-                        imageUrl: products.find(p => p.id === data.productId)!.imageUrl
-                      } 
-                    : price.product,
-                  supplier: suppliers.find(s => s.id === data.supplierId)
-                    ? {
-                        name: suppliers.find(s => s.id === data.supplierId)!.name,
-                        country: suppliers.find(s => s.id === data.supplierId)!.country
-                      }
-                    : price.supplier
+                  shippingCost: data.shippingCost || 0,
+                  updatedAt: new Date()
                 }
               : price
           )
         );
         
+        setModalOpen(false);
+        setEditingPrice(null);
         showNotification('Precio actualizado correctamente');
+        
       } else {
+        // Comprobar si ya existe un precio para este producto y proveedor
+        const existingPrice = prices.find(
+          p => p.productId === data.productId && p.supplierId === data.supplierId
+        );
+        
+        if (existingPrice) {
+          const confirmUpdate = window.confirm(
+            `Ya existe un precio para este producto y proveedor. ¿Desea actualizarlo?`
+          );
+          
+          if (confirmUpdate) {
+            // Actualizar precio existente
+            await updatePrice(existingPrice.id, {
+              price: data.price,
+              currency: data.currency,
+              shippingCost: data.shippingCost || 0,
+              updatedAt: new Date()
+            });
+            
+            setPrices(prevPrices => 
+              prevPrices.map(price => 
+                price.id === existingPrice.id 
+                  ? {
+                      ...price,
+                      price: data.price,
+                      currency: data.currency,
+                      shippingCost: data.shippingCost || 0,
+                      updatedAt: new Date()
+                    }
+                  : price
+              )
+            );
+            
+            setModalOpen(false);
+            showNotification('Precio actualizado correctamente');
+            return;
+          } else {
+            setModalOpen(false);
+            return;
+          }
+        }
+        
         // Añadir nuevo precio
-        const newPrice = await addPrice({
+        const newPriceId = await addPrice({
           productId: data.productId,
           supplierId: data.supplierId,
           price: data.price,
           currency: data.currency,
-          url: data.url,
-          shippingCost: data.shippingCost,
-          inStock: data.inStock,
-          notes: data.notes
+          shippingCost: data.shippingCost || 0,
+          createdAt: new Date(),
+          updatedAt: new Date()
         });
         
+        // Enriquecer el nuevo precio para añadirlo al estado
         const product = products.find(p => p.id === data.productId);
         const supplier = suppliers.find(s => s.id === data.supplierId);
         
-        setPrices(prev => [...prev, {
-          ...newPrice,
-          product: product 
-            ? {
-                name: product.name,
-                language: product.language,
-                type: product.type,
-                imageUrl: product.imageUrl
-              } 
-            : {
-                name: 'Producto desconocido',
-                language: 'Desconocido',
-                type: 'Desconocido'
-              },
-          supplier: supplier
-            ? {
-                name: supplier.name,
-                country: supplier.country
-              }
-            : {
-                name: 'Proveedor desconocido',
-                country: 'Desconocido'
-              }
-        }]);
+        const enrichedNewPrice: EnrichedPrice = {
+          id: newPriceId,
+          productId: data.productId,
+          supplierId: data.supplierId,
+          price: data.price,
+          currency: data.currency,
+          shippingCost: data.shippingCost || 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          product: product ? {
+            name: product.name || 'Producto desconocido',
+            language: product.language || 'Desconocido',
+            type: product.type || 'Desconocido',
+            imageUrl: product.imageUrl
+          } : {
+            name: 'Producto desconocido',
+            language: 'Desconocido',
+            type: 'Desconocido'
+          },
+          supplier: supplier ? {
+            name: supplier.name || 'Proveedor desconocido',
+            country: supplier.country || 'Desconocido'
+          } : {
+            name: 'Proveedor desconocido',
+            country: 'Desconocido'
+          }
+        };
         
+        setPrices(prevPrices => [...prevPrices, enrichedNewPrice]);
+        setModalOpen(false);
         showNotification('Precio añadido correctamente');
       }
       
-      setModalOpen(false);
-      setEditingPrice(null);
+      // Invalidar cachés de precios de Cardmarket para forzar recarga
+      invalidateCardmarketPricesCache();
+      
     } catch (error) {
-      console.error('Error al guardar el precio:', error);
-      showNotification('Error al guardar el precio', 'error');
+      console.error('Error al procesar el precio:', error);
+      showNotification('Error al procesar el precio', 'error');
+    }
+  };
+  
+  // Función para recargar todos los datos
+  const handleReloadData = async () => {
+    if (window.confirm('¿Quieres recargar todos los datos? Esto borrará las cachés y cargará los datos nuevamente desde Firebase.')) {
+      try {
+        // Mostrar notificación de carga
+        setNotification({
+          show: true,
+          message: 'Recargando datos...',
+          type: 'success'
+        });
+        
+        // Invalidar todas las cachés
+        invalidateProductsCache();
+        invalidateSuppliersCache();
+        invalidateCardmarketPricesCache();
+        
+        // Recargar datos
+        await fetchPrices();
+        
+        showNotification('Datos recargados correctamente');
+      } catch (error) {
+        console.error('Error al recargar datos:', error);
+        showNotification('Error al recargar datos', 'error');
+      }
     }
   };
   
@@ -826,17 +873,26 @@ export default function PricesContent() {
         }))
       }>Beneficio ↕</div>,
       cell: info => {
-        const rowData = info.row.original as unknown as BestPriceProduct;
-        const productId = rowData.productId;
+        const price = info.row.original;
+        const productId = price.productId;
         const product = products.find(p => p.id === productId);
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
-          const profit = product.cardmarketPrice - rowData.bestPriceInEUR;
+          // Calcular precio en EUR
+          const priceInEUR = convertCurrency(price.price, price.currency, 'EUR');
+          const profit = product.cardmarketPrice - priceInEUR;
           
-          // Formatear el beneficio con signo positivo o negativo
+          // Aplicar estilo según si hay beneficio o pérdida
           const isProfit = profit > 0;
-          return `${formatCurrency(profit, 'EUR')} ${isProfit ? '▲' : '▼'}`;
+          const displayClass = isProfit ? 'text-green-600 font-medium' : 'text-red-600 font-medium';
+          
+          return (
+            <span className={displayClass}>
+              {formatCurrency(profit, 'EUR')}
+              {isProfit ? ' ▲' : ' ▼'}
+            </span>
+          );
         }
         
         return 'No disponible';
@@ -941,28 +997,12 @@ export default function PricesContent() {
         }))
       }>Precio Cardmarket ↕</div>,
       accessorFn: (row: BestPriceProduct) => {
-        const rowData = row as unknown as BestPriceProduct;
-        const productId = rowData.productId;
+        const price = row;
+        const productId = price.productId;
         const product = products.find(p => p.id === productId);
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
-          // Si tiene URL, renderizar como enlace
-          if (product.cardmarketUrl) {
-            return (
-              <a 
-                href={product.cardmarketUrl} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="text-blue-400 hover:text-blue-300 hover:underline"
-                title="Ver en Cardmarket"
-              >
-                {formatCurrency(product.cardmarketPrice, 'EUR')}
-              </a>
-            );
-          }
-          
-          // Si no tiene URL, solo mostrar el precio
           return formatCurrency(product.cardmarketPrice, 'EUR');
         }
         
@@ -984,24 +1024,20 @@ export default function PricesContent() {
         }))
       }>Beneficio ↕</div>,
       accessorFn: (row: BestPriceProduct) => {
-        const rowData = row as unknown as BestPriceProduct;
-        const productId = rowData.productId;
+        const price = row;
+        const productId = price.productId;
         const product = products.find(p => p.id === productId);
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
-          const profit = product.cardmarketPrice - rowData.bestPriceInEUR;
+          const profit = product.cardmarketPrice - price.bestPriceInEUR;
           
-          // Aplicar estilo según si hay beneficio o pérdida
-          const isProfit = profit > 0;
-          const displayClass = isProfit ? 'text-green-600 font-medium' : 'text-red-600 font-medium';
-          
-          return (
-            <span className={displayClass}>
-              {formatCurrency(profit, 'EUR')}
-              {isProfit ? ' ▲' : ' ▼'}
-            </span>
-          );
+          // Formato del beneficio
+          if (profit > 0) {
+            return `${formatCurrency(profit, 'EUR')} ▲`;
+          } else {
+            return `${formatCurrency(profit, 'EUR')} ▼`;
+          }
         }
         
         return 'No disponible';
@@ -1182,16 +1218,66 @@ export default function PricesContent() {
       </div>
       
       {/* Botón para añadir precio */}
-      <div className="mb-4">
-        <button
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded"
-          onClick={() => {
-            setEditingPrice(null);
-            setModalOpen(true);
-          }}
-        >
-          Añadir Precio
-        </button>
+      <div className="py-6 px-4 sm:px-6 md:px-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-2">Precios</h1>
+            <div className="flex flex-col md:flex-row md:items-center space-y-2 md:space-y-0 md:space-x-4">
+              <p className="text-gray-400">
+                Total: {filteredPrices.length} de {prices.length} precios
+              </p>
+              
+              {/* Indicador de datos en caché */}
+              {localStorage.getItem('pokebim_products_cache_timestamp') && (
+                <div className="text-gray-400 flex items-center text-sm">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                  Usando datos en caché
+                </div>
+              )}
+              
+              {/* Indicador de carga de precios de cardmarket */}
+              {loadingCardmarketPrices && (
+                <div className="flex items-center text-gray-400">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-sm">Cargando precios de Cardmarket: {cardmarketPricesStatus.loaded}/{cardmarketPricesStatus.total}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 mt-4 md:mt-0">
+            {/* Botón para recargar datos */}
+            <button
+              onClick={handleReloadData}
+              className="px-4 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-600 flex items-center justify-center"
+              title="Recargar todos los datos desde la base de datos"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Recargar datos
+            </button>
+            
+            {/* Botón para añadir precio */}
+            <button
+              onClick={() => {
+                setEditingPrice(null);
+                setModalOpen(true);
+              }}
+              className="px-4 py-2 bg-green-700 text-white rounded hover:bg-green-600 flex items-center justify-center"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Añadir Precio
+            </button>
+          </div>
+        </div>
       </div>
       
       {/* Pestañas para alternar entre tablas */}

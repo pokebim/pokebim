@@ -25,78 +25,119 @@ export interface Product {
   lastPriceUpdate?: any; // Fecha de la última actualización del precio
 }
 
+// Clave para la caché de productos
+const PRODUCTS_CACHE_KEY = 'pokebim_products_cache';
+const PRODUCTS_CACHE_TIMESTAMP_KEY = 'pokebim_products_cache_timestamp';
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutos
+
 // Obtener todos los productos
 export const getAllProducts = async (): Promise<Product[]> => {
-  let retryCount = 0;
-  const maxRetries = 3;
-  
-  while (retryCount <= maxRetries) {
-    try {
-      console.log(`FIREBASE: Intentando cargar productos (intento ${retryCount + 1}/${maxRetries + 1})`);
-      
-      // Intentar un enfoque alternativo para cargar productos
-      const productsCol = collection(db, "products");
-      const productsSnapshot = await getDocs(productsCol);
-      
-      if (productsSnapshot.empty) {
-        console.warn('FIREBASE: No se encontraron documentos en la colección "products"');
-        retryCount++;
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount)));
-        continue;
-      }
-      
-      const result: Product[] = [];
-      
-      // Procesar cada documento manualmente
-      productsSnapshot.forEach((doc) => {
-        try {
-          const data = doc.data();
-          const product: Product = {
-            id: doc.id,
-            name: data.name || 'Sin nombre',
-            description: data.description || '',
-            language: data.language || 'es',
-            type: data.type || 'regular', // Asegurar que siempre tenga un tipo
-            imageUrl: data.imageUrl || `https://via.placeholder.com/400x400?text=${encodeURIComponent(data.name || 'Producto')}`,
-            notes: data.notes || '',
-            cardmarketUrl: data.cardmarketUrl || '',
-            cardmarketPrice: data.cardmarketPrice || 0,
-            lastPriceUpdate: data.lastPriceUpdate || null
-          };
-          result.push(product);
-        } catch (itemError) {
-          console.error(`FIREBASE: Error al procesar producto ${doc.id}:`, itemError);
-        }
-      });
-      
-      console.log(`FIREBASE: Carga de productos exitosa. ${result.length} productos cargados.`);
-      
-      // Verificar si hay productos sin campo type
-      const productsWithoutType = result.filter(p => !p.type);
-      if (productsWithoutType.length > 0) {
-        console.warn(`FIREBASE: Se encontraron ${productsWithoutType.length} productos sin campo 'type'`);
-      }
-      
-      return result;
-    } catch (error) {
-      console.error(`FIREBASE: Error al cargar productos (intento ${retryCount + 1}):`, error);
-      
-      if (retryCount >= maxRetries) {
-        console.error('FIREBASE: Se agotaron los intentos de carga de productos.');
-        return [];
-      }
-      
-      retryCount++;
-      // Esperar un tiempo incremental antes de reintentar
-      const delayMs = 1000 * retryCount;
-      console.log(`FIREBASE: Reintentando en ${delayMs / 1000} segundos...`);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
+  try {
+    // Verificar si tenemos una caché válida
+    const cachedData = getCachedProducts();
+    if (cachedData) {
+      console.log('Usando productos en caché local');
+      return cachedData;
     }
+    
+    console.log('Cargando productos desde Firebase...');
+    const productsCol = collection(db, "products");
+    const productsSnapshot = await getDocs(productsCol);
+    
+    if (productsSnapshot.empty) {
+      console.warn('No se encontraron documentos en la colección "products"');
+      return [];
+    }
+    
+    const result: Product[] = [];
+    
+    // Procesar cada documento
+    productsSnapshot.forEach((doc) => {
+      try {
+        const data = doc.data();
+        const product: Product = {
+          id: doc.id,
+          name: data.name || 'Sin nombre',
+          description: data.description || '',
+          language: data.language || 'es',
+          type: data.type || 'regular',
+          imageUrl: data.imageUrl || '',
+          notes: data.notes || '',
+          cardmarketUrl: data.cardmarketUrl || '',
+          cardmarketPrice: data.cardmarketPrice || 0,
+          lastPriceUpdate: data.lastPriceUpdate || null
+        };
+        result.push(product);
+      } catch (itemError) {
+        console.error(`Error al procesar producto ${doc.id}:`, itemError);
+      }
+    });
+    
+    // Guardar en caché
+    cacheProducts(result);
+    
+    console.log(`Cargados ${result.length} productos desde Firebase`);
+    return result;
+    
+  } catch (err) {
+    console.error('Error al cargar productos:', err);
+    
+    // Si hay un error, intentar usar la caché aunque esté expirada
+    const cachedData = getCachedProducts(true);
+    if (cachedData) {
+      console.log('Usando caché expirada debido a error');
+      return cachedData;
+    }
+    
+    return [];
   }
-  
-  // Este punto no debería alcanzarse debido al manejo de errores anterior
-  console.error('FIREBASE: Fallo al cargar productos después de múltiples intentos');
-  return [];
+};
+
+// Obtener productos de la caché
+const getCachedProducts = (ignoreExpiry = false): Product[] | null => {
+  try {
+    const cachedProducts = localStorage.getItem(PRODUCTS_CACHE_KEY);
+    const timestamp = localStorage.getItem(PRODUCTS_CACHE_TIMESTAMP_KEY);
+    
+    if (!cachedProducts || !timestamp) return null;
+    
+    // Verificar si la caché ha expirado
+    if (!ignoreExpiry) {
+      const cacheTime = parseInt(timestamp, 10);
+      const now = Date.now();
+      if (now - cacheTime > CACHE_TTL) {
+        console.log('La caché de productos ha expirado');
+        return null;
+      }
+    }
+    
+    return JSON.parse(cachedProducts);
+  } catch (error) {
+    console.error('Error al leer la caché de productos:', error);
+    return null;
+  }
+};
+
+// Guardar productos en caché
+const cacheProducts = (products: Product[]): void => {
+  try {
+    localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(products));
+    localStorage.setItem(PRODUCTS_CACHE_TIMESTAMP_KEY, Date.now().toString());
+    console.log(`${products.length} productos guardados en caché local`);
+  } catch (error) {
+    console.error('Error al guardar productos en caché:', error);
+  }
+};
+
+// Invalidar la caché de productos
+export const invalidateProductsCache = (): void => {
+  try {
+    localStorage.removeItem(PRODUCTS_CACHE_KEY);
+    localStorage.removeItem(PRODUCTS_CACHE_TIMESTAMP_KEY);
+    console.log('Caché de productos invalidada');
+  } catch (error) {
+    console.error('Error al invalidar caché de productos:', error);
+  }
 };
 
 // Obtener productos por proveedor

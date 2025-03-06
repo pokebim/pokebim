@@ -43,6 +43,11 @@ interface CardmarketPriceResult {
   error?: string;
 }
 
+// Clave para la caché de precios de Cardmarket
+const CARDMARKET_PRICES_CACHE_KEY = 'pokebim_cardmarket_prices_cache';
+const CARDMARKET_PRICES_TIMESTAMP_KEY = 'pokebim_cardmarket_prices_cache_timestamp';
+const CARDMARKET_CACHE_TTL = 1000 * 60 * 60 * 24; // 24 horas, los precios de Cardmarket no cambian tan a menudo
+
 /**
  * Valida si la URL de CardMarket proporcionada es válida
  */
@@ -203,6 +208,13 @@ export async function saveCardmarketPrice(data: Omit<CardmarketPrice, 'id' | 'up
  */
 export async function getCardmarketPriceForProduct(productId: string): Promise<CardmarketPrice | null> {
   try {
+    // Primero verificar si existe en caché
+    const cachedPrice = getCardmarketPriceFromCache(productId);
+    if (cachedPrice) {
+      return cachedPrice;
+    }
+    
+    // Si no está en caché, consultar a Firebase
     const querySnapshot = await getDocs(
       query(pricesCollection, where("productId", "==", productId))
     );
@@ -212,11 +224,16 @@ export async function getCardmarketPriceForProduct(productId: string): Promise<C
     }
     
     const data = querySnapshot.docs[0].data() as Omit<CardmarketPrice, 'id'>;
-    return {
+    const price = {
       ...data,
       id: querySnapshot.docs[0].id,
       updatedAt: data.updatedAt ? data.updatedAt : null
     } as CardmarketPrice;
+    
+    // Guardar en caché
+    addCardmarketPriceToCache(price);
+    
+    return price;
   } catch (error) {
     console.error("Error al obtener precio de Cardmarket:", error);
     return null;
@@ -224,31 +241,155 @@ export async function getCardmarketPriceForProduct(productId: string): Promise<C
 }
 
 /**
- * Elimina un precio de Cardmarket de la base de datos
+ * Obtiene todos los precios de Cardmarket en una sola consulta para reducir operaciones de lectura
  */
-export async function deleteCardmarketPrice(productId: string): Promise<boolean> {
+export async function getAllCardmarketPrices(): Promise<CardmarketPrice[]> {
   try {
-    // Buscar el documento por productId
-    const querySnapshot = await getDocs(
-      query(pricesCollection, where("productId", "==", productId))
-    );
+    // Verificar si tenemos caché completa
+    const allCachedPrices = getAllCardmarketPricesFromCache();
+    if (allCachedPrices && allCachedPrices.length > 0) {
+      console.log(`Usando ${allCachedPrices.length} precios de Cardmarket desde caché local`);
+      return allCachedPrices;
+    }
+    
+    console.log('Cargando todos los precios de Cardmarket desde Firebase...');
+    
+    // Obtener todos los precios en una sola consulta
+    const querySnapshot = await getDocs(pricesCollection);
     
     if (querySnapshot.empty) {
-      console.log(`No se encontró precio para producto ${productId}`);
-      return true; // No hay nada que eliminar
+      console.log('No hay precios de Cardmarket en Firebase');
+      return [];
     }
     
-    // Eliminar todos los documentos encontrados (debería ser solo uno)
-    for (const docSnapshot of querySnapshot.docs) {
-      const docId = docSnapshot.id;
-      await deleteDoc(doc(db, "cardmarketPrices", docId));
-      console.log(`Precio eliminado para producto ${productId}`);
-    }
+    const prices: CardmarketPrice[] = [];
     
-    return true;
+    querySnapshot.forEach(doc => {
+      const data = doc.data() as Omit<CardmarketPrice, 'id'>;
+      prices.push({
+        ...data,
+        id: doc.id,
+        updatedAt: data.updatedAt ? data.updatedAt : null
+      } as CardmarketPrice);
+    });
+    
+    // Guardar en caché
+    cacheAllCardmarketPrices(prices);
+    
+    console.log(`Cargados ${prices.length} precios de Cardmarket desde Firebase`);
+    return prices;
   } catch (error) {
-    console.error(`Error al eliminar precio para producto ${productId}: ${error}`);
-    return false;
+    console.error("Error al obtener todos los precios de Cardmarket:", error);
+    return [];
+  }
+}
+
+// Funciones para gestionar la caché de precios de Cardmarket
+
+/**
+ * Obtiene un precio de Cardmarket específico desde la caché
+ */
+function getCardmarketPriceFromCache(productId: string): CardmarketPrice | null {
+  try {
+    // Verificar si la caché existe y es válida
+    const timestamp = localStorage.getItem(CARDMARKET_PRICES_TIMESTAMP_KEY);
+    const cachedData = localStorage.getItem(CARDMARKET_PRICES_CACHE_KEY);
+    
+    if (!timestamp || !cachedData) return null;
+    
+    // Verificar si la caché ha expirado
+    const cacheTime = parseInt(timestamp, 10);
+    const now = Date.now();
+    if (now - cacheTime > CARDMARKET_CACHE_TTL) {
+      console.log('La caché de precios de Cardmarket ha expirado');
+      return null;
+    }
+    
+    // Buscar el precio en la caché
+    const prices = JSON.parse(cachedData) as CardmarketPrice[];
+    const cachedPrice = prices.find(p => p.productId === productId);
+    
+    return cachedPrice || null;
+  } catch (error) {
+    console.error('Error al leer precio de Cardmarket de caché:', error);
+    return null;
+  }
+}
+
+/**
+ * Obtiene todos los precios de Cardmarket desde la caché
+ */
+function getAllCardmarketPricesFromCache(): CardmarketPrice[] | null {
+  try {
+    const timestamp = localStorage.getItem(CARDMARKET_PRICES_TIMESTAMP_KEY);
+    const cachedData = localStorage.getItem(CARDMARKET_PRICES_CACHE_KEY);
+    
+    if (!timestamp || !cachedData) return null;
+    
+    // Verificar si la caché ha expirado
+    const cacheTime = parseInt(timestamp, 10);
+    const now = Date.now();
+    if (now - cacheTime > CARDMARKET_CACHE_TTL) {
+      console.log('La caché de precios de Cardmarket ha expirado');
+      return null;
+    }
+    
+    return JSON.parse(cachedData) as CardmarketPrice[];
+  } catch (error) {
+    console.error('Error al leer precios de Cardmarket de caché:', error);
+    return null;
+  }
+}
+
+/**
+ * Añade un precio de Cardmarket a la caché
+ */
+function addCardmarketPriceToCache(price: CardmarketPrice): void {
+  try {
+    // Obtener la caché actual o crear una nueva
+    let prices: CardmarketPrice[] = [];
+    const cachedData = localStorage.getItem(CARDMARKET_PRICES_CACHE_KEY);
+    
+    if (cachedData) {
+      prices = JSON.parse(cachedData) as CardmarketPrice[];
+      // Eliminar el precio antiguo si existe
+      prices = prices.filter(p => p.productId !== price.productId);
+    }
+    
+    // Añadir el nuevo precio
+    prices.push(price);
+    
+    // Guardar en caché
+    localStorage.setItem(CARDMARKET_PRICES_CACHE_KEY, JSON.stringify(prices));
+    localStorage.setItem(CARDMARKET_PRICES_TIMESTAMP_KEY, Date.now().toString());
+  } catch (error) {
+    console.error('Error al guardar precio de Cardmarket en caché:', error);
+  }
+}
+
+/**
+ * Guarda todos los precios de Cardmarket en la caché
+ */
+function cacheAllCardmarketPrices(prices: CardmarketPrice[]): void {
+  try {
+    localStorage.setItem(CARDMARKET_PRICES_CACHE_KEY, JSON.stringify(prices));
+    localStorage.setItem(CARDMARKET_PRICES_TIMESTAMP_KEY, Date.now().toString());
+    console.log(`${prices.length} precios de Cardmarket guardados en caché local`);
+  } catch (error) {
+    console.error('Error al guardar precios de Cardmarket en caché:', error);
+  }
+}
+
+/**
+ * Invalida la caché de precios de Cardmarket
+ */
+export function invalidateCardmarketPricesCache(): void {
+  try {
+    localStorage.removeItem(CARDMARKET_PRICES_CACHE_KEY);
+    localStorage.removeItem(CARDMARKET_PRICES_TIMESTAMP_KEY);
+    console.log('Caché de precios de Cardmarket invalidada');
+  } catch (error) {
+    console.error('Error al invalidar caché de precios de Cardmarket:', error);
   }
 }
 
@@ -467,4 +608,33 @@ export async function updateAllCardmarketPrices(
   console.log(`   ❌ ${result.failed} productos fallidos`);
   
   return result;
+}
+
+/**
+ * Elimina un precio de Cardmarket de la base de datos
+ */
+export async function deleteCardmarketPrice(productId: string): Promise<boolean> {
+  try {
+    // Buscar el documento por productId
+    const querySnapshot = await getDocs(
+      query(pricesCollection, where("productId", "==", productId))
+    );
+    
+    if (querySnapshot.empty) {
+      console.log(`No se encontró precio para producto ${productId}`);
+      return true; // No hay nada que eliminar
+    }
+    
+    // Eliminar todos los documentos encontrados (debería ser solo uno)
+    for (const docSnapshot of querySnapshot.docs) {
+      const docId = docSnapshot.id;
+      await deleteDoc(doc(db, "cardmarketPrices", docId));
+      console.log(`Precio eliminado para producto ${productId}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`Error al eliminar precio para producto ${productId}: ${error}`);
+    return false;
+  }
 }
