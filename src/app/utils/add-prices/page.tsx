@@ -5,6 +5,8 @@ import MainLayout from '@/components/layout/MainLayout';
 import { addPrice } from '@/lib/priceService';
 import { getAllProducts, addProduct, updateProduct } from '@/lib/productService';
 import { getAllSuppliers, addSupplier } from '@/lib/supplierService';
+import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 // Interfaces
 interface Product {
@@ -34,6 +36,100 @@ interface Price {
   supplierId?: string;
   date?: string;
   notes?: string;
+}
+
+// Add this after the imports
+const TINA_CAI_PRICES = [
+  { productName: "Gem Pack box", price: 22, language: "Chinese", notes: "Chino 440 gem pack, 880 thin case. Shipping Free" }
+];
+
+// Add this function before addTinaCaiPrices
+async function findSupplierByName(name: string) {
+  const suppliersCol = collection(db, "suppliers");
+  const q = query(suppliersCol, where("name", "==", name));
+  const snapshot = await getDocs(q);
+  
+  if (snapshot.empty) {
+    return null;
+  }
+  
+  const doc = snapshot.docs[0];
+  return {
+    id: doc.id,
+    ...doc.data()
+  };
+}
+
+// Add this function before addTinaCaiPrices
+async function findOrCreateProduct(productName: string, language: string) {
+  try {
+    // Primero buscamos si ya existe el producto por nombre exacto y lenguaje
+    console.log(`Looking for product: "${productName}" in language: "${language}"`);
+    
+    const productsCol = collection(db, "products");
+    const q = query(productsCol, 
+      where("name", "==", productName.trim()),
+      where("language", "==", language)
+    );
+    const snapshot = await getDocs(q);
+    
+    if (!snapshot.empty) {
+      const doc = snapshot.docs[0];
+      console.log(`Found existing product with ID: ${doc.id}`);
+      return doc.id;
+    }
+
+    // Si no existe, creamos un nuevo producto
+    console.log(`Creating new product: "${productName}" in language: "${language}"`);
+    const newProduct = {
+      name: productName.trim(),
+      language: language,
+      type: language === "Japanese" ? "JPN" : 
+            language === "Korean" ? "KOR" : 
+            language === "Chinese" ? "CHN" : "OTHER",
+      notes: `${language} product added via price import`,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const docRef = await addDoc(productsCol, newProduct);
+    console.log(`Created new product with ID: ${docRef.id}`);
+    return docRef.id;
+  } catch (error) {
+    console.error(`Error finding/creating product ${productName}:`, error);
+    throw error;
+  }
+}
+
+// Add this function before the AddPricesPage component
+async function addTinaCaiPrices() {
+  try {
+    const supplier = await findSupplierByName("Tina Cai");
+    if (!supplier) {
+      console.error("Supplier Tina Cai not found");
+      return;
+    }
+
+    for (const priceData of TINA_CAI_PRICES) {
+      // Find or create product
+      const productId = await findOrCreateProduct(priceData.productName, priceData.language);
+      
+      // Add price
+      await addPrice({
+        productId: productId,
+        supplierId: supplier.id,
+        price: priceData.price,
+        currency: 'EUR',
+        notes: priceData.notes,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+    }
+
+    console.log("Added prices for Tina Cai successfully");
+  } catch (error) {
+    console.error("Error adding prices for Tina Cai:", error);
+  }
 }
 
 export default function AddPricesPage() {
@@ -1036,6 +1132,13 @@ export default function AddPricesPage() {
               </div>
             </div>
           )}
+
+          <button
+            onClick={addTinaCaiPrices}
+            className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+          >
+            Add Tina Cai Prices
+          </button>
         </div>
       </div>
     </MainLayout>
