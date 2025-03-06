@@ -22,7 +22,8 @@ import {
 import { 
   Supplier, 
   getAllSuppliers, 
-  checkSuppliersExist 
+  checkSuppliersExist,
+  addSupplier
 } from '@/lib/supplierService';
 import { toast } from 'react-hot-toast';
 import { collection, getDocs } from 'firebase/firestore/lite';
@@ -35,6 +36,7 @@ import ImageModal from '@/components/ui/ImageModal';
 import { flexRender } from '@tanstack/react-table';
 import DefaultProductImage from '@/components/ui/DefaultProductImage';
 import { getCardmarketPriceForProduct, getAllCardmarketPrices, invalidateCardmarketPricesCache } from '@/lib/cardmarketService';
+import SupplierWithPricesForm from '@/components/forms/SupplierWithPricesForm';
 
 interface EnrichedPrice extends Price {
   product: {
@@ -105,6 +107,9 @@ export default function PricesContent() {
   // Estado para tracking de carga de precios de Cardmarket
   const [loadingCardmarketPrices, setLoadingCardmarketPrices] = useState(false);
   const [cardmarketPricesStatus, setCardmarketPricesStatus] = useState({ loaded: 0, total: 0 });
+  
+  // Añadir estado para el nuevo modal
+  const [bulkAddModalOpen, setBulkAddModalOpen] = useState(false);
   
   // Obtener valores únicos para los filtros
   const uniqueLanguages = useMemo(() => {
@@ -273,55 +278,56 @@ export default function PricesContent() {
   }, [prices, filters]);
   
   // Función para obtener datos
+  const fetchPrices = async () => {
+    try {
+      setLoading(true);
+      
+      // Obtener precios, productos y proveedores
+      const pricesData = await getAllPrices();
+      const productsData = await getAllProducts();
+      const suppliersData = await getAllSuppliers();
+      
+      setProducts(productsData);
+      setSuppliers(suppliersData);
+      
+      // Enriquecer los datos de precios
+      const enrichedPrices: EnrichedPrice[] = pricesData.map(price => {
+        const product = productsData.find(p => p.id === price.productId);
+        const supplier = suppliersData.find(s => s.id === price.supplierId);
+        
+        return {
+          ...price,
+          product: product ? {
+            name: product.name,
+            language: product.language,
+            type: product.type,
+            imageUrl: product.imageUrl
+          } : {
+            name: 'Producto desconocido',
+            language: 'Desconocido',
+            type: 'Desconocido'
+          },
+          supplier: supplier ? {
+            name: supplier.name,
+            country: supplier.country
+          } : {
+            name: 'Proveedor desconocido',
+            country: 'Desconocido'
+          }
+        };
+      });
+      
+      setPrices(enrichedPrices);
+    } catch (error) {
+      console.error('Error al cargar los datos:', error);
+      setError('Error al cargar los datos. Por favor, inténtalo de nuevo más tarde.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Efecto para cargar datos iniciales
   useEffect(() => {
-    const fetchPrices = async () => {
-      try {
-        setLoading(true);
-        
-        // Obtener precios, productos y proveedores
-        const pricesData = await getAllPrices();
-        const productsData = await getAllProducts();
-        const suppliersData = await getAllSuppliers();
-        
-        setProducts(productsData);
-        setSuppliers(suppliersData);
-        
-        // Enriquecer los datos de precios
-        const enrichedPrices: EnrichedPrice[] = pricesData.map(price => {
-          const product = productsData.find(p => p.id === price.productId);
-          const supplier = suppliersData.find(s => s.id === price.supplierId);
-          
-          return {
-            ...price,
-            product: product ? {
-              name: product.name,
-              language: product.language,
-              type: product.type,
-              imageUrl: product.imageUrl
-            } : {
-              name: 'Producto desconocido',
-              language: 'Desconocido',
-              type: 'Desconocido'
-            },
-            supplier: supplier ? {
-              name: supplier.name,
-              country: supplier.country
-            } : {
-              name: 'Proveedor desconocido',
-              country: 'Desconocido'
-            }
-          };
-        });
-        
-        setPrices(enrichedPrices);
-      } catch (error) {
-        console.error('Error al cargar los datos:', error);
-        setError('Error al cargar los datos. Por favor, inténtalo de nuevo más tarde.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchPrices();
   }, []);
   
@@ -674,6 +680,64 @@ export default function PricesContent() {
     setSelectedImageUrl(imageUrl);
   };
   
+  // Función para manejar la adición de proveedor y precios en bulk
+  const handleBulkAdd = async (data: {
+    supplier: {
+      name: string;
+      country: string;
+      email?: string;
+      phone?: string;
+      website?: string;
+      notes?: string;
+    },
+    prices: {
+      productId: string;
+      price: number;
+      currency: Currency;
+      shippingCost?: number;
+    }[]
+  }) => {
+    try {
+      // Añadir el proveedor
+      const supplierId = await addSupplier({
+        name: data.supplier.name,
+        country: data.supplier.country,
+        email: data.supplier.email,
+        phone: data.supplier.phone,
+        website: data.supplier.website,
+        notes: data.supplier.notes,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      // Añadir todos los precios
+      const pricePromises = data.prices.map(price => 
+        addPrice({
+          productId: price.productId,
+          supplierId,
+          price: price.price,
+          currency: price.currency,
+          shippingCost: price.shippingCost || 0,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        })
+      );
+
+      await Promise.all(pricePromises);
+
+      // Recargar los datos
+      await fetchPrices();
+      
+      // Cerrar el modal y mostrar notificación
+      setBulkAddModalOpen(false);
+      showNotification('Proveedor y precios añadidos correctamente');
+      
+    } catch (error) {
+      console.error('Error al añadir proveedor y precios:', error);
+      showNotification('Error al añadir proveedor y precios', 'error');
+    }
+  };
+  
   // Definir columnas de la tabla
   const columnHelper = createColumnHelper<EnrichedPrice>();
   
@@ -865,9 +929,9 @@ export default function PricesContent() {
           const priceAInEUR = convertCurrency(a.price, a.currency, 'EUR');
           const priceBInEUR = convertCurrency(b.price, b.currency, 'EUR');
           
-          // Calcular beneficios (descontando IVA del precio de Cardmarket)
-          const profitA = ((productA?.cardmarketPrice || 0) / 1.21) - priceAInEUR;
-          const profitB = ((productB?.cardmarketPrice || 0) / 1.21) - priceBInEUR;
+          // Calcular beneficios (añadiendo 10% y descontando IVA del precio de Cardmarket)
+          const profitA = ((productA?.cardmarketPrice || 0) * 1.1 / 1.21) - priceAInEUR;
+          const profitB = ((productB?.cardmarketPrice || 0) * 1.1 / 1.21) - priceBInEUR;
           
           return profitB - profitA; // Ordenar de mayor a menor beneficio
         }))
@@ -879,9 +943,9 @@ export default function PricesContent() {
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
-          // Calcular precio en EUR y beneficio (descontando IVA del precio de Cardmarket)
+          // Calcular precio en EUR y beneficio (añadiendo 10% y descontando IVA del precio de Cardmarket)
           const priceInEUR = convertCurrency(price.price, price.currency, 'EUR');
-          const cardmarketPriceWithoutVAT = product.cardmarketPrice / 1.21;
+          const cardmarketPriceWithoutVAT = (product.cardmarketPrice * 1.1) / 1.21;
           const profit = cardmarketPriceWithoutVAT - priceInEUR;
           
           // Aplicar estilo según si hay beneficio o pérdida
@@ -1018,9 +1082,9 @@ export default function PricesContent() {
           const productA = products.find(p => p.id === a.productId);
           const productB = products.find(p => p.id === b.productId);
           
-          // Calcular beneficios (descontando IVA del precio de Cardmarket)
-          const profitA = ((productA?.cardmarketPrice || 0) / 1.21) - a.bestPriceInEUR;
-          const profitB = ((productB?.cardmarketPrice || 0) / 1.21) - b.bestPriceInEUR;
+          // Calcular beneficios (añadiendo 10% y descontando IVA del precio de Cardmarket)
+          const profitA = ((productA?.cardmarketPrice || 0) * 1.1 / 1.21) - a.bestPriceInEUR;
+          const profitB = ((productB?.cardmarketPrice || 0) * 1.1 / 1.21) - b.bestPriceInEUR;
           
           return profitB - profitA; // Mayor beneficio primero
         }))
@@ -1032,8 +1096,8 @@ export default function PricesContent() {
         
         // Verificar si el producto existe y tiene precio de Cardmarket
         if (product && product.cardmarketPrice) {
-          // Calcular beneficio (descontando IVA del precio de Cardmarket)
-          const cardmarketPriceWithoutVAT = product.cardmarketPrice / 1.21;
+          // Calcular beneficio (añadiendo 10% y descontando IVA del precio de Cardmarket)
+          const cardmarketPriceWithoutVAT = (product.cardmarketPrice * 1.1) / 1.21;
           const profit = cardmarketPriceWithoutVAT - price.bestPriceInEUR;
           
           // Formato del beneficio
@@ -1267,6 +1331,17 @@ export default function PricesContent() {
               Recargar datos
             </button>
             
+            {/* Botón para añadir proveedor y precios */}
+            <button
+              onClick={() => setBulkAddModalOpen(true)}
+              className="px-4 py-2 bg-purple-700 text-white rounded hover:bg-purple-600 flex items-center justify-center"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Añadir Proveedor y Precios
+            </button>
+            
             {/* Botón para añadir precio */}
             <button
               onClick={() => {
@@ -1466,6 +1541,24 @@ export default function PricesContent() {
         onClose={() => setSelectedImageUrl('')}
         imageUrl={selectedImageUrl}
       />
+      
+      {/* Modal para añadir proveedor y precios en bulk */}
+      <Modal 
+        isOpen={bulkAddModalOpen} 
+        onClose={() => setBulkAddModalOpen(false)}
+        closeOnClickOutside={false}
+      >
+        <div className="p-4">
+          <h2 className="text-xl font-semibold mb-4">
+            Añadir Proveedor y Precios
+          </h2>
+          <SupplierWithPricesForm
+            products={products}
+            onSubmit={handleBulkAdd}
+            onCancel={() => setBulkAddModalOpen(false)}
+          />
+        </div>
+      </Modal>
     </div>
   );
 } 

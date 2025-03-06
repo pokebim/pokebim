@@ -5,17 +5,24 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: ReactNode;
+  closeOnClickOutside?: boolean;
 }
 
-export default function Modal({ isOpen, onClose, title, children }: ModalProps) {
+export default function Modal({ isOpen, onClose, title, children, closeOnClickOutside = true }: ModalProps) {
   if (!isOpen) return null;
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget && closeOnClickOutside) {
+      onClose();
+    }
+  };
 
   return (
     <Fragment>
       {/* Overlay */}
       <div 
         className="fixed inset-0 bg-black bg-opacity-75 z-40 flex items-center justify-center p-4"
-        onClick={onClose}
+        onClick={handleBackdropClick}
       >
         {/* Modal Content */}
         <div 

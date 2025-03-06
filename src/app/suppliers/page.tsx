@@ -19,16 +19,19 @@ import {
   getAllMissingSuppliers,
   addMissingSupplier,
   updateMissingSupplier,
-  deleteMissingSupplier
+  deleteMissingSupplier,
+  toggleFavorite
 } from '@/lib/supplierService';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
+import { useRouter } from 'next/navigation';
 
 // Define the tabs for the page
-type TabType = 'asian' | 'european' | 'missing';
+type TabType = 'asian' | 'european' | 'missing' | 'favorites';
 const tabs: { id: TabType; label: string }[] = [
   { id: 'asian', label: 'Proveedores Asiáticos' },
   { id: 'european', label: 'Proveedores Europeos' },
-  { id: 'missing', label: 'Proveedores Pendientes' }
+  { id: 'missing', label: 'Proveedores Pendientes' },
+  { id: 'favorites', label: 'Favoritos' }
 ];
 
 // Sample missing suppliers data - solo se usará si no hay datos en Firestore
@@ -63,6 +66,9 @@ export default function SuppliersPage() {
   // Nuevo estado para vista detallada
   const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('table');
+
+  const router = useRouter();
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -72,10 +78,15 @@ export default function SuppliersPage() {
 
   // Re-filtrar proveedores cuando cambia la pestaña
   useEffect(() => {
-    if (activeTab !== 'missing') {
+    if (activeTab === 'missing') {
+      fetchMissingSuppliers();
+    } else if (activeTab === 'favorites') {
+      const favorites = suppliers.filter(s => s.isFavorite === true);
+      setFilteredSuppliers(favorites);
+    } else {
       fetchSuppliersByRegion(activeTab);
     }
-  }, [activeTab, updateCounter]);
+  }, [activeTab, updateCounter, suppliers]);
 
   // Función para forzar actualización de UI
   const forceUpdate = () => {
@@ -284,39 +295,33 @@ export default function SuppliersPage() {
     }
   };
 
-  const handleSubmitMissing = async (data: MissingSupplier) => {
+  const handleSubmitMissing = async (data: any) => {
     try {
-      if (editingMissingSupplier && editingMissingSupplier.id) {
-        // Update existing missing supplier
-        await updateMissingSupplier(editingMissingSupplier.id, data);
-        console.log(`FIREBASE: Updated missing supplier ${editingMissingSupplier.id}`);
-        
-        // Actualizar estado local
-        setMissingSuppliers(prev => prev.map(supplier => 
-          supplier.id === editingMissingSupplier.id 
-            ? { ...supplier, ...data, id: editingMissingSupplier.id } 
+      const supplierData = {
+        ...data,
+        region: 'missing'
+      };
+
+      if (editingSupplier && editingSupplier.id) {
+        await updateSupplier(editingSupplier.id, supplierData);
+        setSuppliers(prev => prev.map(supplier => 
+          supplier.id === editingSupplier.id 
+            ? { ...supplier, ...supplierData } 
             : supplier
         ));
-        
         showNotification('Proveedor pendiente actualizado correctamente');
       } else {
-        // Create new missing supplier
-        const newId = await addMissingSupplier(data);
-        console.log(`FIREBASE: Added new missing supplier with ID ${newId}`);
-        
-        // Actualizar estado local
-        setMissingSuppliers(prev => [...prev, { ...data, id: newId }]);
-        
+        const newId = await addSupplier(supplierData);
+        setSuppliers(prev => [...prev, { ...supplierData, id: newId }]);
         showNotification('Proveedor pendiente añadido correctamente');
       }
-      
-      // Close modal
+
       setShowMissingModal(false);
-      setEditingMissingSupplier(null);
-      
+      setEditingSupplier(null);
+      fetchMissingSuppliers(); // Recargar la lista
     } catch (err) {
-      console.error('Error creating/updating missing supplier:', err);
-      showNotification('Error al procesar el proveedor pendiente', 'error');
+      console.error('Error al guardar proveedor pendiente:', err);
+      showNotification('Error al guardar el proveedor pendiente', 'error');
     }
   };
 
@@ -532,6 +537,37 @@ export default function SuppliersPage() {
     setDetailViewOpen(true);
   };
 
+  // Función para manejar favoritos
+  const handleToggleFavorite = async (supplier: Supplier) => {
+    try {
+      const newValue = !supplier.isFavorite;
+      await toggleFavorite(supplier.id!, newValue);
+      
+      // Actualizar estado local
+      const updatedSuppliers = suppliers.map(s => 
+        s.id === supplier.id ? { ...s, isFavorite: newValue } : s
+      );
+      setSuppliers(updatedSuppliers);
+      
+      // Si estamos en la pestaña de favoritos, actualizar la lista filtrada
+      if (activeTab === 'favorites') {
+        setFilteredSuppliers(updatedSuppliers.filter(s => s.isFavorite === true));
+      } else {
+        setFilteredSuppliers(prev => prev.map(s => 
+          s.id === supplier.id ? { ...s, isFavorite: newValue } : s
+        ));
+      }
+      
+      showNotification(newValue ? 'Añadido a favoritos' : 'Eliminado de favoritos');
+      
+      // Forzar actualización de UI
+      forceUpdate();
+    } catch (error) {
+      console.error('Error al cambiar favorito:', error);
+      showNotification('Error al actualizar favorito', 'error');
+    }
+  };
+
   return (
     <MainLayout>
       {/* Notification */}
@@ -645,174 +681,331 @@ export default function SuppliersPage() {
         </DetailView>
       )}
 
-      <div className="py-6">
-        <div className="px-4 sm:px-6 md:px-8">
-          <div className="md:flex md:items-center md:justify-between mb-6">
-            <div className="min-w-0 flex-1">
-              <h2 className="text-2xl font-semibold leading-tight text-white">Proveedores</h2>
-              <p className="mt-1 text-sm text-gray-300">
-                Gestiona tus proveedores de cartas Pokémon.
-              </p>
-              <div className="mt-1 flex space-x-4 text-xs">
-                <button 
-                  onClick={() => {
-                    console.log('FIREBASE: Refreshing data');
-                    if (activeTab === 'missing') {
-                      fetchMissingSuppliers();
-                    } else {
-                      fetchSuppliersByRegion(activeTab);
-                    }
-                    showNotification('Datos actualizados');
-                  }}
-                  className="text-gray-400 underline hover:text-gray-300"
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-white mb-2">Proveedores</h1>
+          <p className="text-gray-400">Gestiona tus proveedores de cartas Pokémon.</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex space-x-1 mb-6">
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded-lg font-medium ${
+                activeTab === tab.id
+                  ? 'bg-purple-600 text-white'
+                  : 'text-gray-400 hover:text-white hover:bg-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Barra de herramientas */}
+        <div className="flex justify-between items-center mb-6">
+          <div className="flex-1 max-w-md">
+            <input
+              type="text"
+              placeholder="Buscar proveedores..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+          <div className="flex space-x-4">
+            {activeTab !== 'missing' && (
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg ${
+                    viewMode === 'grid' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-gray-700 text-gray-400 hover:text-white'
+                  }`}
+                  title="Vista en cuadrícula"
                 >
-                  Actualizar datos
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`p-2 rounded-lg ${
+                    viewMode === 'table' 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-gray-700 text-gray-400 hover:text-white'
+                  }`}
+                  title="Vista en tabla"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
                 </button>
               </div>
-            </div>
-            <div className="mt-4 flex md:mt-0 md:ml-4">
-              <button
-                type="button"
-                onClick={() => {
-                  if (activeTab === 'missing') {
-                    setShowMissingModal(true);
-                  } else {
-                    // Pre-select the right region based on active tab
-                    const initialData = { region: activeTab };
-                    console.log('FIREBASE: Creating new supplier with initial data:', initialData);
-                    setEditingSupplier(initialData);
-                    setShowModal(true);
-                  }
-                }}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-700 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-150"
-              >
-                <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                </svg>
-                {activeTab === 'missing' ? 'Añadir Pendiente' : 'Añadir Proveedor'}
-              </button>
-            </div>
+            )}
+            <button
+              onClick={() => {
+                setEditingSupplier(null);
+                setShowModal(true);
+              }}
+              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center"
+            >
+              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              {activeTab === 'missing' ? 'Añadir Proveedor Pendiente' : 'Añadir Proveedor'}
+            </button>
           </div>
+        </div>
 
-          {/* Tabs */}
-          <div className="border-b border-gray-700 mb-6">
-            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-              {tabs.map((tab) => {
-                // Calculate count for each tab
-                let count = 0;
-                if (tab.id === 'missing') {
-                  count = missingSuppliers.length;
-                } else {
-                  // Count suppliers with this region
-                  count = suppliers.filter(supplier => (supplier.region || 'asian') === tab.id).length;
-                }
-                
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`
-                      whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center
-                      ${activeTab === tab.id
-                        ? 'border-green-500 text-green-400'
-                        : 'border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600'}
-                    `}
-                  >
-                    {tab.label}
-                    <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-800 text-gray-300">
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </nav>
+        {/* Loading state */}
+        {loading && (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
           </div>
-          
-          {error && (
-            <div className="mb-6 bg-red-900 border-l-4 border-red-500 p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-white">{error}</p>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {loading && activeTab !== 'missing' ? (
-            <div className="flex justify-center p-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600"></div>
-            </div>
-          ) : activeTab !== 'missing' && displayedSuppliers.length === 0 ? (
-            <div className="bg-gray-900 shadow overflow-hidden sm:rounded-md p-6 text-center">
-              <p className="text-gray-300">No hay proveedores registrados en esta categoría aún.</p>
-              <button
-                onClick={() => {
-                  // Pre-select the right region based on active tab
-                  const initialData = { region: activeTab };
-                  console.log('FIREBASE: Creating new supplier with initial data:', initialData);
-                  setEditingSupplier(initialData);
-                  setShowModal(true);
-                }}
-                className="mt-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-700 hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-              >
-                Añade tu primer proveedor
-              </button>
-            </div>
-          ) : activeTab === 'missing' ? (
-            // Missing Suppliers Table
-            <div className="bg-gray-900 shadow overflow-hidden sm:rounded-md">
-              <div className="p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-white">Proveedores Pendientes</h3>
-                  <span className="px-2 py-1 text-xs rounded-full bg-blue-900 text-blue-200">
-                    {missingSuppliers.length} proveedores
-                  </span>
-                </div>
-                
-                <DataTable 
-                  data={missingSuppliers} 
-                  columns={missingColumns} 
-                  searchPlaceholder="Buscar proveedores pendientes..."
-                  itemsPerPage={20}
-                />
-              </div>
+        )}
+
+        {/* Error state */}
+        {error && (
+          <div className="text-center py-12">
+            <div className="text-red-500 text-lg">{error}</div>
+            <button
+              onClick={() => activeTab === 'missing' ? fetchMissingSuppliers() : fetchSuppliersByRegion(activeTab)}
+              className="mt-4 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        {/* Content */}
+        {!loading && !error && (
+          activeTab === 'missing' ? (
+            <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-700">
+                <thead className="bg-gray-900">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Nombre
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      País
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Teléfono
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Notas
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-gray-800 divide-y divide-gray-700">
+                  {missingSuppliers.map((supplier) => (
+                    <tr key={supplier.id} className="hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-white">{supplier.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-300">{supplier.email || '-'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-300">{supplier.country || '-'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-300">{supplier.phone || '-'}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-300">{supplier.notes || '-'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => handleEdit(supplier)}
+                          className="text-indigo-400 hover:text-indigo-300 mr-3"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleDelete(supplier.id)}
+                          className="text-red-400 hover:text-red-300"
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
-            // Regular Suppliers Table
-            <div className="bg-gray-900 shadow overflow-hidden sm:rounded-md">
-              <div className="p-4">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-medium text-white">Proveedores</h3>
-                  <div className="relative w-full max-w-md">
-                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                      <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 20">
-                        <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m19 19-4-4m0-7A7 7 0 1 1 1 8a7 7 0 0 1 14 0Z"/>
-                      </svg>
-                    </div>
-                    <input
-                      type="text"
-                      className="block w-full p-2 pl-10 text-sm border rounded-lg bg-gray-800 border-gray-700 placeholder-gray-400 text-white focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Buscar proveedores por nombre, email, teléfono..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <DataTable 
-                  data={displayedSuppliers} 
-                  columns={supplierColumns} 
-                  searchPlaceholder="Buscar proveedores..."
-                  itemsPerPage={10}
-                />
+            viewMode === 'table' ? (
+              <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-700">
+                  <thead className="bg-gray-900">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        Favorito
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        Nombre
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        País
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        Contacto
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                        Acciones
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-gray-800 divide-y divide-gray-700">
+                    {filteredSuppliers.map((supplier) => (
+                      <tr key={supplier.id} className="hover:bg-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button
+                            onClick={() => handleToggleFavorite(supplier)}
+                            className="text-gray-400 hover:text-yellow-400 transition-colors"
+                          >
+                            <svg
+                              className={`w-6 h-6 ${supplier.isFavorite ? 'text-yellow-400 fill-current' : ''}`}
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                              />
+                            </svg>
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-white">{supplier.name}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">{supplier.country}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-300">
+                            {supplier.email && <div>{supplier.email}</div>}
+                            {supplier.phone && <div>{supplier.phone}</div>}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                          <button
+                            onClick={() => router.push(`/prices?supplier=${supplier.id}`)}
+                            className="text-purple-400 hover:text-purple-300"
+                          >
+                            Ver Precios
+                          </button>
+                          <button
+                            onClick={() => handleEdit(supplier)}
+                            className="text-indigo-400 hover:text-indigo-300"
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => handleDelete(supplier.id)}
+                            className="text-red-400 hover:text-red-300"
+                          >
+                            Eliminar
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {filteredSuppliers.map((supplier) => (
+                  <div key={supplier.id} className="bg-gray-800 rounded-lg shadow-lg overflow-hidden border border-gray-700">
+                    <div className="p-4">
+                      <div className="flex justify-between items-start mb-4">
+                        <h3 className="text-lg font-medium text-white truncate flex-1">{supplier.name}</h3>
+                        <button
+                          onClick={() => handleToggleFavorite(supplier)}
+                          className="text-gray-400 hover:text-yellow-400 transition-colors ml-2"
+                        >
+                          <svg
+                            className={`w-6 h-6 ${supplier.isFavorite ? 'text-yellow-400 fill-current' : ''}`}
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
+                            />
+                          </svg>
+                        </button>
+                      </div>
+                      
+                      <div className="space-y-2 text-sm text-gray-300">
+                        <div className="flex items-center">
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" />
+                          </svg>
+                          {supplier.country}
+                        </div>
+                        {supplier.email && (
+                          <div className="flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
+                            {supplier.email}
+                          </div>
+                        )}
+                        {supplier.phone && (
+                          <div className="flex items-center">
+                            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                            </svg>
+                            {supplier.phone}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="bg-gray-900 px-4 py-3 flex justify-end space-x-2">
+                      <button
+                        onClick={() => router.push(`/prices?supplier=${supplier.id}`)}
+                        className="text-purple-400 hover:text-purple-300 text-sm font-medium"
+                      >
+                        Ver Precios
+                      </button>
+                      <button
+                        onClick={() => handleEdit(supplier)}
+                        className="text-indigo-400 hover:text-indigo-300 text-sm font-medium"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDelete(supplier.id)}
+                        className="text-red-400 hover:text-red-300 text-sm font-medium"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          )
+        )}
       </div>
     </MainLayout>
   );

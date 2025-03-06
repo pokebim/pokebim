@@ -23,6 +23,11 @@ export interface Supplier {
   verified?: boolean;
   createdAt?: any;
   updatedAt?: any;
+  isFavorite?: boolean;
+  region?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
 }
 
 // Clave para la caché de proveedores
@@ -63,7 +68,12 @@ export const getAllSuppliers = async (): Promise<Supplier[]> => {
           notes: data.notes || '',
           verified: data.verified || false,
           createdAt: data.createdAt || null,
-          updatedAt: data.updatedAt || null
+          updatedAt: data.updatedAt || null,
+          isFavorite: data.isFavorite === true,
+          region: data.region || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          website: data.website || ''
         };
         result.push(supplier);
       } catch (itemError) {
@@ -160,6 +170,7 @@ export const getSuppliersByRegion = async (region: string): Promise<Supplier[]> 
 export const addSupplier = async (supplierData: Omit<Supplier, 'id'>): Promise<string> => {
   const dataToSave = {
     ...supplierData,
+    isFavorite: supplierData.isFavorite || false,
     createdAt: Timestamp.now(),
     updatedAt: Timestamp.now()
   };
@@ -194,29 +205,77 @@ export const deleteSupplier = async (id: string): Promise<void> => {
   }
 };
 
+// Marcar/desmarcar proveedor como favorito
+export const toggleFavorite = async (id: string, isFavorite: boolean): Promise<void> => {
+  try {
+    console.log(`Actualizando favorito para proveedor ${id} a ${isFavorite}`);
+    const supplierRef = doc(db, "suppliers", id);
+    
+    await updateDoc(supplierRef, { 
+      isFavorite: isFavorite,
+      updatedAt: Timestamp.now()
+    });
+    
+    // Invalidar caché
+    invalidateSuppliersCache();
+    
+    console.log(`Favorito actualizado correctamente para proveedor ${id}`);
+  } catch (error) {
+    console.error(`Error toggling favorite for supplier ${id}:`, error);
+    throw error;
+  }
+};
+
 // Interfaz para proveedores pendientes
 export interface MissingSupplier {
   id?: string;
   name: string;
+  country: string;
   email: string;
-  emailSent: boolean;
-  emailDate?: string;
-  responded: boolean;
-  info: string;
+  phone: string;
+  notes: string;
+  website: string;
+  createdAt?: any;
+  updatedAt?: any;
 }
 
 // Obtener todos los proveedores pendientes
 export const getAllMissingSuppliers = async (): Promise<MissingSupplier[]> => {
   try {
-    const missingCol = collection(db, "missingSuppliers");
-    const snapshot = await getDocs(missingCol);
+    console.log('Cargando proveedores pendientes desde Firebase...');
+    const missingCol = collection(db, "suppliers");
+    const q = query(missingCol, where("region", "==", "missing"));
+    const snapshot = await getDocs(q);
     
-    return snapshot.docs.map(doc => {
-      return { 
-        id: doc.id, 
-        ...doc.data() as Omit<MissingSupplier, 'id'> 
-      };
+    if (snapshot.empty) {
+      console.log('No se encontraron proveedores pendientes');
+      return [];
+    }
+
+    const result: MissingSupplier[] = [];
+    
+    snapshot.forEach((doc) => {
+      try {
+        const data = doc.data();
+        const supplier: MissingSupplier = {
+          id: doc.id,
+          name: data.name || 'Sin nombre',
+          country: data.country || '',
+          email: data.email || '',
+          phone: data.phone || '',
+          notes: data.notes || '',
+          website: data.website || '',
+          createdAt: data.createdAt || null,
+          updatedAt: data.updatedAt || null
+        };
+        result.push(supplier);
+      } catch (itemError) {
+        console.error(`Error al procesar proveedor pendiente ${doc.id}:`, itemError);
+      }
     });
+    
+    console.log(`Cargados ${result.length} proveedores pendientes desde Firebase`);
+    return result;
   } catch (error) {
     console.error("Error getting missing suppliers:", error);
     throw error;
@@ -226,8 +285,14 @@ export const getAllMissingSuppliers = async (): Promise<MissingSupplier[]> => {
 // Añadir un nuevo proveedor pendiente
 export const addMissingSupplier = async (supplier: Omit<MissingSupplier, 'id'>): Promise<string> => {
   try {
-    const missingCol = collection(db, "missingSuppliers");
-    const docRef = await addDoc(missingCol, supplier);
+    const dataToSave = {
+      ...supplier,
+      region: 'missing',
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now()
+    };
+    
+    const docRef = await addDoc(collection(db, "suppliers"), dataToSave);
     return docRef.id;
   } catch (error) {
     console.error("Error adding missing supplier:", error);
@@ -238,8 +303,13 @@ export const addMissingSupplier = async (supplier: Omit<MissingSupplier, 'id'>):
 // Actualizar un proveedor pendiente
 export const updateMissingSupplier = async (id: string, supplier: Partial<MissingSupplier>): Promise<void> => {
   try {
-    const supplierRef = doc(db, "missingSuppliers", id);
-    await updateDoc(supplierRef, supplier);
+    const dataToUpdate = {
+      ...supplier,
+      updatedAt: Timestamp.now()
+    };
+    
+    const supplierRef = doc(db, "suppliers", id);
+    await updateDoc(supplierRef, dataToUpdate);
   } catch (error) {
     console.error(`Error updating missing supplier ${id}:`, error);
     throw error;
@@ -249,7 +319,7 @@ export const updateMissingSupplier = async (id: string, supplier: Partial<Missin
 // Eliminar un proveedor pendiente
 export const deleteMissingSupplier = async (id: string): Promise<void> => {
   try {
-    const supplierRef = doc(db, "missingSuppliers", id);
+    const supplierRef = doc(db, "suppliers", id);
     await deleteDoc(supplierRef);
   } catch (error) {
     console.error(`Error deleting missing supplier ${id}:`, error);
