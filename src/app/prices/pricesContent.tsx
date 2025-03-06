@@ -484,20 +484,65 @@ export default function PricesContent() {
   // Función para enviar formulario
   const handleSubmit = async (data: any) => {
     try {
-      // Comprobar que el producto y proveedor existen antes de continuar
-      const productExists = await checkProductsExist([data.productId]);
-      const supplierExists = await checkSuppliersExist([data.supplierId]);
-      
-      if (!productExists) {
-        showNotification('El producto seleccionado no existe', 'error');
+      // Si es un array de precios, procesarlos todos
+      if (Array.isArray(data)) {
+        // Verificar si algún precio ya existe
+        for (const priceData of data) {
+          const existingPrice = prices.find(
+            p => p.productId === priceData.productId && p.supplierId === priceData.supplierId
+          );
+          
+          if (existingPrice) {
+            const confirmUpdate = window.confirm(
+              `Ya existe un precio para el producto "${products.find(p => p.id === priceData.productId)?.name}" y este proveedor. ¿Desea actualizarlo?`
+            );
+            
+            if (confirmUpdate) {
+              // Actualizar precio existente
+              await updatePrice(existingPrice.id, {
+                price: priceData.price,
+                currency: priceData.currency,
+                priceUnit: priceData.priceUnit,
+                bulkPrice: priceData.bulkPrice,
+                boxesPerPack: priceData.boxesPerPack,
+                inStock: priceData.inStock,
+                url: priceData.url,
+                notes: priceData.notes,
+                shippingCost: priceData.shippingCost || 0,
+                updatedAt: new Date()
+              });
+            } else {
+              // Si el usuario rechaza la actualización, continuar con el siguiente precio
+              continue;
+            }
+          } else {
+            // Añadir nuevo precio
+            await addPrice({
+              productId: priceData.productId,
+              supplierId: priceData.supplierId,
+              price: priceData.price,
+              currency: priceData.currency,
+              priceUnit: priceData.priceUnit,
+              bulkPrice: priceData.bulkPrice,
+              boxesPerPack: priceData.boxesPerPack,
+              inStock: priceData.inStock,
+              url: priceData.url,
+              notes: priceData.notes,
+              shippingCost: priceData.shippingCost || 0,
+              createdAt: new Date(),
+              updatedAt: new Date()
+            });
+          }
+        }
+        
+        // Recargar los precios después de añadir/actualizar todos
+        await fetchPrices();
+        setModalOpen(false);
+        showNotification('Precios guardados correctamente');
         return;
       }
       
-      if (!supplierExists) {
-        showNotification('El proveedor seleccionado no existe', 'error');
-        return;
-      }
-      
+      // A partir de aquí, el código existente para un solo precio
       if (editingPrice) {
         // Actualizar precio existente
         await updatePrice(editingPrice.id, {
@@ -1419,13 +1464,17 @@ export default function PricesContent() {
       </div>
       
       {/* Modal para editar/añadir precio */}
-      <Modal isOpen={modalOpen} onClose={() => {
-        setModalOpen(false);
-        setEditingPrice(null);
-      }}>
+      <Modal 
+        isOpen={modalOpen} 
+        onClose={() => {
+          setModalOpen(false);
+          setEditingPrice(null);
+        }}
+        closeOnClickOutside={false}
+      >
         <div className="p-4">
           <h2 className="text-xl font-semibold mb-4">
-            {editingPrice ? 'Editar Precio' : 'Añadir Precio'}
+            {editingPrice ? 'Editar Precio' : 'Añadir Precios'}
           </h2>
           <PriceForm
             initialData={editingPrice || undefined}

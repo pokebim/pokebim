@@ -22,6 +22,11 @@ interface Price {
   shippingCost?: number;
 }
 
+interface PriceEntry extends Price {
+  // Campo para renderizado visual
+  tempId?: string;
+}
+
 interface Product {
   id: string;
   name: string;
@@ -38,7 +43,7 @@ interface Supplier {
 }
 
 interface PriceFormProps {
-  onSubmit: (data: Price) => void;
+  onSubmit: (data: Price | Price[]) => void;
   onCancel: () => void;
   initialData?: Price;
   products?: Product[];
@@ -66,6 +71,9 @@ export default function PriceForm({
     url: '',
     shippingCost: 0
   });
+  
+  // Array para almacenar múltiples precios
+  const [priceEntries, setPriceEntries] = useState<PriceEntry[]>([]);
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -193,13 +201,64 @@ export default function PriceForm({
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Función para añadir un precio a la lista
+  const handleAddPrice = () => {
+    // Validar datos mínimos
+    if (!formData.productId || !formData.price || !formData.supplierId) {
+      setError('Por favor, completa al menos el producto, proveedor y precio.');
+      return;
+    }
+
+    // Verificar si ya existe este producto en la lista
+    const existingIndex = priceEntries.findIndex(entry => entry.productId === formData.productId);
+    
+    if (existingIndex >= 0) {
+      // Actualizar el precio existente
+      const updatedEntries = [...priceEntries];
+      updatedEntries[existingIndex] = {
+        ...formData,
+        tempId: Date.now().toString() // Actualizar el ID temporal para forzar re-render
+      };
+      setPriceEntries(updatedEntries);
+    } else {
+      // Añadir nuevo precio a la lista
+      setPriceEntries([...priceEntries, {
+        ...formData,
+        tempId: Date.now().toString()
+      }]);
+    }
+
+    // Resetear el producto seleccionado pero mantener el resto de los datos
+    setFormData(prev => ({
+      ...prev,
+      productId: '',
+      price: 0,
+      shippingCost: 0,
+      notes: ''
+    }));
+
+    // Limpiar error si existía
+    setError('');
+  };
+
+  // Función para eliminar un precio de la lista
+  const handleRemovePrice = (index: number) => {
+    setPriceEntries(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError('');
     
     try {
-      onSubmit(formData);
+      // Si hay entradas de precios múltiples, enviar todas
+      if (priceEntries.length > 0) {
+        onSubmit(priceEntries);
+      } else {
+        // Modo tradicional con un solo precio
+        onSubmit(formData);
+      }
     } catch (err) {
       setError('Ocurrió un error al guardar el precio. Por favor, inténtalo de nuevo.');
       console.error('Error al enviar formulario:', err);
@@ -230,116 +289,109 @@ export default function PriceForm({
         </div>
       )}
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="productId" className="block text-sm font-bold text-white mb-2">
-            Producto
-          </label>
-          <Select2
-            id="productId"
-            name="productId"
-            options={productOptions}
-            value={formData.productId || ''}
-            onChange={(value) => handleSelectChange('productId', value)}
-            placeholder="Selecciona un producto"
-            disabled={loadingProducts}
-            required
-          />
-        </div>
-
-        <div>
-          <label htmlFor="supplierId" className="block text-sm font-bold text-white mb-2">
-            Proveedor
-          </label>
-          <Select2
-            id="supplierId"
-            name="supplierId"
-            options={supplierOptions}
-            value={formData.supplierId || ''}
-            onChange={(value) => handleSelectChange('supplierId', value)}
-            placeholder="Selecciona un proveedor"
-            disabled={loadingSuppliers}
-            required
-          />
-        </div>
+      {/* Sección de selección de proveedor - Solo se puede cambiar si no hay precios añadidos */}
+      <div className="mb-6 pb-4 border-b border-gray-700">
+        <label htmlFor="supplierId" className="block text-sm font-bold text-white mb-2">
+          Proveedor
+        </label>
+        <Select2
+          id="supplierId"
+          name="supplierId"
+          options={supplierOptions}
+          value={formData.supplierId || ''}
+          onChange={(value) => handleSelectChange('supplierId', value)}
+          placeholder="Selecciona un proveedor"
+          disabled={loadingSuppliers || priceEntries.length > 0}
+          required
+        />
+        {priceEntries.length > 0 && (
+          <p className="text-xs text-gray-400 mt-1">
+            Para cambiar de proveedor, elimina primero todos los precios añadidos.
+          </p>
+        )}
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label htmlFor="price" className="block text-sm font-bold text-white mb-2">
-            Precio
-          </label>
-          <div className="flex rounded-md shadow-sm">
-            <input
-              type="number"
-              id="price"
-              name="price"
-              value={formData.price || ''}
-              onChange={handleChange}
-              min="0"
-              step="0.01"
-              className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
+      
+      {/* Formulario para añadir un nuevo precio */}
+      <div className="bg-gray-800 p-4 rounded-md border border-gray-700 mb-4">
+        <h3 className="text-lg font-medium text-white mb-4">Añadir Precio</h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="productId" className="block text-sm font-bold text-white mb-2">
+              Producto
+            </label>
+            <Select2
+              id="productId"
+              name="productId"
+              options={productOptions}
+              value={formData.productId || ''}
+              onChange={(value) => handleSelectChange('productId', value)}
+              placeholder="Selecciona un producto"
+              disabled={loadingProducts}
               required
             />
           </div>
-          {formData.price > 0 && (
-            <div className="mt-1">
-              <span className="text-sm text-gray-400">
-                Equivale a {priceInEUR}
-              </span>
-            </div>
-          )}
-        </div>
 
-        <div>
-          <label htmlFor="currency" className="block text-sm font-bold text-white mb-2">
-            Moneda
-          </label>
-          <select
-            id="currency"
-            name="currency"
-            value={formData.currency}
-            onChange={handleChange}
-            className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
-            required
-          >
-            <option value="EUR">EUR (€)</option>
-            <option value="USD">USD ($)</option>
-            <option value="JPY">JPY (¥)</option>
-            <option value="GBP">GBP (£)</option>
-            <option value="CNY">CNY (¥)</option>
-            <option value="KRW">KRW (₩)</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="priceUnit" className="block text-sm font-bold text-white mb-2">
-            Unidad de Precio
-          </label>
-          <select
-            id="priceUnit"
-            name="priceUnit"
-            value={formData.priceUnit}
-            onChange={handleChange}
-            className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
-          >
-            <option value="Per Box">Por Caja</option>
-            <option value="Per Pack">Por Pack</option>
-            <option value="Per Card">Por Carta</option>
-            <option value="Per Collection">Por Colección</option>
-            <option value="Per Tin">Por Lata</option>
-          </select>
-        </div>
-      </div>
-
-      {/* Campo para cajas por pack, solo visible cuando la unidad es Pack */}
-      {formData.priceUnit === 'Per Pack' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label htmlFor="boxesPerPack" className="block text-sm font-bold text-white mb-2">
-              Cantidad de cajas por pack
+            <label htmlFor="price" className="block text-sm font-bold text-white mb-2">
+              Precio
             </label>
-            <div className="flex rounded-md shadow-sm">
+            <div className="flex space-x-2">
+              <input
+                type="number"
+                id="price"
+                name="price"
+                value={formData.price || ''}
+                onChange={handleChange}
+                min="0"
+                step="0.01"
+                className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+                required
+              />
+              <select
+                id="currency"
+                name="currency"
+                value={formData.currency}
+                onChange={handleChange}
+                className="block rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+              >
+                <option value="EUR">EUR</option>
+                <option value="USD">USD</option>
+                <option value="GBP">GBP</option>
+                <option value="JPY">JPY</option>
+              </select>
+            </div>
+            {formData.price && formData.currency !== 'EUR' && (
+              <p className="text-xs text-gray-400 mt-1">
+                Equivalente: {priceInEUR}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label htmlFor="priceUnit" className="block text-sm font-bold text-white mb-2">
+              Unidad de precio
+            </label>
+            <select
+              id="priceUnit"
+              name="priceUnit"
+              value={formData.priceUnit}
+              onChange={handleChange}
+              className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+            >
+              <option value="Per Box">Por Caja</option>
+              <option value="Per Pack">Por Pack (múltiples cajas)</option>
+              <option value="Per Piece">Por Pieza</option>
+            </select>
+          </div>
+
+          {formData.priceUnit === 'Per Pack' && (
+            <div>
+              <label htmlFor="boxesPerPack" className="block text-sm font-bold text-white mb-2">
+                Cajas por pack
+              </label>
               <input
                 type="number"
                 id="boxesPerPack"
@@ -348,23 +400,52 @@ export default function PriceForm({
                 onChange={handleChange}
                 min="1"
                 step="1"
-                className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
+                className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
               />
-            </div>
-          </div>
-          
-          {unitPrice && (
-            <div className="flex items-center">
-              <span className="text-white font-medium">Precio unitario por caja: {unitPrice}</span>
+              {unitPrice && (
+                <p className="text-xs text-gray-400 mt-1">
+                  Precio por caja: {unitPrice}
+                </p>
+              )}
             </div>
           )}
         </div>
-      )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label htmlFor="shippingCost" className="block text-sm font-bold text-white mb-2">
+              Coste de envío
+            </label>
+            <input
+              type="number"
+              id="shippingCost"
+              name="shippingCost"
+              value={formData.shippingCost || ''}
+              onChange={handleChange}
+              min="0"
+              step="0.01"
+              className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="inStock" className="flex items-center text-sm font-bold text-white mt-6">
+              <input
+                type="checkbox"
+                id="inStock"
+                name="inStock"
+                checked={formData.inStock}
+                onChange={(e) => setFormData(prev => ({ ...prev, inStock: e.target.checked }))}
+                className="mr-2 rounded border-gray-700 bg-gray-800 text-green-500 focus:ring-green-500"
+              />
+              En stock / Disponible
+            </label>
+          </div>
+        </div>
+
+        <div className="mt-4">
           <label htmlFor="url" className="block text-sm font-bold text-white mb-2">
-            URL
+            URL del producto
           </label>
           <input
             type="url"
@@ -372,58 +453,93 @@ export default function PriceForm({
             name="url"
             value={formData.url || ''}
             onChange={handleChange}
-            className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
-            placeholder="https://..."
+            className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white"
+            placeholder="https://ejemplo.com/producto"
           />
         </div>
-        
-        <div>
-          <label htmlFor="shippingCost" className="block text-sm font-bold text-white mb-2">
-            Coste de envío
+
+        <div className="mt-4">
+          <label htmlFor="notes" className="block text-sm font-bold text-white mb-2">
+            Notas
           </label>
-          <input
-            type="number"
-            id="shippingCost"
-            name="shippingCost"
-            value={formData.shippingCost ?? ''}
+          <textarea
+            id="notes"
+            name="notes"
+            value={formData.notes || ''}
             onChange={handleChange}
-            min="0"
-            step="0.01"
+            rows={3}
             className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
+            placeholder="Información adicional..."
           />
+        </div>
+
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={handleAddPrice}
+            className="px-4 py-2 bg-indigo-700 text-white rounded hover:bg-indigo-600"
+          >
+            Añadir a la lista
+          </button>
         </div>
       </div>
 
-      <div>
-        <div className="flex items-center">
-          <input
-            type="checkbox"
-            id="inStock"
-            name="inStock"
-            checked={formData.inStock}
-            onChange={(e) => setFormData(prev => ({ ...prev, inStock: e.target.checked }))}
-            className="h-4 w-4 rounded border-gray-700 text-green-600 focus:ring-green-500"
-          />
-          <label htmlFor="inStock" className="ml-2 block text-sm font-bold text-white">
-            Disponible en stock
-          </label>
+      {/* Tabla de precios añadidos */}
+      {priceEntries.length > 0 && (
+        <div className="bg-gray-800 p-4 rounded-md border border-gray-700 mb-4">
+          <h3 className="text-lg font-medium text-white mb-4">Precios a Guardar</h3>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Producto</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Precio</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Unidad</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Envío</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Notas</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {priceEntries.map((entry, index) => {
+                  const product = productsList.find(p => p.id === entry.productId);
+                  return (
+                    <tr key={entry.tempId || index}>
+                      <td className="px-4 py-2 text-sm text-gray-300">
+                        {product?.name} {product?.language ? `(${product.language})` : ''}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-300">
+                        {entry.price} {entry.currency}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-300">
+                        {entry.priceUnit}
+                        {entry.priceUnit === 'Per Pack' && entry.boxesPerPack ? ` (${entry.boxesPerPack} cajas)` : ''}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-300">
+                        {entry.shippingCost ? `${entry.shippingCost} ${entry.currency}` : '-'}
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-300">
+                        {entry.notes && entry.notes.length > 20 
+                          ? entry.notes.substring(0, 20) + '...' 
+                          : entry.notes || '-'}
+                      </td>
+                      <td className="px-4 py-2 text-sm">
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePrice(index)}
+                          className="text-red-500 hover:text-red-400"
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-
-      <div>
-        <label htmlFor="notes" className="block text-sm font-bold text-white mb-2">
-          Notas
-        </label>
-        <textarea
-          id="notes"
-          name="notes"
-          value={formData.notes || ''}
-          onChange={handleChange}
-          rows={3}
-          className="block w-full rounded-md border-gray-700 bg-gray-800 shadow-sm focus:border-green-500 focus:ring-green-500 text-white px-3 py-2"
-          placeholder="Información adicional..."
-        />
-      </div>
+      )}
 
       <div className="flex justify-end space-x-3 pt-4">
         <button
@@ -437,9 +553,9 @@ export default function PriceForm({
         <button
           type="submit"
           className="px-4 py-2 bg-green-700 text-white rounded-md hover:bg-green-600"
-          disabled={isSubmitting}
+          disabled={isSubmitting || (priceEntries.length === 0 && (!formData.productId || !formData.price || !formData.supplierId))}
         >
-          {isSubmitting ? 'Guardando...' : initialData ? 'Actualizar' : 'Añadir'}
+          {isSubmitting ? 'Guardando...' : initialData ? 'Actualizar' : 'Guardar Precios'}
         </button>
       </div>
     </form>
