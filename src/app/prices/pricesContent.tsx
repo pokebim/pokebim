@@ -8,8 +8,7 @@ import DataTable from '@/components/ui/DataTable';
 import { createColumnHelper } from '@tanstack/react-table';
 import { 
   Price, 
-  getAllPrices,
-  getPricesBySupplier,
+  getAllPrices, 
   addPrice, 
   updatePrice, 
   deletePrice 
@@ -27,7 +26,7 @@ import {
   addSupplier
 } from '@/lib/supplierService';
 import { toast } from 'react-hot-toast';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs } from 'firebase/firestore/lite';
 import { db } from '@/lib/firebase';
 import DetailView, { DetailField, DetailGrid, DetailSection, DetailBadge, DetailLink } from '@/components/ui/DetailView';
 import PriceInlineEdit from '@/components/ui/PriceInlineEdit';
@@ -112,10 +111,6 @@ export default function PricesContent() {
   // Añadir estado para el nuevo modal
   const [bulkAddModalOpen, setBulkAddModalOpen] = useState(false);
   
-  // Obtener el parámetro supplier de la URL
-  const searchParams = new URLSearchParams(window.location.search);
-  const supplierIdFromUrl = searchParams.get('supplier');
-  
   // Obtener valores únicos para los filtros
   const uniqueLanguages = useMemo(() => {
     const languages = new Set<string>();
@@ -166,141 +161,8 @@ export default function PricesContent() {
     }));
   };
   
-  // Cargar datos iniciales
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError('');
-      setPrices([]);
-      
-      try {
-        console.log('Iniciando carga de datos...');
-        
-        // Cargar productos y proveedores
-        const [productsData, suppliersData] = await Promise.all([
-          getAllProducts(),
-          getAllSuppliers()
-        ]);
-        
-        setProducts(productsData);
-        setSuppliers(suppliersData);
-        
-        console.log('Productos cargados:', productsData.length);
-        console.log('Proveedores cargados:', suppliersData.length);
-
-        // Si hay un proveedor en la URL, verificar que existe
-        if (supplierIdFromUrl) {
-          const supplier = suppliersData.find(s => s.id === supplierIdFromUrl);
-          if (!supplier) {
-            setError(`No se encontró el proveedor con ID: ${supplierIdFromUrl}`);
-            setLoading(false);
-            return;
-          }
-          console.log('Proveedor encontrado:', supplier);
-          
-          // Establecer el nombre del proveedor en los filtros solo si no hay un filtro manual
-          if (!filters.supplierName) {
-            setFilters(prev => ({
-              ...prev,
-              supplierName: supplier.name
-            }));
-          }
-
-          // Cargar precios específicos del proveedor
-          console.log('Cargando precios para el proveedor específico:', supplierIdFromUrl);
-          const pricesData = await getPricesBySupplier(supplierIdFromUrl);
-          console.log('Precios obtenidos para el proveedor:', pricesData.length);
-
-          // Enriquecer los precios con datos de productos y proveedores
-          const enrichedPrices = pricesData.map(price => {
-            const product = productsData.find(p => p.id === price.productId);
-            const supplier = suppliersData.find(s => s.id === price.supplierId);
-            
-            if (!product) {
-              console.warn(`Producto no encontrado para el precio ${price.id}, productId: ${price.productId}`);
-            }
-            if (!supplier) {
-              console.warn(`Proveedor no encontrado para el precio ${price.id}, supplierId: ${price.supplierId}`);
-            }
-            
-            return {
-              ...price,
-              product: product ? {
-                name: product.name,
-                language: product.language,
-                type: product.type,
-                imageUrl: product.imageUrl
-              } : {
-                name: 'Producto no encontrado',
-                language: '-',
-                type: '-'
-              },
-              supplier: supplier ? {
-                name: supplier.name,
-                country: supplier.country
-              } : {
-                name: 'Proveedor no encontrado',
-                country: '-'
-              }
-            };
-          });
-
-          console.log('Precios enriquecidos:', enrichedPrices.length);
-          setPrices(enrichedPrices);
-        } else {
-          // Si no hay proveedor específico, cargar todos los precios
-          console.log('Cargando todos los precios');
-          const pricesData = await getAllPrices();
-          console.log('Total de precios cargados:', pricesData.length);
-
-          // Enriquecer los precios
-          const enrichedPrices = pricesData.map(price => {
-            const product = productsData.find(p => p.id === price.productId);
-            const supplier = suppliersData.find(s => s.id === price.supplierId);
-            
-            return {
-              ...price,
-              product: product ? {
-                name: product.name,
-                language: product.language,
-                type: product.type,
-                imageUrl: product.imageUrl
-              } : {
-                name: 'Producto no encontrado',
-                language: '-',
-                type: '-'
-              },
-              supplier: supplier ? {
-                name: supplier.name,
-                country: supplier.country
-              } : {
-                name: 'Proveedor no encontrado',
-                country: '-'
-              }
-            };
-          });
-
-          setPrices(enrichedPrices);
-        }
-
-        setLoading(false);
-        console.log('Carga de datos completada');
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Error al cargar los datos. Por favor, inténtalo de nuevo más tarde.');
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, [supplierIdFromUrl]);
-
   // Aplicar filtros a los precios
   const filteredPrices = useMemo(() => {
-    console.log('Aplicando filtros a los precios...');
-    console.log('Total de precios antes de filtrar:', prices.length);
-    console.log('Filtros actuales:', filters);
-
     return prices.filter(price => {
       // Filtro por nombre de producto
       if (filters.productName && 
@@ -343,17 +205,12 @@ export default function PricesContent() {
     });
   }, [prices, filters]);
 
-  // Filtrar precios para obtener el más bajo por producto
+  // Filtrar precios para obtener el más bajo por producto, ahora aplicando los mismos filtros
   const filteredBestPricesByProduct = useMemo(() => {
     const productMap = new Map<string, BestPriceProduct>();
     
     // Primero filtramos los precios según los filtros aplicados
     const filteredPricesForBest = prices.filter(price => {
-      // Si hay un supplier en la URL, filtrar por su ID
-      if (supplierIdFromUrl && price.supplierId !== supplierIdFromUrl) {
-        return false;
-      }
-
       // Filtro por nombre de producto
       if (filters.productName && 
           !price.product?.name.toLowerCase().includes(filters.productName.toLowerCase())) {
@@ -370,8 +227,8 @@ export default function PricesContent() {
         return false;
       }
       
-      // Filtro por nombre de proveedor (solo si no hay supplier en la URL)
-      if (!supplierIdFromUrl && filters.supplierName && 
+      // Filtro por nombre de proveedor
+      if (filters.supplierName && 
           !price.supplier?.name.toLowerCase().includes(filters.supplierName.toLowerCase())) {
         return false;
       }
@@ -418,7 +275,7 @@ export default function PricesContent() {
     });
     
     return Array.from(productMap.values());
-  }, [prices, filters, supplierIdFromUrl]);
+  }, [prices, filters]);
   
   // Función para obtener datos
   const fetchPrices = async () => {
