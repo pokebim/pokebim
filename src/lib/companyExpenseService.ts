@@ -13,6 +13,12 @@ export interface CompanyExpense {
   notes?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  // Campos para impuestos
+  taxType?: string;
+  taxBase?: number;
+  taxRate?: number;
+  // Referencia a un gasto relacionado (para impuestos asociados a un gasto)
+  relatedExpenseId?: string;
 }
 
 // Obtener todos los gastos
@@ -44,7 +50,11 @@ export const getAllCompanyExpenses = async (): Promise<CompanyExpense[]> => {
         category: data.category || undefined,
         notes: data.notes || undefined,
         createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
-        updatedAt: data.updatedAt ? data.updatedAt.toDate() : new Date()
+        updatedAt: data.updatedAt ? data.updatedAt.toDate() : new Date(),
+        taxType: data.taxType || undefined,
+        taxBase: data.taxBase || undefined,
+        taxRate: data.taxRate || undefined,
+        relatedExpenseId: data.relatedExpenseId || undefined
       });
     });
     
@@ -145,7 +155,11 @@ export const getCompanyExpenseById = async (id: string): Promise<CompanyExpense 
       category: data.category || undefined,
       notes: data.notes || undefined,
       createdAt: data.createdAt ? data.createdAt.toDate() : new Date(),
-      updatedAt: data.updatedAt ? data.updatedAt.toDate() : new Date()
+      updatedAt: data.updatedAt ? data.updatedAt.toDate() : new Date(),
+      taxType: data.taxType || undefined,
+      taxBase: data.taxBase || undefined,
+      taxRate: data.taxRate || undefined,
+      relatedExpenseId: data.relatedExpenseId || undefined
     };
   } catch (error) {
     console.error(`Error al obtener gasto empresarial ${id}:`, error);

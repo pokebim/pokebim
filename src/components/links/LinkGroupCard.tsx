@@ -24,7 +24,7 @@ export default function LinkGroupCard({
   onDeleteLink,
   onLinkClick
 }: LinkGroupCardProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   

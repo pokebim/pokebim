@@ -38,6 +38,8 @@ export default function ExpensesPage() {
   // Nuevo estado para la vista detallada
   const [detailViewOpen, setDetailViewOpen] = useState<boolean>(false);
   const [selectedExpense, setSelectedExpense] = useState<CompanyExpense | null>(null);
+  // Nuevo estado para preseleccionar la categoría de impuestos
+  const [preselectedCategory, setPreselectedCategory] = useState<string | null>(null);
 
   // Cargar los gastos al montar el componente
   useEffect(() => {
@@ -78,6 +80,14 @@ export default function ExpensesPage() {
   // Manejar la edición de un gasto
   const handleEdit = (expense: CompanyExpense) => {
     setEditingExpense(expense);
+    setPreselectedCategory(null);
+    setModalOpen(true);
+  };
+
+  // Nuevo método para manejar la adición de impuestos a un gasto existente
+  const handleAddTaxToExpense = (expense: CompanyExpense) => {
+    setEditingExpense(expense);
+    setPreselectedCategory('Impuestos');
     setModalOpen(true);
   };
 
@@ -85,19 +95,53 @@ export default function ExpensesPage() {
   const handleSubmit = async (formData: Partial<CompanyExpense>) => {
     try {
       if (editingExpense && editingExpense.id) {
-        // Actualizar un gasto existente
-        await updateCompanyExpense(editingExpense.id, formData);
-        
-        // Actualizar el estado local
-        setExpenses(prev => 
-          prev.map(expense => 
-            expense.id === editingExpense.id 
-              ? { ...expense, ...formData, updatedAt: new Date() } 
-              : expense
-          )
-        );
-        
-        toast.success('Gasto actualizado correctamente');
+        // Si estamos añadiendo un impuesto a un gasto existente
+        if (preselectedCategory === 'Impuestos' && editingExpense.category !== 'Impuestos') {
+          // Crear un nuevo gasto para el impuesto, vinculado al gasto original
+          const taxExpense: Omit<CompanyExpense, 'id' | 'createdAt' | 'updatedAt'> = {
+            name: `Impuesto: ${editingExpense.name}`,
+            price: formData.price || 0,
+            link: '',
+            paidBy: editingExpense.paidBy || 'edmon',
+            isPaid: editingExpense.isPaid || false,
+            paymentDate: editingExpense.paymentDate || null,
+            category: 'Impuestos',
+            notes: `Impuesto asociado al gasto: ${editingExpense.name}`,
+            taxType: formData.taxType || '',
+            taxBase: formData.taxBase || 0,
+            taxRate: formData.taxRate || 0,
+            relatedExpenseId: editingExpense.id
+          };
+          
+          // Añadir el nuevo gasto de impuesto
+          const newId = await addCompanyExpense(taxExpense);
+          
+          // Actualizar el estado local con el nuevo gasto de impuesto
+          const newExpense: CompanyExpense = {
+            id: newId,
+            ...taxExpense,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          setExpenses(prev => [newExpense, ...prev]);
+          
+          toast.success('Impuesto añadido correctamente al gasto existente');
+        } else {
+          // Actualizar un gasto existente normalmente
+          await updateCompanyExpense(editingExpense.id, formData);
+          
+          // Actualizar el estado local
+          setExpenses(prev => 
+            prev.map(expense => 
+              expense.id === editingExpense.id 
+                ? { ...expense, ...formData, updatedAt: new Date() } 
+                : expense
+            )
+          );
+          
+          toast.success('Gasto actualizado correctamente');
+        }
       } else {
         // Añadir un nuevo gasto
         const newId = await addCompanyExpense(formData as Omit<CompanyExpense, 'id' | 'createdAt' | 'updatedAt'>);
@@ -118,6 +162,7 @@ export default function ExpensesPage() {
       // Cerrar el modal y limpiar el estado de edición
       setModalOpen(false);
       setEditingExpense(null);
+      setPreselectedCategory(null);
     } catch (error) {
       console.error('Error al guardar el gasto:', error);
       toast.error('Error al guardar el gasto');
@@ -128,6 +173,13 @@ export default function ExpensesPage() {
   const handleViewDetail = (expense: CompanyExpense) => {
     setSelectedExpense(expense);
     setDetailViewOpen(true);
+  };
+
+  // Función para abrir el modal de nuevo gasto
+  const openNewExpenseModal = (category: string | null = null) => {
+    setEditingExpense(null);
+    setPreselectedCategory(category);
+    setModalOpen(true);
   };
 
   // Definir las columnas de la tabla
@@ -145,6 +197,27 @@ export default function ExpensesPage() {
     columnHelper.accessor('category', {
       header: 'Categoría',
       cell: info => <span className="text-gray-300">{info.getValue() || 'Sin categoría'}</span>
+    }),
+    columnHelper.display({
+      id: 'taxDetails',
+      header: 'Detalles Impuesto',
+      cell: info => {
+        const expense = info.row.original;
+        
+        if (expense.category === 'Impuestos' && expense.taxType) {
+          return (
+            <div className="text-sm">
+              <span className="text-indigo-400 font-medium">{expense.taxType}</span>
+              {expense.taxBase ? (
+                <div className="text-gray-400">
+                  Base: {expense.taxBase.toFixed(2)}€ ({expense.taxRate}%)
+                </div>
+              ) : null}
+            </div>
+          );
+        }
+        return null;
+      }
     }),
     columnHelper.accessor('paidBy', {
       header: 'Pagado por',
@@ -188,28 +261,40 @@ export default function ExpensesPage() {
     }),
     columnHelper.accessor('id', {
       header: 'Acciones',
-      cell: info => (
-        <div className="flex space-x-2">
-          <button
-            onClick={() => handleViewDetail(info.row.original)}
-            className="px-3 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
-          >
-            Ver
-          </button>
-          <button
-            onClick={() => handleEdit(info.row.original)}
-            className="px-3 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors"
-          >
-            Editar
-          </button>
-          <button
-            onClick={() => handleDelete(info.getValue() as string)}
-            className="px-3 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
-          >
-            Eliminar
-          </button>
-        </div>
-      )
+      cell: info => {
+        const expense = info.row.original;
+        return (
+          <div className="flex space-x-2">
+            <button
+              onClick={() => handleViewDetail(expense)}
+              className="px-3 py-1 text-xs bg-indigo-700 text-white rounded hover:bg-indigo-600 transition-colors"
+            >
+              Ver
+            </button>
+            <button
+              onClick={() => handleEdit(expense)}
+              className="px-3 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors"
+            >
+              Editar
+            </button>
+            {expense.category !== 'Impuestos' && (
+              <button
+                onClick={() => handleAddTaxToExpense(expense)}
+                className="px-3 py-1 text-xs bg-purple-700 text-white rounded hover:bg-purple-600 transition-colors"
+                title="Añadir información de impuestos a este gasto"
+              >
+                + Impuesto
+              </button>
+            )}
+            <button
+              onClick={() => handleDelete(info.getValue() as string)}
+              className="px-3 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
+            >
+              Eliminar
+            </button>
+          </div>
+        );
+      }
     })
   ], []);
 
@@ -270,6 +355,24 @@ export default function ExpensesPage() {
     return <DetailBadge color={color}>{displayText}</DetailBadge>;
   };
 
+  // Verifica si un gasto tiene un impuesto asociado
+  const hasRelatedTaxExpense = (expenseId: string) => {
+    return expenses.some(expense => expense.relatedExpenseId === expenseId && expense.category === 'Impuestos');
+  };
+
+  // Obtiene los impuestos relacionados a un gasto
+  const getRelatedTaxExpenses = (expenseId: string) => {
+    return expenses.filter(expense => expense.relatedExpenseId === expenseId && expense.category === 'Impuestos');
+  };
+
+  // Obtiene el gasto original de un impuesto
+  const getOriginalExpense = (taxExpense: CompanyExpense) => {
+    if (taxExpense.relatedExpenseId) {
+      return expenses.find(expense => expense.id === taxExpense.relatedExpenseId);
+    }
+    return null;
+  };
+
   return (
     <MainLayout>
       <Modal
@@ -277,16 +380,27 @@ export default function ExpensesPage() {
         onClose={() => {
           setModalOpen(false);
           setEditingExpense(null);
+          setPreselectedCategory(null);
         }}
-        title={editingExpense ? "Editar gasto" : "Añadir nuevo gasto"}
+        title={
+          editingExpense 
+            ? preselectedCategory === "Impuestos" 
+              ? `Añadir impuesto a: ${editingExpense.name}`
+              : "Editar gasto" 
+            : preselectedCategory === "Impuestos" 
+              ? "Añadir impuesto" 
+              : "Añadir nuevo gasto"
+        }
       >
         <CompanyExpenseForm
           onSubmit={handleSubmit}
           onCancel={() => {
             setModalOpen(false);
             setEditingExpense(null);
+            setPreselectedCategory(null);
           }}
           initialData={editingExpense}
+          preselectedCategory={preselectedCategory}
         />
       </Modal>
 
@@ -295,86 +409,198 @@ export default function ExpensesPage() {
         <DetailView
           isOpen={detailViewOpen}
           onClose={() => setDetailViewOpen(false)}
-          title={`Detalle de Gasto: ${selectedExpense.name}`}
-          actions={
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  setDetailViewOpen(false);
-                  setEditingExpense(selectedExpense);
-                  setModalOpen(true);
-                }}
-                className="px-4 py-2 bg-blue-700 text-white rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => setDetailViewOpen(false)}
-                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
-              >
-                Cerrar
-              </button>
-            </>
-          }
+          title={`Detalles del Gasto: ${selectedExpense.name}`}
         >
-          <DetailSection title="Información General">
-            <DetailGrid>
-              <DetailField label="Nombre" value={selectedExpense.name} />
-              <DetailField 
-                label="Precio" 
-                value={
-                  <span className="font-semibold text-lg text-green-400">
-                    {selectedExpense.price.toFixed(2)} €
-                  </span>
-                } 
-              />
-              <DetailField 
-                label="Categoría" 
-                value={selectedExpense.category || 'Sin categoría'} 
-              />
-              <DetailField 
-                label="Pagado por" 
-                value={renderPaidByBadge(selectedExpense.paidBy)} 
-              />
-              <DetailField 
-                label="Estado" 
-                value={
-                  <DetailBadge color={selectedExpense.isPaid ? 'green' : 'yellow'}>
-                    {selectedExpense.isPaid ? 'Pagado' : 'Pendiente'}
-                  </DetailBadge>
-                } 
-              />
-              <DetailField 
-                label="Fecha de creación" 
-                value={selectedExpense.createdAt ? new Date(selectedExpense.createdAt).toLocaleDateString() : 'N/A'} 
-              />
-              {selectedExpense.isPaid && selectedExpense.paymentDate && (
-                <DetailField 
-                  label="Fecha de pago" 
-                  value={new Date(selectedExpense.paymentDate).toLocaleDateString()} 
-                />
+          <DetailGrid>
+            {/* Información básica */}
+            <DetailItem label="Nombre">
+              {selectedExpense.name}
+            </DetailItem>
+            <DetailItem label="Precio">
+              {selectedExpense.price.toFixed(2)} €
+            </DetailItem>
+            <DetailItem label="Categoría">
+              {selectedExpense.category || 'Sin categoría'}
+            </DetailItem>
+            <DetailItem label="Pagado por">
+              {renderPaidByBadge(selectedExpense.paidBy)}
+            </DetailItem>
+            <DetailItem label="Estado">
+              {selectedExpense.isPaid ? (
+                <DetailBadge color="green">Pagado</DetailBadge>
+              ) : (
+                <DetailBadge color="gray">Pendiente</DetailBadge>
               )}
-              {selectedExpense.link && (
-                <DetailField 
-                  label="Enlace" 
-                  value={
-                    <DetailLink 
-                      href={selectedExpense.link} 
-                      label="Ver producto" 
-                    />
-                  } 
-                />
-              )}
-            </DetailGrid>
-          </DetailSection>
+            </DetailItem>
 
-          {selectedExpense.notes && (
-            <DetailSection title="Notas adicionales">
-              <p className="text-gray-300 whitespace-pre-line">{selectedExpense.notes}</p>
-            </DetailSection>
-          )}
+            {/* Mostrar fecha de pago si está pagado */}
+            {selectedExpense.isPaid && selectedExpense.paymentDate && (
+              <DetailItem label="Fecha de pago">
+                {new Date(selectedExpense.paymentDate).toLocaleDateString()}
+              </DetailItem>
+            )}
+
+            {/* Mostrar enlace si existe */}
+            {selectedExpense.link && (
+              <DetailItem label="Enlace">
+                <a 
+                  href={selectedExpense.link} 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="text-blue-400 hover:underline"
+                >
+                  Ver producto
+                </a>
+              </DetailItem>
+            )}
+
+            {/* Mostrar notas si existen */}
+            {selectedExpense.notes && (
+              <DetailItem label="Notas" fullWidth>
+                {selectedExpense.notes}
+              </DetailItem>
+            )}
+
+            {/* Información de impuestos si es un impuesto */}
+            {selectedExpense.category === 'Impuestos' && (
+              <>
+                <div className="col-span-2 mt-2 mb-2">
+                  <h3 className="text-lg font-semibold text-white">Detalles del Impuesto</h3>
+                </div>
+                
+                {selectedExpense.taxType && (
+                  <DetailItem label="Tipo de impuesto">
+                    {selectedExpense.taxType}
+                  </DetailItem>
+                )}
+                
+                {selectedExpense.taxBase !== undefined && (
+                  <DetailItem label="Base imponible">
+                    {selectedExpense.taxBase.toFixed(2)} €
+                  </DetailItem>
+                )}
+                
+                {selectedExpense.taxRate !== undefined && (
+                  <DetailItem label="Tipo impositivo">
+                    {selectedExpense.taxRate.toFixed(2)} %
+                  </DetailItem>
+                )}
+
+                {/* Mostrar gasto relacionado si existe */}
+                {selectedExpense.relatedExpenseId && (
+                  <>
+                    <div className="col-span-2 mt-4 mb-2">
+                      <h3 className="text-lg font-semibold text-white">Gasto Original</h3>
+                    </div>
+                    
+                    {(() => {
+                      const originalExpense = getOriginalExpense(selectedExpense);
+                      if (originalExpense) {
+                        return (
+                          <>
+                            <DetailItem label="Nombre">
+                              {originalExpense.name}
+                            </DetailItem>
+                            <DetailItem label="Precio">
+                              {originalExpense.price.toFixed(2)} €
+                            </DetailItem>
+                            <DetailItem label="Categoría">
+                              {originalExpense.category || 'Sin categoría'}
+                            </DetailItem>
+                            <DetailItem label="Ver detalles completos">
+                              <button
+                                className="text-blue-400 hover:underline"
+                                onClick={() => {
+                                  setDetailViewOpen(false);
+                                  setTimeout(() => {
+                                    setSelectedExpense(originalExpense);
+                                    setDetailViewOpen(true);
+                                  }, 300);
+                                }}
+                              >
+                                Ver gasto original
+                              </button>
+                            </DetailItem>
+                          </>
+                        );
+                      } else {
+                        return (
+                          <DetailItem label="Gasto original" fullWidth>
+                            <span className="text-yellow-500">El gasto original ya no existe</span>
+                          </DetailItem>
+                        );
+                      }
+                    })()}
+                  </>
+                )}
+              </>
+            )}
+
+            {/* Mostrar impuestos relacionados si existen y no es un impuesto */}
+            {selectedExpense.category !== 'Impuestos' && hasRelatedTaxExpense(selectedExpense.id!) && (
+              <>
+                <div className="col-span-2 mt-4 mb-2">
+                  <h3 className="text-lg font-semibold text-white">Impuestos Asociados</h3>
+                </div>
+                
+                {getRelatedTaxExpenses(selectedExpense.id!).map((taxExpense, index) => (
+                  <div key={taxExpense.id} className="col-span-2 p-3 bg-gray-800 rounded-md mb-2">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="text-white font-medium">{taxExpense.taxType || 'Impuesto'}</p>
+                        <p className="text-sm text-gray-400">
+                          Base: {taxExpense.taxBase?.toFixed(2) || '0.00'} € | 
+                          Tasa: {taxExpense.taxRate?.toFixed(2) || '0.00'} % | 
+                          Importe: {taxExpense.price.toFixed(2)} €
+                        </p>
+                      </div>
+                      <button
+                        className="text-blue-400 hover:underline text-sm"
+                        onClick={() => {
+                          setDetailViewOpen(false);
+                          setTimeout(() => {
+                            setSelectedExpense(taxExpense);
+                            setDetailViewOpen(true);
+                          }, 300);
+                        }}
+                      >
+                        Ver detalles
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+
+            {/* Fechas de creación y actualización */}
+            <div className="col-span-2 mt-4 pt-3 border-t border-gray-700">
+              <div className="flex justify-between text-xs text-gray-500">
+                <span>Creado: {new Date(selectedExpense.createdAt!).toLocaleString()}</span>
+                <span>Actualizado: {new Date(selectedExpense.updatedAt!).toLocaleString()}</span>
+              </div>
+            </div>
+          </DetailGrid>
+
+          <div className="mt-6 flex space-x-4 justify-end">
+            <button
+              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
+              onClick={() => {
+                setDetailViewOpen(false);
+                handleEdit(selectedExpense);
+              }}
+            >
+              Editar
+            </button>
+            <button
+              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
+              onClick={() => {
+                setDetailViewOpen(false);
+                handleDelete(selectedExpense.id!);
+              }}
+            >
+              Eliminar
+            </button>
+          </div>
         </DetailView>
       )}
 
@@ -402,7 +628,7 @@ export default function ExpensesPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setModalOpen(true)}
+                onClick={() => openNewExpenseModal()}
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
               >
                 <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -554,16 +780,16 @@ export default function ExpensesPage() {
                 <p className="mt-2 text-sm font-medium text-gray-400">
                   No hay gastos registrados{filterPaidBy !== 'all' ? ` para ${filterPaidBy}` : ''}.
                 </p>
-                <div className="mt-6">
+                <div className="mt-6 flex space-x-3 justify-center">
                   <button
                     type="button"
-                    onClick={() => setModalOpen(true)}
+                    onClick={() => openNewExpenseModal()}
                     className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                   >
                     <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                       <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
                     </svg>
-                    Añadir nuevo gasto
+                    Añadir gasto
                   </button>
                 </div>
               </div>

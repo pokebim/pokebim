@@ -56,6 +56,18 @@ export function DetailGrid({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Componente para mostrar un elemento en la vista detallada
+ */
+export function DetailItem({ label, children, fullWidth = false }: { label: string; children: ReactNode; fullWidth?: boolean }) {
+  return (
+    <div className={`${fullWidth ? 'col-span-2' : ''}`}>
+      <dt className="text-sm font-medium text-gray-400">{label}</dt>
+      <dd className="mt-1 text-sm text-white">{children}</dd>
+    </div>
+  );
+}
+
+/**
  * Componente para mostrar una sección con título dentro de la vista detallada
  */
 export function DetailSection({ title, children }: { title: string; children: ReactNode }) {
