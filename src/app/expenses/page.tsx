@@ -68,9 +68,25 @@ export default function ExpensesPage() {
     }
     
     try {
+      // Primero obtenemos los impuestos relacionados con este gasto
+      const relatedTaxes = getRelatedTaxExpenses(id);
+      
+      // Eliminamos el gasto principal
       await deleteCompanyExpense(id);
-      setExpenses(prev => prev.filter(expense => expense.id !== id));
-      toast.success('Gasto eliminado correctamente');
+      
+      // Ahora eliminamos todos los impuestos relacionados
+      for (const tax of relatedTaxes) {
+        if (tax.id) {
+          await deleteCompanyExpense(tax.id);
+        }
+      }
+      
+      // Actualizar el estado de la UI para eliminar tanto el gasto como sus impuestos
+      setExpenses(prev => prev.filter(expense => 
+        expense.id !== id && expense.relatedExpenseId !== id
+      ));
+      
+      toast.success('Gasto e impuestos relacionados eliminados correctamente');
     } catch (error) {
       console.error('Error al eliminar el gasto:', error);
       toast.error('Error al eliminar el gasto');
@@ -182,6 +198,99 @@ export default function ExpensesPage() {
     setModalOpen(true);
   };
 
+  // Filtrar los gastos según el filtro seleccionado
+  const filteredExpenses = useMemo(() => {
+    // Primero obtenemos una lista de IDs de los gastos que son impuestos
+    // relacionados con otros gastos, para excluirlos de la vista principal
+    const taxExpenseIds = expenses
+      .filter(expense => expense.category === 'Impuestos' && expense.relatedExpenseId)
+      .map(expense => expense.id);
+    
+    // Filtramos para excluir los impuestos que están relacionados con gastos existentes
+    // ya que mostraremos esa información en la misma línea del gasto original
+    let filtered = expenses.filter(expense => !taxExpenseIds.includes(expense.id));
+    
+    // Aplicamos el filtro de persona
+    if (filterPaidBy !== 'all') {
+      filtered = filtered.filter(expense => expense.paidBy === filterPaidBy);
+    }
+    
+    return filtered;
+  }, [expenses, filterPaidBy]);
+
+  // Función para obtener los impuestos relacionados a un gasto
+  const getRelatedTaxExpenses = (expenseId: string) => {
+    return expenses.filter(expense => 
+      expense.relatedExpenseId === expenseId && 
+      expense.category === 'Impuestos'
+    );
+  };
+
+  // Verificar si un gasto tiene impuestos asociados
+  const hasRelatedTaxExpense = (expenseId: string) => {
+    return expenses.some(expense => 
+      expense.relatedExpenseId === expenseId && 
+      expense.category === 'Impuestos'
+    );
+  };
+
+  // Calcular estadísticas
+  const stats = useMemo(() => {
+    const total = expenses.reduce((sum, expense) => sum + expense.price, 0);
+    
+    const byPerson = {
+      edmon: expenses.filter(e => e.paidBy === 'edmon').reduce((sum, e) => sum + e.price, 0),
+      albert: expenses.filter(e => e.paidBy === 'albert').reduce((sum, e) => sum + e.price, 0),
+      biel: expenses.filter(e => e.paidBy === 'biel').reduce((sum, e) => sum + e.price, 0),
+      todos: expenses.filter(e => e.paidBy === 'todos').reduce((sum, e) => sum + e.price, 0)
+    };
+    
+    const byCategory = expenses.reduce((acc, expense) => {
+      const category = expense.category || 'Sin categoría';
+      acc[category] = (acc[category] || 0) + expense.price;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return { total, byPerson, byCategory };
+  }, [expenses]);
+
+  // Función para renderizar el paidBy como badge
+  const renderPaidByBadge = (paidBy: string) => {
+    let color: 'blue' | 'red' | 'yellow' | 'purple' = 'blue';
+    let displayText = '';
+    
+    switch(paidBy) {
+      case 'edmon':
+        displayText = 'Edmon';
+        color = 'blue';
+        break;
+      case 'albert':
+        displayText = 'Albert';
+        color = 'red';
+        break;
+      case 'biel':
+        displayText = 'Biel';
+        color = 'yellow';
+        break;
+      case 'todos':
+        displayText = 'Todos';
+        color = 'purple';
+        break;
+      default:
+        displayText = paidBy;
+    }
+    
+    return <DetailBadge color={color}>{displayText}</DetailBadge>;
+  };
+
+  // Obtiene el gasto original de un impuesto
+  const getOriginalExpense = (taxExpense: CompanyExpense) => {
+    if (taxExpense.relatedExpenseId) {
+      return expenses.find(expense => expense.id === taxExpense.relatedExpenseId);
+    }
+    return null;
+  };
+
   // Definir las columnas de la tabla
   const columnHelper = createColumnHelper<CompanyExpense>();
   
@@ -204,6 +313,7 @@ export default function ExpensesPage() {
       cell: info => {
         const expense = info.row.original;
         
+        // Si el gasto mismo es un impuesto, mostrar sus detalles
         if (expense.category === 'Impuestos' && expense.taxType) {
           return (
             <div className="text-sm">
@@ -216,6 +326,27 @@ export default function ExpensesPage() {
             </div>
           );
         }
+        
+        // Si el gasto tiene impuestos relacionados, mostrarlos aquí
+        if (hasRelatedTaxExpense(expense.id!)) {
+          const relatedTaxes = getRelatedTaxExpenses(expense.id!);
+          
+          return (
+            <div className="space-y-1">
+              {relatedTaxes.map((tax, index) => (
+                <div key={tax.id} className="text-sm bg-gray-800 p-1.5 rounded">
+                  <span className="text-indigo-400 font-medium">{tax.taxType}</span>
+                  {tax.taxBase ? (
+                    <div className="text-gray-400">
+                      Base: {tax.taxBase.toFixed(2)}€ ({tax.taxRate}%) = {tax.price.toFixed(2)}€
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          );
+        }
+        
         return null;
       }
     }),
@@ -296,82 +427,7 @@ export default function ExpensesPage() {
         );
       }
     })
-  ], []);
-
-  // Filtrar los gastos según el filtro seleccionado
-  const filteredExpenses = useMemo(() => {
-    if (filterPaidBy === 'all') {
-      return expenses;
-    }
-    return expenses.filter(expense => expense.paidBy === filterPaidBy);
-  }, [expenses, filterPaidBy]);
-
-  // Calcular estadísticas
-  const stats = useMemo(() => {
-    const total = expenses.reduce((sum, expense) => sum + expense.price, 0);
-    
-    const byPerson = {
-      edmon: expenses.filter(e => e.paidBy === 'edmon').reduce((sum, e) => sum + e.price, 0),
-      albert: expenses.filter(e => e.paidBy === 'albert').reduce((sum, e) => sum + e.price, 0),
-      biel: expenses.filter(e => e.paidBy === 'biel').reduce((sum, e) => sum + e.price, 0),
-      todos: expenses.filter(e => e.paidBy === 'todos').reduce((sum, e) => sum + e.price, 0)
-    };
-    
-    const byCategory = expenses.reduce((acc, expense) => {
-      const category = expense.category || 'Sin categoría';
-      acc[category] = (acc[category] || 0) + expense.price;
-      return acc;
-    }, {} as Record<string, number>);
-    
-    return { total, byPerson, byCategory };
-  }, [expenses]);
-
-  // Función para renderizar el paidBy como badge
-  const renderPaidByBadge = (paidBy: string) => {
-    let color: 'blue' | 'red' | 'yellow' | 'purple' = 'blue';
-    let displayText = '';
-    
-    switch(paidBy) {
-      case 'edmon':
-        displayText = 'Edmon';
-        color = 'blue';
-        break;
-      case 'albert':
-        displayText = 'Albert';
-        color = 'red';
-        break;
-      case 'biel':
-        displayText = 'Biel';
-        color = 'yellow';
-        break;
-      case 'todos':
-        displayText = 'Todos';
-        color = 'purple';
-        break;
-      default:
-        displayText = paidBy;
-    }
-    
-    return <DetailBadge color={color}>{displayText}</DetailBadge>;
-  };
-
-  // Verifica si un gasto tiene un impuesto asociado
-  const hasRelatedTaxExpense = (expenseId: string) => {
-    return expenses.some(expense => expense.relatedExpenseId === expenseId && expense.category === 'Impuestos');
-  };
-
-  // Obtiene los impuestos relacionados a un gasto
-  const getRelatedTaxExpenses = (expenseId: string) => {
-    return expenses.filter(expense => expense.relatedExpenseId === expenseId && expense.category === 'Impuestos');
-  };
-
-  // Obtiene el gasto original de un impuesto
-  const getOriginalExpense = (taxExpense: CompanyExpense) => {
-    if (taxExpense.relatedExpenseId) {
-      return expenses.find(expense => expense.id === taxExpense.relatedExpenseId);
-    }
-    return null;
-  };
+  ], [expenses]);
 
   return (
     <MainLayout>
@@ -543,32 +599,49 @@ export default function ExpensesPage() {
                   <h3 className="text-lg font-semibold text-white">Impuestos Asociados</h3>
                 </div>
                 
-                {getRelatedTaxExpenses(selectedExpense.id!).map((taxExpense, index) => (
-                  <div key={taxExpense.id} className="col-span-2 p-3 bg-gray-800 rounded-md mb-2">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-white font-medium">{taxExpense.taxType || 'Impuesto'}</p>
-                        <p className="text-sm text-gray-400">
-                          Base: {taxExpense.taxBase?.toFixed(2) || '0.00'} € | 
-                          Tasa: {taxExpense.taxRate?.toFixed(2) || '0.00'} % | 
-                          Importe: {taxExpense.price.toFixed(2)} €
-                        </p>
+                <div className="col-span-2 space-y-2">
+                  {getRelatedTaxExpenses(selectedExpense.id!).map((taxExpense, index) => (
+                    <div key={taxExpense.id} className="bg-gray-800 rounded-md p-3">
+                      <div className="flex flex-col md:flex-row md:justify-between md:items-center">
+                        <div className="mb-2 md:mb-0">
+                          <p className="text-white font-medium">{taxExpense.taxType || 'Impuesto'}</p>
+                          <div className="text-gray-400 text-sm">
+                            <span className="inline-block mr-3">Base: {taxExpense.taxBase?.toFixed(2) || '0.00'} €</span>
+                            <span className="inline-block mr-3">Tasa: {taxExpense.taxRate?.toFixed(2) || '0.00'} %</span>
+                            <span className="inline-block font-medium text-indigo-400">Importe: {taxExpense.price.toFixed(2)} €</span>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2 mt-2 md:mt-0">
+                          <button
+                            className="px-2 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors"
+                            onClick={() => {
+                              setDetailViewOpen(false);
+                              setTimeout(() => {
+                                setEditingExpense(taxExpense);
+                                setModalOpen(true);
+                              }, 300);
+                            }}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className="px-2 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
+                            onClick={() => {
+                              if (confirm('¿Estás seguro de que quieres eliminar este impuesto?')) {
+                                deleteCompanyExpense(taxExpense.id!).then(() => {
+                                  setExpenses(prev => prev.filter(e => e.id !== taxExpense.id));
+                                  toast.success('Impuesto eliminado correctamente');
+                                });
+                              }
+                            }}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        className="text-blue-400 hover:underline text-sm"
-                        onClick={() => {
-                          setDetailViewOpen(false);
-                          setTimeout(() => {
-                            setSelectedExpense(taxExpense);
-                            setDetailViewOpen(true);
-                          }, 300);
-                        }}
-                      >
-                        Ver detalles
-                      </button>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </>
             )}
 

@@ -131,6 +131,15 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
     }));
   };
 
+  // Actualizar la base imponible automáticamente cuando se edita un impuesto de un gasto existente
+  useEffect(() => {
+    // Si estamos añadiendo un impuesto a un gasto existente y tenemos datos iniciales
+    if (isAddingTaxToExistingExpense && initialData) {
+      // Al cambiar el tipo de impuesto o la tasa, recalcular el precio
+      calculateTax();
+    }
+  }, [formData.taxType, formData.taxRate, isAddingTaxToExistingExpense, initialData]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSubmit(formData);
@@ -140,11 +149,30 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
     <form onSubmit={handleSubmit} className="space-y-4">
       {/* Si estamos añadiendo un impuesto a un gasto existente, mostrar información del gasto original */}
       {isAddingTaxToExistingExpense && (
-        <div className="bg-gray-800 p-4 rounded-md mb-4">
+        <div className="bg-gray-800 p-4 rounded-md mb-4 border-l-4 border-indigo-500">
           <h3 className="text-sm font-medium text-gray-300 mb-2">Información del gasto original:</h3>
-          <p className="text-white"><span className="text-gray-400">Nombre:</span> {initialData?.name}</p>
-          <p className="text-white"><span className="text-gray-400">Precio:</span> {initialData?.price?.toFixed(2)} €</p>
-          <p className="text-white"><span className="text-gray-400">Categoría:</span> {initialData?.category}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <span className="text-gray-400 text-xs">Nombre:</span>
+              <p className="text-white font-medium">{initialData?.name}</p>
+            </div>
+            <div>
+              <span className="text-gray-400 text-xs">Precio:</span>
+              <p className="text-white font-medium">{initialData?.price?.toFixed(2)} €</p>
+            </div>
+            <div>
+              <span className="text-gray-400 text-xs">Categoría:</span>
+              <p className="text-white">{initialData?.category}</p>
+            </div>
+            <div>
+              <span className="text-gray-400 text-xs">Pagado por:</span>
+              <p className="text-white">{
+                initialData?.paidBy === 'edmon' ? 'Edmon' :
+                initialData?.paidBy === 'albert' ? 'Albert' :
+                initialData?.paidBy === 'biel' ? 'Biel' : 'Todos'
+              }</p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -189,7 +217,11 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
 
       {/* Mostrar campos específicos para impuestos solo si la categoría es 'Impuestos' */}
       {(formData.category === 'Impuestos' || isAddingTaxToExistingExpense) && (
-        <>
+        <div className={`${isAddingTaxToExistingExpense ? 'bg-gray-850 p-4 rounded-md border border-gray-700' : ''}`}>
+          {isAddingTaxToExistingExpense && (
+            <h3 className="text-white font-medium mb-3">Información del Impuesto</h3>
+          )}
+          
           <div>
             <label htmlFor="taxType" className="block text-sm font-medium text-white">
               Tipo de impuesto *
@@ -200,7 +232,7 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
               required
               value={formData.taxType}
               onChange={handleTaxTypeChange}
-              className="mt-1 block w-full p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-white"
+              className="mt-1 block w-full p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-white"
             >
               <option value="">Seleccionar tipo de impuesto</option>
               {TAX_TYPES.map(type => (
@@ -209,7 +241,7 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
             </select>
           </div>
 
-          <div>
+          <div className="mt-3">
             <label htmlFor="taxBase" className="block text-sm font-medium text-white">
               Base imponible (€) *
             </label>
@@ -222,11 +254,16 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
               min="0"
               value={formData.taxBase}
               onChange={handleChange}
-              className="mt-1 block w-full p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-white"
+              className="mt-1 block w-full p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-white"
             />
+            {isAddingTaxToExistingExpense && (
+              <p className="text-xs text-gray-400 mt-1">
+                La base imponible se ha establecido automáticamente con el precio del producto
+              </p>
+            )}
           </div>
 
-          <div>
+          <div className="mt-3">
             <label htmlFor="taxRate" className="block text-sm font-medium text-white">
               Tipo impositivo (%) *
             </label>
@@ -239,11 +276,11 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
               min="0"
               value={formData.taxRate}
               onChange={handleChange}
-              className="mt-1 block w-full p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-white"
+              className="mt-1 block w-full p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-white"
             />
           </div>
 
-          <div>
+          <div className="mt-4">
             <button
               type="button"
               onClick={calculateTax}
@@ -252,10 +289,41 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
               <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
               </svg>
-              Calcular Impuesto Automáticamente
+              Calcular Importe del Impuesto
             </button>
           </div>
-        </>
+
+          {/* Mostrar el resultado del cálculo del impuesto */}
+          <div className="mt-3 bg-gray-800 p-2 rounded border border-gray-700">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-400">Base: {formData.taxBase?.toFixed(2) || '0.00'} € × {formData.taxRate?.toFixed(2) || '0.00'} %</span>
+              <span className="text-white font-medium">{((formData.taxBase || 0) * (formData.taxRate || 0) / 100).toFixed(2)} €</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Solo mostrar precio si estamos añadiendo un impuesto a un gasto existente (para mostrar el impuesto calculado) */}
+      {isAddingTaxToExistingExpense && (
+        <div>
+          <label htmlFor="price" className="block text-sm font-medium text-white">
+            Importe final del Impuesto (€) *
+          </label>
+          <input
+            type="number"
+            id="price"
+            name="price"
+            required
+            step="0.01"
+            min="0"
+            value={formData.price}
+            onChange={handleChange}
+            className="mt-1 block w-full p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 text-white"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Puede ajustar este valor si es necesario
+          </p>
+        </div>
       )}
 
       {/* Solo mostrar los campos no relacionados con impuestos si NO estamos añadiendo un impuesto a un gasto existente */}
@@ -355,26 +423,6 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
             />
           </div>
         </>
-      )}
-
-      {/* Solo mostrar precio si estamos añadiendo un impuesto a un gasto existente (para mostrar el impuesto calculado) */}
-      {isAddingTaxToExistingExpense && (
-        <div>
-          <label htmlFor="price" className="block text-sm font-medium text-white">
-            Importe del Impuesto (€) *
-          </label>
-          <input
-            type="number"
-            id="price"
-            name="price"
-            required
-            step="0.01"
-            min="0"
-            value={formData.price}
-            onChange={handleChange}
-            className="mt-1 block w-full p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-white"
-          />
-        </div>
       )}
 
       <div className="flex justify-end space-x-3 pt-3">
