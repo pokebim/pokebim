@@ -63,6 +63,114 @@ export default function LinksPage() {
         }
       }
       
+      // Verificar si existe un grupo de Marketplaces
+      const marketplacesGroup = allGroups.find(g => g.name === 'Marketplaces');
+      
+      // Si no existe, crear el grupo de Marketplaces
+      if (!marketplacesGroup) {
+        try {
+          const marketplacesGroupId = await createLinkGroup({
+            name: 'Marketplaces',
+            description: 'Plataformas para vender y comprar',
+            icon: '🛒',
+            order: allGroups.length
+          });
+          
+          // Crear enlaces para este grupo
+          const marketplaceLinks = [
+            {
+              title: 'Wallapop',
+              url: 'https://es.wallapop.com/',
+              description: 'Marketplace de compra/venta de segunda mano',
+              active: true
+            },
+            {
+              title: 'eBay',
+              url: 'https://www.ebay.es/',
+              description: 'Plataforma global de subastas y compraventa',
+              active: true
+            },
+            {
+              title: 'Cardmarket',
+              url: 'https://www.cardmarket.com/',
+              description: 'Marketplace especializado en cartas coleccionables',
+              active: true
+            },
+            {
+              title: 'CardTrader',
+              url: 'https://www.cardtrader.com/es/pokemon',
+              description: 'Plataforma para comprar y vender cartas Pokémon',
+              active: true
+            },
+            {
+              title: 'Whatnot',
+              url: 'https://www.whatnot.com/',
+              description: 'Plataforma de subastas en vivo para coleccionables',
+              active: true
+            },
+            {
+              title: 'WordPress Admin',
+              url: 'https://pokebim.com/wp-admin/',
+              description: 'Panel de administración de la web',
+              active: true
+            },
+            {
+              title: 'TikTok',
+              url: 'https://www.tiktok.com/',
+              description: 'Plataforma de vídeos cortos',
+              active: true
+            },
+            {
+              title: 'Instagram Shopping',
+              url: 'https://business.facebook.com/commerce/manager/',
+              description: 'Gestión de productos en Instagram',
+              active: true
+            },
+            {
+              title: 'Facebook Marketplace',
+              url: 'https://www.facebook.com/marketplace/',
+              description: 'Marketplace de Facebook',
+              active: true
+            }
+          ];
+          
+          // Añadir enlaces al grupo
+          for (let i = 0; i < marketplaceLinks.length; i++) {
+            const link = marketplaceLinks[i];
+            await createLink({
+              groupId: marketplacesGroupId,
+              title: link.title,
+              url: link.url,
+              description: link.description || '',
+              order: i,
+              active: link.active
+            });
+          }
+          
+          // Actualizar la UI con el nuevo grupo y sus enlaces
+          const newGroup: LinkGroup = {
+            id: marketplacesGroupId,
+            name: 'Marketplaces',
+            description: 'Plataformas para vender y comprar',
+            icon: '🛒',
+            order: allGroups.length,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          // Obtener los enlaces recién creados
+          const newLinks = await getLinksByGroup(marketplacesGroupId);
+          
+          // Actualizar el estado
+          setGroups(prev => [newGroup, ...prev]);
+          setGroupLinks(prev => ({ ...prev, [marketplacesGroupId]: newLinks }));
+          
+          showNotification('Grupo de Marketplaces creado automáticamente');
+        } catch (err) {
+          console.error('Error al crear el grupo de Marketplaces:', err);
+        }
+      }
+      
       setGroupLinks(linksMap);
       setError(null);
     } catch (err) {

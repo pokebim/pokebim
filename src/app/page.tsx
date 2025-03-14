@@ -276,6 +276,37 @@ export default function HomePage() {
                 </a>
 
                 <a 
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const urls = [
+                      'https://es.wallapop.com/',
+                      'https://www.ebay.es/',
+                      'https://www.cardmarket.com/',
+                      'https://www.cardtrader.com/es/pokemon',
+                      'https://www.whatnot.com/',
+                      'https://pokebim.com/wp-admin/',
+                      'https://www.tiktok.com/',
+                      'https://business.facebook.com/commerce/manager/',
+                      'https://www.facebook.com/marketplace/'
+                    ];
+                    // Abrir cada URL en una nueva ventana
+                    urls.forEach(url => {
+                      window.open(url, '_blank', 'noopener,noreferrer');
+                    });
+                  }}
+                  className="group relative rounded-lg border border-gray-800 p-6 hover:border-gray-700 transition-all duration-200 hover:bg-gray-800"
+                >
+                  <div className="flex justify-center items-center h-10 w-10 rounded-lg bg-purple-700 text-white mb-3">
+                    <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  </div>
+                  <h4 className="text-base font-medium text-white">Marketplaces</h4>
+                  <p className="mt-1 text-sm text-gray-400 truncate">Abrir todas las plataformas</p>
+                </a>
+
+                <a 
                   href="https://pokebim.com/wp-admin/about.php" 
                   target="_blank" 
                   rel="noopener noreferrer"
