@@ -4,6 +4,7 @@ import { useState, ReactNode, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import { cleanupLocalStorage } from '@/lib/localStorageCleanup';
 import { Toaster } from 'react-hot-toast';
+import ProfitCalculator from '../widgets/ProfitCalculator';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -61,6 +62,9 @@ export default function MainLayout({ children }: MainLayoutProps) {
     <div className="bg-black min-h-screen text-white">
       {/* Toaster para notificaciones */}
       <Toaster position="top-right" />
+      
+      {/* Widget de calculadora de beneficios */}
+      <ProfitCalculator />
       
       {/* Sidebar */}
       <Sidebar 
