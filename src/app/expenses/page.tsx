@@ -27,6 +27,27 @@ const PaymentStatusBadge = ({ isPaid }: { isPaid: boolean }) => (
   </span>
 );
 
+// Componente para mostrar el badge de asignación
+const AssignedToBadge = ({ assignedTo }: { assignedTo?: string }) => {
+  if (!assignedTo) return null;
+  
+  const bgColor = 
+    assignedTo === 'edmon' ? 'bg-blue-900 text-blue-200' : 
+    assignedTo === 'albert' ? 'bg-purple-900 text-purple-200' : 
+    'bg-red-900 text-red-200';
+  
+  const label = 
+    assignedTo === 'edmon' ? 'Pagado a Edmon' : 
+    assignedTo === 'albert' ? 'Pagado a Albert' : 
+    'Pagado a Biel';
+  
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${bgColor}`}>
+      {label}
+    </span>
+  );
+};
+
 // Componente para la página principal de gastos
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<CompanyExpense[]>([]);
@@ -238,11 +259,41 @@ export default function ExpensesPage() {
   const stats = useMemo(() => {
     const total = expenses.reduce((sum, expense) => sum + expense.price, 0);
     
+    // Calcular pagos por persona
     const byPerson = {
       edmon: expenses.filter(e => e.paidBy === 'edmon').reduce((sum, e) => sum + e.price, 0),
       albert: expenses.filter(e => e.paidBy === 'albert').reduce((sum, e) => sum + e.price, 0),
       biel: expenses.filter(e => e.paidBy === 'biel').reduce((sum, e) => sum + e.price, 0),
       todos: expenses.filter(e => e.paidBy === 'todos').reduce((sum, e) => sum + e.price, 0)
+    };
+    
+    // Calcular gastos asignados a cada persona
+    const assignedToPerson = {
+      edmon: expenses.filter(e => e.assignedTo === 'edmon').reduce((sum, e) => sum + e.price, 0),
+      albert: expenses.filter(e => e.assignedTo === 'albert').reduce((sum, e) => sum + e.price, 0),
+      biel: expenses.filter(e => e.assignedTo === 'biel').reduce((sum, e) => sum + e.price, 0),
+    };
+    
+    // Calcular totales netos (pagos - asignaciones)
+    const netByPerson = {
+      edmon: byPerson.edmon - assignedToPerson.edmon,
+      albert: byPerson.albert - assignedToPerson.albert,
+      biel: byPerson.biel - assignedToPerson.biel,
+      todos: byPerson.todos
+    };
+    
+    // Total neto (suma de los netos individuales)
+    const netTotal = netByPerson.edmon + netByPerson.albert + netByPerson.biel + netByPerson.todos;
+    
+    // Cálculo de reparto equitativo
+    const totalGasto = netTotal; // El total neto que debe ser repartido
+    const parteEquitativa = totalGasto / 3; // División entre las 3 personas
+    
+    // Diferencia entre lo que ha pagado cada uno y lo que debería pagar para que sea equitativo
+    const balanceEquitativo = {
+      edmon: parteEquitativa - netByPerson.edmon, // Positivo: debe pagar, Negativo: debe recibir
+      albert: parteEquitativa - netByPerson.albert,
+      biel: parteEquitativa - netByPerson.biel
     };
     
     const byCategory = expenses.reduce((acc, expense) => {
@@ -251,7 +302,21 @@ export default function ExpensesPage() {
       return acc;
     }, {} as Record<string, number>);
     
-    return { total, byPerson, byCategory };
+    const pendingPayment = expenses.filter(e => !e.isPaid).length;
+    const paid = expenses.filter(e => e.isPaid).length;
+    
+    return {
+      total,
+      netTotal,
+      byPerson,
+      assignedToPerson,
+      netByPerson,
+      byCategory,
+      pendingPayment,
+      paid,
+      parteEquitativa,
+      balanceEquitativo
+    };
   }, [expenses]);
 
   // Función para renderizar el paidBy como badge
@@ -390,6 +455,15 @@ export default function ExpensesPage() {
       header: 'Estado',
       cell: info => <PaymentStatusBadge isPaid={info.getValue()} />
     }),
+    columnHelper.accessor('assignedTo', {
+      header: 'Pagado a',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <AssignedToBadge assignedTo={row.original.assignedTo} />
+        </div>
+      ),
+      enableSorting: true
+    }),
     columnHelper.accessor('id', {
       header: 'Acciones',
       cell: info => {
@@ -462,219 +536,151 @@ export default function ExpensesPage() {
 
       {/* Vista detallada del gasto */}
       {selectedExpense && (
-        <DetailView
+        <Modal
           isOpen={detailViewOpen}
           onClose={() => setDetailViewOpen(false)}
-          title={`Detalles del Gasto: ${selectedExpense.name}`}
+          title={`Detalle del Gasto: ${selectedExpense.name}`}
+          size="lg"
         >
-          <DetailGrid>
-            {/* Información básica */}
-            <DetailItem label="Nombre">
-              {selectedExpense.name}
-            </DetailItem>
-            <DetailItem label="Precio">
-              {selectedExpense.price.toFixed(2)} €
-            </DetailItem>
-            <DetailItem label="Categoría">
-              {selectedExpense.category || 'Sin categoría'}
-            </DetailItem>
-            <DetailItem label="Pagado por">
-              {renderPaidByBadge(selectedExpense.paidBy)}
-            </DetailItem>
-            <DetailItem label="Estado">
-              {selectedExpense.isPaid ? (
-                <DetailBadge color="green">Pagado</DetailBadge>
-              ) : (
-                <DetailBadge color="gray">Pendiente</DetailBadge>
-              )}
-            </DetailItem>
-
-            {/* Mostrar fecha de pago si está pagado */}
-            {selectedExpense.isPaid && selectedExpense.paymentDate && (
-              <DetailItem label="Fecha de pago">
-                {new Date(selectedExpense.paymentDate).toLocaleDateString()}
-              </DetailItem>
-            )}
-
-            {/* Mostrar enlace si existe */}
-            {selectedExpense.link && (
-              <DetailItem label="Enlace">
-                <a 
-                  href={selectedExpense.link} 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className="text-blue-400 hover:underline"
-                >
-                  Ver producto
-                </a>
-              </DetailItem>
-            )}
-
-            {/* Mostrar notas si existen */}
-            {selectedExpense.notes && (
-              <DetailItem label="Notas" fullWidth>
-                {selectedExpense.notes}
-              </DetailItem>
-            )}
-
-            {/* Información de impuestos si es un impuesto */}
-            {selectedExpense.category === 'Impuestos' && (
-              <>
-                <div className="col-span-2 mt-2 mb-2">
-                  <h3 className="text-lg font-semibold text-white">Detalles del Impuesto</h3>
-                </div>
-                
-                {selectedExpense.taxType && (
-                  <DetailItem label="Tipo de impuesto">
-                    {selectedExpense.taxType}
-                  </DetailItem>
+          <DetailView>
+            <DetailSection title="Información General">
+              <DetailGrid columns={2}>
+                <DetailField label="Nombre" value={selectedExpense.name} />
+                <DetailField 
+                  label="Precio" 
+                  value={`${selectedExpense.price.toFixed(2)} €`}
+                  valueClassName="text-green-400 font-medium"
+                />
+                <DetailField 
+                  label="Pagado Por" 
+                  value={
+                    selectedExpense.paidBy === 'edmon' ? 'Edmon' : 
+                    selectedExpense.paidBy === 'albert' ? 'Albert' : 
+                    selectedExpense.paidBy === 'biel' ? 'Biel' : 'Todos'
+                  } 
+                />
+                {selectedExpense.assignedTo && (
+                  <DetailField 
+                    label="Pagado A" 
+                    value={
+                      selectedExpense.assignedTo === 'edmon' ? 'Edmon' : 
+                      selectedExpense.assignedTo === 'albert' ? 'Albert' : 
+                      selectedExpense.assignedTo === 'biel' ? 'Biel' : '-'
+                    } 
+                    valueClassName={
+                      selectedExpense.assignedTo === 'edmon' ? 'text-blue-400' : 
+                      selectedExpense.assignedTo === 'albert' ? 'text-purple-400' : 
+                      selectedExpense.assignedTo === 'biel' ? 'text-red-400' : ''
+                    }
+                  />
                 )}
-                
-                {selectedExpense.taxBase !== undefined && (
-                  <DetailItem label="Base imponible">
-                    {selectedExpense.taxBase.toFixed(2)} €
-                  </DetailItem>
-                )}
-                
-                {selectedExpense.taxRate !== undefined && (
-                  <DetailItem label="Tipo impositivo">
-                    {selectedExpense.taxRate.toFixed(2)} %
-                  </DetailItem>
+                <DetailField 
+                  label="Estado" 
+                  value={<PaymentStatusBadge isPaid={selectedExpense.isPaid} />} 
+                />
+                <DetailField 
+                  label="Fecha de pago" 
+                  value={selectedExpense.paymentDate ? new Date(selectedExpense.paymentDate).toLocaleDateString() : 'No pagado'} 
+                />
+              </DetailGrid>
+            </DetailSection>
+
+            {/* Información adicional */}
+            <DetailSection title="Información Adicional">
+              <DetailGrid columns={1}>
+                {/* Mostrar enlace si existe */}
+                {selectedExpense.link && (
+                  <DetailField 
+                    label="Enlace" 
+                    value={
+                      <a 
+                        href={selectedExpense.link} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-blue-400 hover:underline"
+                      >
+                        Ver producto
+                      </a>
+                    } 
+                  />
                 )}
 
-                {/* Mostrar gasto relacionado si existe */}
-                {selectedExpense.relatedExpenseId && (
+                {/* Mostrar notas si existen */}
+                {selectedExpense.notes && (
+                  <DetailField 
+                    label="Notas" 
+                    value={selectedExpense.notes} 
+                  />
+                )}
+
+                {/* Información de impuestos si es un impuesto */}
+                {selectedExpense.category === 'Impuestos' && (
                   <>
-                    <div className="col-span-2 mt-4 mb-2">
-                      <h3 className="text-lg font-semibold text-white">Gasto Original</h3>
-                    </div>
-                    
-                    {(() => {
-                      const originalExpense = getOriginalExpense(selectedExpense);
-                      if (originalExpense) {
-                        return (
-                          <>
-                            <DetailItem label="Nombre">
-                              {originalExpense.name}
-                            </DetailItem>
-                            <DetailItem label="Precio">
-                              {originalExpense.price.toFixed(2)} €
-                            </DetailItem>
-                            <DetailItem label="Categoría">
-                              {originalExpense.category || 'Sin categoría'}
-                            </DetailItem>
-                            <DetailItem label="Ver detalles completos">
-                              <button
-                                className="text-blue-400 hover:underline"
-                                onClick={() => {
-                                  setDetailViewOpen(false);
-                                  setTimeout(() => {
-                                    setSelectedExpense(originalExpense);
-                                    setDetailViewOpen(true);
-                                  }, 300);
-                                }}
-                              >
-                                Ver gasto original
-                              </button>
-                            </DetailItem>
-                          </>
-                        );
-                      } else {
-                        return (
-                          <DetailItem label="Gasto original" fullWidth>
-                            <span className="text-yellow-500">El gasto original ya no existe</span>
-                          </DetailItem>
-                        );
-                      }
-                    })()}
+                    <DetailField 
+                      label="Tipo de Impuesto" 
+                      value={selectedExpense.taxType || '-'} 
+                    />
+                    <DetailField 
+                      label="Base Imponible" 
+                      value={selectedExpense.taxBase ? `${selectedExpense.taxBase.toFixed(2)} €` : '-'} 
+                    />
+                    <DetailField 
+                      label="Tasa Impositiva" 
+                      value={selectedExpense.taxRate ? `${selectedExpense.taxRate}%` : '-'} 
+                    />
                   </>
                 )}
-              </>
-            )}
+              </DetailGrid>
+            </DetailSection>
 
-            {/* Mostrar impuestos relacionados si existen y no es un impuesto */}
-            {selectedExpense.category !== 'Impuestos' && hasRelatedTaxExpense(selectedExpense.id!) && (
-              <>
-                <div className="col-span-2 mt-4 mb-2">
-                  <h3 className="text-lg font-semibold text-white">Impuestos Asociados</h3>
-                </div>
-                
-                <div className="col-span-2 space-y-2">
-                  {getRelatedTaxExpenses(selectedExpense.id!).map((taxExpense, index) => (
-                    <div key={taxExpense.id} className="bg-gray-800 rounded-md p-3">
-                      <div className="flex flex-col md:flex-row md:justify-between md:items-center">
-                        <div className="mb-2 md:mb-0">
-                          <p className="text-white font-medium">{taxExpense.taxType || 'Impuesto'}</p>
-                          <div className="text-gray-400 text-sm">
-                            <span className="inline-block mr-3">Base: {taxExpense.taxBase?.toFixed(2) || '0.00'} €</span>
-                            <span className="inline-block mr-3">Tasa: {taxExpense.taxRate?.toFixed(2) || '0.00'} %</span>
-                            <span className="inline-block font-medium text-indigo-400">Importe: {taxExpense.price.toFixed(2)} €</span>
-                          </div>
-                        </div>
-                        <div className="flex space-x-2 mt-2 md:mt-0">
-                          <button
-                            className="px-2 py-1 text-xs bg-blue-700 text-white rounded hover:bg-blue-600 transition-colors"
-                            onClick={() => {
-                              setDetailViewOpen(false);
-                              setTimeout(() => {
-                                setEditingExpense(taxExpense);
-                                setModalOpen(true);
-                              }, 300);
-                            }}
-                          >
-                            Editar
-                          </button>
-                          <button
-                            className="px-2 py-1 text-xs bg-red-700 text-white rounded hover:bg-red-600 transition-colors"
-                            onClick={() => {
-                              if (confirm('¿Estás seguro de que quieres eliminar este impuesto?')) {
-                                deleteCompanyExpense(taxExpense.id!).then(() => {
-                                  setExpenses(prev => prev.filter(e => e.id !== taxExpense.id));
-                                  toast.success('Impuesto eliminado correctamente');
-                                });
-                              }
-                            }}
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+            {/* Fechas */}
+            <DetailSection title="Metadatos">
+              <DetailGrid columns={2}>
+                <DetailField 
+                  label="Creado" 
+                  value={selectedExpense.createdAt ? new Date(selectedExpense.createdAt).toLocaleString() : '-'} 
+                />
+                <DetailField 
+                  label="Actualizado" 
+                  value={selectedExpense.updatedAt ? new Date(selectedExpense.updatedAt).toLocaleString() : '-'} 
+                />
+              </DetailGrid>
+            </DetailSection>
 
-            {/* Fechas de creación y actualización */}
-            <div className="col-span-2 mt-4 pt-3 border-t border-gray-700">
-              <div className="flex justify-between text-xs text-gray-500">
-                <span>Creado: {new Date(selectedExpense.createdAt!).toLocaleString()}</span>
-                <span>Actualizado: {new Date(selectedExpense.updatedAt!).toLocaleString()}</span>
-              </div>
+            {/* Botones de acción */}
+            <div className="mt-6 flex space-x-4 justify-end">
+              <button
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                onClick={() => {
+                  setDetailViewOpen(false);
+                  handleEdit(selectedExpense);
+                }}
+              >
+                Editar
+              </button>
+              {selectedExpense.category !== 'Impuestos' && (
+                <button
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded"
+                  onClick={() => {
+                    setDetailViewOpen(false);
+                    handleAddTaxToExpense(selectedExpense);
+                  }}
+                >
+                  Añadir Impuesto
+                </button>
+              )}
+              <button
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+                onClick={() => {
+                  setDetailViewOpen(false);
+                  handleDelete(selectedExpense.id!);
+                }}
+              >
+                Eliminar
+              </button>
             </div>
-          </DetailGrid>
-
-          <div className="mt-6 flex space-x-4 justify-end">
-            <button
-              className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
-              onClick={() => {
-                setDetailViewOpen(false);
-                handleEdit(selectedExpense);
-              }}
-            >
-              Editar
-            </button>
-            <button
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded"
-              onClick={() => {
-                setDetailViewOpen(false);
-                handleDelete(selectedExpense.id!);
-              }}
-            >
-              Eliminar
-            </button>
-          </div>
-        </DetailView>
+          </DetailView>
+        </Modal>
       )}
 
       <div className="py-6">
@@ -727,92 +733,137 @@ export default function ExpensesPage() {
             </div>
           )}
 
-          {/* Panel de estadísticas */}
-          <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="bg-gray-900 rounded-lg shadow p-5">
+          {/* Mostrar estadísticas al inicio de la página */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="bg-gray-800 p-4 rounded-lg">
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
                   <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                   </svg>
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Total Gastos
-                    </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-white">
-                        {stats.total.toFixed(2)} €
-                      </div>
-                    </dd>
-                  </dl>
+                <div className="ml-4">
+                  <h3 className="text-gray-400 mb-1 text-sm">Total</h3>
+                  <p className="text-2xl font-semibold text-white">{stats.netTotal.toFixed(2)} €</p>
                 </div>
               </div>
             </div>
-
-            <div className="bg-gray-900 rounded-lg shadow p-5">
+            
+            <div className="bg-gray-800 p-4 rounded-lg">
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
                   <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                   </svg>
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Gastos de Edmon
-                    </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-white">
-                        {stats.byPerson.edmon.toFixed(2)} €
-                      </div>
-                    </dd>
-                  </dl>
+                <div className="ml-4">
+                  <h3 className="text-gray-400 mb-1 text-sm">Pagado por Edmon</h3>
+                  <p className="text-xl font-semibold text-white">{stats.byPerson.edmon.toFixed(2)} €</p>
+                  {stats.assignedToPerson.edmon > 0 && (
+                    <div className="mt-1">
+                      <span className="text-sm text-gray-400">Pagado a: -{stats.assignedToPerson.edmon.toFixed(2)} €</span>
+                      <p className="text-md font-semibold text-white">Neto: {stats.netByPerson.edmon.toFixed(2)} €</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="mt-2 pt-2 border-t border-gray-700">
+                <div className={`text-sm ${stats.balanceEquitativo.edmon > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {stats.balanceEquitativo.edmon > 0 
+                    ? `Debe pagar: ${stats.balanceEquitativo.edmon.toFixed(2)} €` 
+                    : `Debe recibir: ${Math.abs(stats.balanceEquitativo.edmon).toFixed(2)} €`}
                 </div>
               </div>
             </div>
-
-            <div className="bg-gray-900 rounded-lg shadow p-5">
+            
+            <div className="bg-gray-800 p-4 rounded-lg">
               <div className="flex items-center">
-                <div className="flex-shrink-0 bg-red-500 rounded-md p-3">
+                <div className="flex-shrink-0 bg-purple-500 rounded-md p-3">
                   <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                   </svg>
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Gastos de Albert
-                    </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-white">
-                        {stats.byPerson.albert.toFixed(2)} €
-                      </div>
-                    </dd>
-                  </dl>
+                <div className="ml-4">
+                  <h3 className="text-gray-400 mb-1 text-sm">Pagado por Albert</h3>
+                  <p className="text-xl font-semibold text-white">{stats.byPerson.albert.toFixed(2)} €</p>
+                  {stats.assignedToPerson.albert > 0 && (
+                    <div className="mt-1">
+                      <span className="text-sm text-gray-400">Pagado a: -{stats.assignedToPerson.albert.toFixed(2)} €</span>
+                      <p className="text-md font-semibold text-white">Neto: {stats.netByPerson.albert.toFixed(2)} €</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="mt-2 pt-2 border-t border-gray-700">
+                <div className={`text-sm ${stats.balanceEquitativo.albert > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {stats.balanceEquitativo.albert > 0 
+                    ? `Debe pagar: ${stats.balanceEquitativo.albert.toFixed(2)} €` 
+                    : `Debe recibir: ${Math.abs(stats.balanceEquitativo.albert).toFixed(2)} €`}
                 </div>
               </div>
             </div>
-
-            <div className="bg-gray-900 rounded-lg shadow p-5">
+            
+            <div className="bg-gray-800 p-4 rounded-lg">
               <div className="flex items-center">
                 <div className="flex-shrink-0 bg-yellow-500 rounded-md p-3">
                   <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
                   </svg>
                 </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-400 truncate">
-                      Gastos de Biel
-                    </dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-white">
-                        {stats.byPerson.biel.toFixed(2)} €
-                      </div>
-                    </dd>
-                  </dl>
+                <div className="ml-4">
+                  <h3 className="text-gray-400 mb-1 text-sm">Pagado por Biel</h3>
+                  <p className="text-xl font-semibold text-white">{stats.byPerson.biel.toFixed(2)} €</p>
+                  {stats.assignedToPerson.biel > 0 && (
+                    <div className="mt-1">
+                      <span className="text-sm text-gray-400">Pagado a: -{stats.assignedToPerson.biel.toFixed(2)} €</span>
+                      <p className="text-md font-semibold text-white">Neto: {stats.netByPerson.biel.toFixed(2)} €</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="mt-2 pt-2 border-t border-gray-700">
+                <div className={`text-sm ${stats.balanceEquitativo.biel > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {stats.balanceEquitativo.biel > 0 
+                    ? `Debe pagar: ${stats.balanceEquitativo.biel.toFixed(2)} €` 
+                    : `Debe recibir: ${Math.abs(stats.balanceEquitativo.biel).toFixed(2)} €`}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Información sobre el reparto equitativo */}
+          <div className="bg-gray-800 p-4 rounded-lg mb-6">
+            <h3 className="text-white font-medium mb-2">Reparto equitativo</h3>
+            <p className="text-gray-300 mb-2">Para un reparto equitativo, cada persona debería haber pagado: <span className="font-semibold text-white">{stats.parteEquitativa.toFixed(2)} €</span></p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+              <div className="bg-gray-900 p-3 rounded">
+                <p className="text-gray-400 text-sm">Edmon</p>
+                <div className={`text-lg font-medium ${stats.balanceEquitativo.edmon > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {stats.balanceEquitativo.edmon > 0 
+                    ? `Debe pagar: ${stats.balanceEquitativo.edmon.toFixed(2)} €` 
+                    : `Debe recibir: ${Math.abs(stats.balanceEquitativo.edmon).toFixed(2)} €`}
+                </div>
+              </div>
+              
+              <div className="bg-gray-900 p-3 rounded">
+                <p className="text-gray-400 text-sm">Albert</p>
+                <div className={`text-lg font-medium ${stats.balanceEquitativo.albert > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {stats.balanceEquitativo.albert > 0 
+                    ? `Debe pagar: ${stats.balanceEquitativo.albert.toFixed(2)} €` 
+                    : `Debe recibir: ${Math.abs(stats.balanceEquitativo.albert).toFixed(2)} €`}
+                </div>
+              </div>
+              
+              <div className="bg-gray-900 p-3 rounded">
+                <p className="text-gray-400 text-sm">Biel</p>
+                <div className={`text-lg font-medium ${stats.balanceEquitativo.biel > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {stats.balanceEquitativo.biel > 0 
+                    ? `Debe pagar: ${stats.balanceEquitativo.biel.toFixed(2)} €` 
+                    : `Debe recibir: ${Math.abs(stats.balanceEquitativo.biel).toFixed(2)} €`}
                 </div>
               </div>
             </div>

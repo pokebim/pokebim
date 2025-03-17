@@ -19,6 +19,8 @@ export interface CompanyExpense {
   taxRate?: number;
   // Referencia a un gasto relacionado (para impuestos asociados a un gasto)
   relatedExpenseId?: string;
+  // Persona a la que se asigna este gasto (para deducirlo de sus gastos)
+  assignedTo?: 'edmon' | 'albert' | 'biel' | '';
 }
 
 // Obtener todos los gastos
@@ -54,7 +56,8 @@ export const getAllCompanyExpenses = async (): Promise<CompanyExpense[]> => {
         taxType: data.taxType || undefined,
         taxBase: data.taxBase || undefined,
         taxRate: data.taxRate || undefined,
-        relatedExpenseId: data.relatedExpenseId || undefined
+        relatedExpenseId: data.relatedExpenseId || undefined,
+        assignedTo: data.assignedTo || undefined
       });
     });
     
@@ -159,7 +162,8 @@ export const getCompanyExpenseById = async (id: string): Promise<CompanyExpense 
       taxType: data.taxType || undefined,
       taxBase: data.taxBase || undefined,
       taxRate: data.taxRate || undefined,
-      relatedExpenseId: data.relatedExpenseId || undefined
+      relatedExpenseId: data.relatedExpenseId || undefined,
+      assignedTo: data.assignedTo || undefined
     };
   } catch (error) {
     console.error(`Error al obtener gasto empresarial ${id}:`, error);

@@ -27,6 +27,13 @@ const PAYERS = [
   { value: 'todos', label: 'Todos' }
 ];
 
+const ASSIGNEES = [
+  { value: '', label: 'Ninguno' },
+  { value: 'edmon', label: 'Edmon' },
+  { value: 'albert', label: 'Albert' },
+  { value: 'biel', label: 'Biel' }
+];
+
 const CATEGORIES = [
   'Material',
   'Oficina',
@@ -50,7 +57,8 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
     notes: '',
     taxType: '',
     taxBase: 0,
-    taxRate: 0
+    taxRate: 0,
+    assignedTo: ''
   });
 
   // Determinar si estamos añadiendo un impuesto a un gasto existente
@@ -69,7 +77,8 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
         notes: initialData.notes || '',
         taxType: initialData.taxType || '',
         taxBase: initialData.taxBase || initialData.price || 0, // Si estamos añadiendo impuesto, usar el precio como base imponible por defecto
-        taxRate: initialData.taxRate || 0
+        taxRate: initialData.taxRate || 0,
+        assignedTo: initialData.assignedTo || ''
       });
     } else if (preselectedCategory) {
       // Si no hay datos iniciales pero hay una categoría preseleccionada, actualizar solo la categoría
@@ -172,6 +181,16 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
                 initialData?.paidBy === 'biel' ? 'Biel' : 'Todos'
               }</p>
             </div>
+            {initialData?.assignedTo && (
+              <div>
+                <span className="text-gray-400 text-xs">Pagado a:</span>
+                <p className="text-white">{
+                  initialData?.assignedTo === 'edmon' ? 'Edmon' :
+                  initialData?.assignedTo === 'albert' ? 'Albert' :
+                  initialData?.assignedTo === 'biel' ? 'Biel' : 'Ninguno'
+                }</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -376,6 +395,26 @@ export default function CompanyExpenseForm({ onSubmit, onCancel, initialData, pr
                 <option key={payer.value} value={payer.value}>{payer.label}</option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label htmlFor="assignedTo" className="block text-sm font-medium text-white">
+              Pagado a
+            </label>
+            <select
+              id="assignedTo"
+              name="assignedTo"
+              value={formData.assignedTo || ''}
+              onChange={handleChange}
+              className="mt-1 block w-full p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-white"
+            >
+              {ASSIGNEES.map(assignee => (
+                <option key={assignee.value} value={assignee.value}>{assignee.label}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-sm text-gray-400">
+              Si se paga a una persona, el gasto se deducirá de sus gastos totales.
+            </p>
           </div>
 
           <div className="flex items-center">
