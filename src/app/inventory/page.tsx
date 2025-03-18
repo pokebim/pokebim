@@ -55,29 +55,17 @@ export default function InventoryPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Cargar productos primero
+      // Cargar productos primero y esperar a que terminen de cargarse
       const firebaseProducts = await getAllProducts();
       console.log('FIREBASE: Loaded products for inventory:', firebaseProducts);
       setProducts(firebaseProducts);
       
       // Luego cargar inventario
-      await fetchInventory();
-      
-      setLoading(false);
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError('Error al cargar los datos. Por favor, inténtalo de nuevo más tarde.');
-      setLoading(false);
-    }
-  };
-
-  const fetchInventory = async () => {
-    try {
       const inventoryData = await getAllInventoryItems();
       
       // Enriquecer los datos con información del producto
       const enrichedInventory: EnrichedInventoryItem[] = inventoryData.map(item => {
-        const product = products.find(p => p.id === item.productId);
+        const product = firebaseProducts.find(p => p.id === item.productId);
         
         return {
           ...item,
@@ -92,10 +80,10 @@ export default function InventoryPage() {
       });
       
       setInventoryItems(enrichedInventory);
-    } catch (error) {
-      console.error('Error al cargar inventario:', error);
-      setError('Error al cargar los datos de inventario');
-    } finally {
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Error al cargar los datos. Por favor, inténtalo de nuevo más tarde.');
       setLoading(false);
     }
   };

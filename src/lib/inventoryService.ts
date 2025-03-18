@@ -93,4 +93,25 @@ export const deleteInventoryItem = async (id: string): Promise<void> => {
     console.error(`Error deleting inventory item ${id}:`, error);
     throw error;
   }
+};
+
+// Obtener un ítem de inventario por ID
+export const getInventoryItemById = async (id: string): Promise<InventoryItem | null> => {
+  try {
+    const docRef = doc(db, "inventory", id);
+    const snapshot = await getDoc(docRef);
+    
+    if (!snapshot.exists()) {
+      console.log(`No se encontró ítem de inventario con ID ${id}`);
+      return null;
+    }
+    
+    return {
+      id: snapshot.id,
+      ...snapshot.data() as Omit<InventoryItem, 'id'>
+    };
+  } catch (error) {
+    console.error(`Error getting inventory item ${id}:`, error);
+    throw error;
+  }
 }; 
