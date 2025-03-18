@@ -81,6 +81,11 @@ const icons = {
       <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
     </svg>
   ),
+  sales: (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v1H5a1 1 0 00-.994.89l-1 9A1 1 0 004 18h12a1 1 0 00.994-1.11l-1-9A1 1 0 0015 7h-1V6a4 4 0 00-4-4zm2 5V6a2 2 0 10-4 0v1h4zm-6 3a1 1 0 112 0 1 1 0 01-2 0zm7-1a1 1 0 100 2 1 1 0 000-2z" clipRule="evenodd" />
+    </svg>
+  ),
 };
 
 const menuItems = [
@@ -94,6 +99,7 @@ const menuItems = [
   { name: 'Inventario', path: '/inventory', icon: icons.inventory },
   { name: 'Tareas', path: '/tasks', icon: icons.tasks },
   { name: 'Gastos Empresa', path: '/expenses', icon: icons.expenses },
+  { name: 'Ventas', path: '/sales', icon: icons.sales },
   { name: 'Wiki', path: '/wiki', icon: icons.wiki },
   { name: 'Fotos', path: '/photos', icon: icons.photos },
   { name: 'Links', path: '/links', icon: icons.links },
