@@ -124,15 +124,18 @@ export default function SalesPage() {
     const bySeller: Record<string, number> = {};
     
     sales.forEach(sale => {
-      const amount = sale.hasVAT ? sale.totalWithVAT : sale.price;
-      total += amount;
-      totalProducts += sale.quantity;
+      const pricePerUnit = sale.hasVAT ? sale.totalWithVAT : sale.price;
+      const quantity = sale.quantity || 1;
+      const totalAmount = pricePerUnit * quantity;
+      
+      total += totalAmount;
+      totalProducts += quantity;
       
       // Por plataforma
-      byPlatform[sale.platform] = (byPlatform[sale.platform] || 0) + amount;
+      byPlatform[sale.platform] = (byPlatform[sale.platform] || 0) + totalAmount;
       
       // Por vendedor
-      bySeller[sale.soldBy] = (bySeller[sale.soldBy] || 0) + amount;
+      bySeller[sale.soldBy] = (bySeller[sale.soldBy] || 0) + totalAmount;
     });
     
     return { total, byPlatform, bySeller, totalProducts };
@@ -141,7 +144,10 @@ export default function SalesPage() {
   const stats = calculateStats();
 
   // Calcular beneficio neto total
-  const totalNetProfit = sales.reduce((sum, sale) => sum + (sale.netProfit || 0), 0);
+  const totalNetProfit = sales.reduce((sum, sale) => {
+    const quantity = sale.quantity || 1;
+    return sum + ((sale.netProfit || 0) * quantity);
+  }, 0);
 
   if (isLoading) {
     return (
@@ -298,7 +304,7 @@ export default function SalesPage() {
                 <thead className="bg-gray-700">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Producto</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Precio</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Precio unitario (€)</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Cantidad</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Fecha</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Plataforma</th>
@@ -364,18 +370,25 @@ export default function SalesPage() {
                               <div>
                                 <h3 className="font-medium text-white mb-2">Detalles de la venta</h3>
                                 <p className="text-sm text-gray-300 mb-1">
-                                  <span className="font-medium">Beneficio neto:</span> {formatCurrency(sale.netProfit)}
+                                  <span className="font-medium">Precio unitario:</span> {formatCurrency(sale.hasVAT ? sale.totalWithVAT : sale.price)}
+                                  {sale.hasVAT && <span className="ml-1 text-xs text-green-500">(IVA incluido)</span>}
+                                </p>
+                                <p className="text-sm text-gray-300 mb-1">
+                                  <span className="font-medium">Beneficio neto unitario:</span> {formatCurrency(sale.netProfit)}
+                                </p>
+                                <p className="text-sm text-gray-300 mb-1">
+                                  <span className="font-medium">Importe total:</span> {formatCurrency((sale.hasVAT ? sale.totalWithVAT : sale.price) * (sale.quantity || 1))}
                                 </p>
                                 <p className="text-sm text-gray-300 mb-1">
                                   <span className="font-medium">Comprador:</span> {sale.buyer || 'No especificado'}
                                 </p>
                                 {sale.hasVAT && (
                                   <p className="text-sm text-gray-300 mb-1">
-                                    <span className="font-medium">IVA ({sale.vatRate}%):</span> {formatCurrency(sale.vatAmount)}
+                                    <span className="font-medium">IVA unitario ({sale.vatRate}%):</span> {formatCurrency(sale.vatAmount)}
                                   </p>
                                 )}
                                 <p className="text-sm text-gray-300 mb-1">
-                                  <span className="font-medium">Costes adicionales:</span>
+                                  <span className="font-medium">Costes adicionales (por unidad):</span>
                                 </p>
                                 <ul className="list-disc list-inside text-sm text-gray-300 ml-4">
                                   <li>Envío: {formatCurrency(sale.shippingCost)}</li>

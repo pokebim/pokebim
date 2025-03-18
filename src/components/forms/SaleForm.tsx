@@ -127,7 +127,7 @@ export default function SaleForm({ onSubmit, onCancel, initialData }: SaleFormPr
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label htmlFor="price" className="block text-sm font-medium text-white">
-            Precio (€)
+            Precio unitario (€)
           </label>
           <input
             type="number"
