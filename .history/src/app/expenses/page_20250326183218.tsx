@@ -985,18 +985,14 @@ export default function ExpensesPage() {
               </div>
             </div>
             
-            <h4 className="text-white font-medium mb-2">Balance FINAL (considerando gastos y reparto de ventas)</h4>
+            <h4 className="text-white font-medium mb-2">Balance FINAL (considerando ventas y beneficios)</h4>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
               <div className="bg-gray-900 p-3 rounded border-2 border-blue-500">
                 <p className="text-gray-400 text-sm">Edmon</p>
                 <div className={`text-lg font-medium ${stats.balanceFinal.edmon > 0 ? 'text-red-400' : 'text-green-400'}`}>
                   {stats.balanceFinal.edmon > 0 
-                    ? `Debe pagar: ${stats.balanceFinal.edmon.toFixed(2)} €` 
-                    : `Debe recibir: ${Math.abs(stats.balanceFinal.edmon).toFixed(2)} €`}
-                </div>
-                <div className="mt-2 text-xs text-gray-400">
-                  <p>Gastos: {stats.balanceEquitativo.edmon > 0 ? `Debe ${stats.balanceEquitativo.edmon.toFixed(2)}€` : `Recibe ${Math.abs(stats.balanceEquitativo.edmon).toFixed(2)}€`}</p>
-                  <p>Ventas: Debe recibir {(stats.totalIngresos / 3).toFixed(2)}€</p>
+                    ? `Debe pagar a Biel: ${stats.balanceFinal.edmon.toFixed(2)} €` 
+                    : `Debe recibir de Biel: ${Math.abs(stats.balanceFinal.edmon).toFixed(2)} €`}
                 </div>
               </div>
               
@@ -1004,12 +1000,8 @@ export default function ExpensesPage() {
                 <p className="text-gray-400 text-sm">Albert</p>
                 <div className={`text-lg font-medium ${stats.balanceFinal.albert > 0 ? 'text-red-400' : 'text-green-400'}`}>
                   {stats.balanceFinal.albert > 0 
-                    ? `Debe pagar: ${stats.balanceFinal.albert.toFixed(2)} €` 
-                    : `Debe recibir: ${Math.abs(stats.balanceFinal.albert).toFixed(2)} €`}
-                </div>
-                <div className="mt-2 text-xs text-gray-400">
-                  <p>Gastos: {stats.balanceEquitativo.albert > 0 ? `Debe ${stats.balanceEquitativo.albert.toFixed(2)}€` : `Recibe ${Math.abs(stats.balanceEquitativo.albert).toFixed(2)}€`}</p>
-                  <p>Ventas: Debe recibir {(stats.totalIngresos / 3).toFixed(2)}€</p>
+                    ? `Debe pagar a Biel: ${stats.balanceFinal.albert.toFixed(2)} €` 
+                    : `Debe recibir de Biel: ${Math.abs(stats.balanceFinal.albert).toFixed(2)} €`}
                 </div>
               </div>
               
@@ -1018,11 +1010,7 @@ export default function ExpensesPage() {
                 <div className={`text-lg font-medium ${stats.balanceFinal.biel > 0 ? 'text-red-400' : 'text-green-400'}`}>
                   {stats.balanceFinal.biel > 0 
                     ? `Debe pagar: ${stats.balanceFinal.biel.toFixed(2)} €` 
-                    : `Debe recibir: ${Math.abs(stats.balanceFinal.biel).toFixed(2)} €`}
-                </div>
-                <div className="mt-2 text-xs text-gray-400">
-                  <p>Gastos: {stats.balanceEquitativo.biel > 0 ? `Debe ${stats.balanceEquitativo.biel.toFixed(2)}€` : `Recibe ${Math.abs(stats.balanceEquitativo.biel).toFixed(2)}€`}</p>
-                  <p>Ventas: Debe compartir {((stats.totalIngresos / 3) * 2).toFixed(2)}€</p>
+                    : `Debe pagar a Edmon y Albert: ${Math.abs(stats.balanceFinal.biel).toFixed(2)} €`}
                 </div>
               </div>
             </div>
