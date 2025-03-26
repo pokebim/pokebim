@@ -2,12 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import sharp from 'sharp';
 import { randomUUID } from 'crypto';
 
-export const config = {
-  api: {
-    bodyParser: false, // Disable body parsing, we'll handle the multipart form data manually
-    responseLimit: '10mb',
-  },
-};
+// Updated to use the new route segment config format
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 // Tipos para los parámetros de procesamiento de imágenes
 type FitMode = 'contain' | 'cover';
