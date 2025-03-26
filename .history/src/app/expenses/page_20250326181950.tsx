@@ -916,27 +916,7 @@ export default function ExpensesPage() {
             <h3 className="text-white font-medium mb-2">Reparto equitativo</h3>
             <p className="text-gray-300 mb-2">Para un reparto equitativo, cada persona debería haber pagado: <span className="font-semibold text-white">{stats.parteEquitativa.toFixed(2)} €</span></p>
             
-            <div className="bg-gray-700 p-3 mb-4 rounded">
-              <h4 className="text-white font-medium mb-2">Ventas y beneficios</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="bg-gray-800 p-2 rounded">
-                  <p className="text-gray-400 text-sm">Total Ventas</p>
-                  <p className="text-lg font-medium text-white">{stats.totalIngresos.toFixed(2)} €</p>
-                </div>
-                <div className="bg-gray-800 p-2 rounded">
-                  <p className="text-gray-400 text-sm">Beneficio Neto</p>
-                  <p className="text-lg font-medium text-white">{stats.netBeneficio.toFixed(2)} €</p>
-                </div>
-                <div className="bg-gray-800 p-2 rounded">
-                  <p className="text-gray-400 text-sm">Beneficio por Persona</p>
-                  <p className="text-lg font-medium text-white">{stats.beneficioEquitativo.toFixed(2)} €</p>
-                </div>
-              </div>
-              <p className="mt-2 text-yellow-300 text-sm">* Todo el dinero de ventas ({stats.totalIngresos.toFixed(2)} €) se atribuye a Biel</p>
-            </div>
-            
-            <h4 className="text-white font-medium mb-2">Balance antes de considerar ventas</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
               <div className="bg-gray-900 p-3 rounded">
                 <p className="text-gray-400 text-sm">Edmon</p>
                 <div className={`text-lg font-medium ${stats.balanceEquitativo.edmon > 0 ? 'text-red-400' : 'text-green-400'}`}>
@@ -961,36 +941,6 @@ export default function ExpensesPage() {
                   {stats.balanceEquitativo.biel > 0 
                     ? `Debe pagar: ${stats.balanceEquitativo.biel.toFixed(2)} €` 
                     : `Debe recibir: ${Math.abs(stats.balanceEquitativo.biel).toFixed(2)} €`}
-                </div>
-              </div>
-            </div>
-            
-            <h4 className="text-white font-medium mb-2">Balance FINAL (considerando ventas y beneficios)</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
-              <div className="bg-gray-900 p-3 rounded border-2 border-blue-500">
-                <p className="text-gray-400 text-sm">Edmon</p>
-                <div className={`text-lg font-medium ${stats.balanceFinal.edmon > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                  {stats.balanceFinal.edmon > 0 
-                    ? `Debe pagar a Biel: ${stats.balanceFinal.edmon.toFixed(2)} €` 
-                    : `Debe recibir de Biel: ${Math.abs(stats.balanceFinal.edmon).toFixed(2)} €`}
-                </div>
-              </div>
-              
-              <div className="bg-gray-900 p-3 rounded border-2 border-purple-500">
-                <p className="text-gray-400 text-sm">Albert</p>
-                <div className={`text-lg font-medium ${stats.balanceFinal.albert > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                  {stats.balanceFinal.albert > 0 
-                    ? `Debe pagar a Biel: ${stats.balanceFinal.albert.toFixed(2)} €` 
-                    : `Debe recibir de Biel: ${Math.abs(stats.balanceFinal.albert).toFixed(2)} €`}
-                </div>
-              </div>
-              
-              <div className="bg-gray-900 p-3 rounded border-2 border-yellow-500">
-                <p className="text-gray-400 text-sm">Biel</p>
-                <div className={`text-lg font-medium ${stats.balanceFinal.biel > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                  {stats.balanceFinal.biel > 0 
-                    ? `Debe pagar: ${stats.balanceFinal.biel.toFixed(2)} €` 
-                    : `Debe pagar a Edmon y Albert: ${Math.abs(stats.balanceFinal.biel).toFixed(2)} €`}
                 </div>
               </div>
             </div>
