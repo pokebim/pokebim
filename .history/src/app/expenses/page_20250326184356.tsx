@@ -862,228 +862,134 @@ export default function ExpensesPage() {
                       <h3 className="text-gray-400 mb-1 text-sm flex items-center">
                         Total Ventas
                         <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                        </svg>
-                      </h3>
-                    </Tooltip>
-                    <p className="text-2xl font-semibold text-white">{totalSales?.toFixed(2) || "0.00"} €</p>
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {/* New cards for Sales and Profit */}
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-gray-400 mb-1 text-sm">Total Ventas</h3>
+                  <p className="text-2xl font-semibold text-white">{totalSales?.toFixed(2) || "0.00"} €</p>
                 </div>
               </div>
+            </div>
 
-              <div className="bg-gray-800 p-4 rounded-lg">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                    <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <Tooltip content="Diferencia entre ventas y gastos. Positivo indica beneficio, negativo indica pérdida.">
-                      <h3 className="text-gray-400 mb-1 text-sm flex items-center">
-                        Beneficios
-                        <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                        </svg>
-                      </h3>
-                    </Tooltip>
-                    <p className="text-2xl font-semibold text-white">{(totalSales - stats.netTotal).toFixed(2) || "0.00"} €</p>
-                  </div>
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
+                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
                 </div>
-              </div>
-              
-              <div className="bg-gray-800 p-4 rounded-lg">
-                <div className="flex items-center">
-                  <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                    <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                  </div>
-                  <div className="ml-4">
-                    <Tooltip content="Suma total de todos los gastos registrados en el sistema">
-                      <h3 className="text-gray-400 mb-1 text-sm flex items-center">
-                        Total Gastos
-                        <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                        </svg>
-                      </h3>
-                    </Tooltip>
-                    <p className="text-2xl font-semibold text-white">{stats.netTotal.toFixed(2)} €</p>
-                  </div>
+                <div className="ml-4">
+                  <h3 className="text-gray-400 mb-1 text-sm">Beneficios</h3>
+                  <p className="text-2xl font-semibold text-white">{(totalSales - stats.netTotal).toFixed(2) || "0.00"} €</p>
                 </div>
               </div>
             </div>
             
-            <CollapsibleSection
-              title="Desglose por persona"
-              tooltipContent="Detalle de lo que ha pagado cada persona y su balance de gastos"
-              defaultOpen={false}
-            >
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gray-800 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
-                      <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                      </svg>
-                    </div>
-                    <div className="ml-4">
-                      <Tooltip content="Total de gastos pagados por Edmon menos los gastos asignados a él">
-                        <h3 className="text-gray-400 mb-1 text-sm flex items-center">
-                          Pagado por Edmon
-                          <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                          </svg>
-                        </h3>
-                      </Tooltip>
-                      <p className="text-xl font-semibold text-white">{stats.byPerson.edmon.toFixed(2)} €</p>
-                      {stats.assignedToPerson.edmon > 0 && (
-                        <div className="mt-1">
-                          <Tooltip content="Gastos que han sido asignados específicamente a Edmon">
-                            <span className="text-sm text-gray-400 flex items-center">
-                              Pagado a: -{stats.assignedToPerson.edmon.toFixed(2)} €
-                              <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                              </svg>
-                            </span>
-                          </Tooltip>
-                          <Tooltip content="Resultado neto: gastos pagados menos gastos asignados">
-                            <p className="text-md font-semibold text-white flex items-center">
-                              Neto: {stats.netByPerson.edmon.toFixed(2)} €
-                              <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                              </svg>
-                            </p>
-                          </Tooltip>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 pt-2 border-t border-gray-700">
-                    <Tooltip content="Balance de gastos: diferencia entre lo que debería pagar equitativamente y lo que ha pagado">
-                      <div className={`text-sm flex items-center ${stats.balanceEquitativo.edmon > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                        {stats.balanceEquitativo.edmon > 0 
-                          ? `Debe pagar: ${stats.balanceEquitativo.edmon.toFixed(2)} €` 
-                          : `Debe recibir: ${Math.abs(stats.balanceEquitativo.edmon).toFixed(2)} €`}
-                        <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                        </svg>
-                      </div>
-                    </Tooltip>
-                  </div>
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
+                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
                 </div>
-                
-                <div className="bg-gray-800 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-purple-500 rounded-md p-3">
-                      <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                      </svg>
-                    </div>
-                    <div className="ml-4">
-                      <Tooltip content="Total de gastos pagados por Albert menos los gastos asignados a él">
-                        <h3 className="text-gray-400 mb-1 text-sm flex items-center">
-                          Pagado por Albert
-                          <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                          </svg>
-                        </h3>
-                      </Tooltip>
-                      <p className="text-xl font-semibold text-white">{stats.byPerson.albert.toFixed(2)} €</p>
-                      {stats.assignedToPerson.albert > 0 && (
-                        <div className="mt-1">
-                          <Tooltip content="Gastos que han sido asignados específicamente a Albert">
-                            <span className="text-sm text-gray-400 flex items-center">
-                              Pagado a: -{stats.assignedToPerson.albert.toFixed(2)} €
-                              <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                              </svg>
-                            </span>
-                          </Tooltip>
-                          <Tooltip content="Resultado neto: gastos pagados menos gastos asignados">
-                            <p className="text-md font-semibold text-white flex items-center">
-                              Neto: {stats.netByPerson.albert.toFixed(2)} €
-                              <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                              </svg>
-                            </p>
-                          </Tooltip>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 pt-2 border-t border-gray-700">
-                    <Tooltip content="Balance de gastos: diferencia entre lo que debería pagar equitativamente y lo que ha pagado">
-                      <div className={`text-sm flex items-center ${stats.balanceEquitativo.albert > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                        {stats.balanceEquitativo.albert > 0 
-                          ? `Debe pagar: ${stats.balanceEquitativo.albert.toFixed(2)} €` 
-                          : `Debe recibir: ${Math.abs(stats.balanceEquitativo.albert).toFixed(2)} €`}
-                        <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                        </svg>
-                      </div>
-                    </Tooltip>
-                  </div>
-                </div>
-                
-                <div className="bg-gray-800 p-4 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 bg-yellow-500 rounded-md p-3">
-                      <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-                      </svg>
-                    </div>
-                    <div className="ml-4">
-                      <Tooltip content="Total de gastos pagados por Biel menos los gastos asignados a él">
-                        <h3 className="text-gray-400 mb-1 text-sm flex items-center">
-                          Pagado por Biel
-                          <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                          </svg>
-                        </h3>
-                      </Tooltip>
-                      <p className="text-xl font-semibold text-white">{stats.byPerson.biel.toFixed(2)} €</p>
-                      {stats.assignedToPerson.biel > 0 && (
-                        <div className="mt-1">
-                          <Tooltip content="Gastos que han sido asignados específicamente a Biel">
-                            <span className="text-sm text-gray-400 flex items-center">
-                              Pagado a: -{stats.assignedToPerson.biel.toFixed(2)} €
-                              <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                              </svg>
-                            </span>
-                          </Tooltip>
-                          <Tooltip content="Resultado neto: gastos pagados menos gastos asignados">
-                            <p className="text-md font-semibold text-white flex items-center">
-                              Neto: {stats.netByPerson.biel.toFixed(2)} €
-                              <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                              </svg>
-                            </p>
-                          </Tooltip>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="mt-2 pt-2 border-t border-gray-700">
-                    <Tooltip content="Balance de gastos: diferencia entre lo que debería pagar equitativamente y lo que ha pagado">
-                      <div className={`text-sm flex items-center ${stats.balanceEquitativo.biel > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                        {stats.balanceEquitativo.biel > 0 
-                          ? `Debe pagar: ${stats.balanceEquitativo.biel.toFixed(2)} €` 
-                          : `Debe recibir: ${Math.abs(stats.balanceEquitativo.biel).toFixed(2)} €`}
-                        <svg className="w-3 h-3 ml-1 text-gray-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd"></path>
-                        </svg>
-                      </div>
-                    </Tooltip>
-                  </div>
+                <div className="ml-4">
+                  <h3 className="text-gray-400 mb-1 text-sm">Total</h3>
+                  <p className="text-2xl font-semibold text-white">{stats.netTotal.toFixed(2)} €</p>
                 </div>
               </div>
-            </CollapsibleSection>
-          </CollapsibleSection>
+            </div>
+            
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-blue-500 rounded-md p-3">
+                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-gray-400 mb-1 text-sm">Pagado por Edmon</h3>
+                  <p className="text-xl font-semibold text-white">{stats.byPerson.edmon.toFixed(2)} €</p>
+                  {stats.assignedToPerson.edmon > 0 && (
+                    <div className="mt-1">
+                      <span className="text-sm text-gray-400">Pagado a: -{stats.assignedToPerson.edmon.toFixed(2)} €</span>
+                      <p className="text-md font-semibold text-white">Neto: {stats.netByPerson.edmon.toFixed(2)} €</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="mt-2 pt-2 border-t border-gray-700">
+                <div className={`text-sm ${stats.balanceEquitativo.edmon > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {stats.balanceEquitativo.edmon > 0 
+                    ? `Debe pagar: ${stats.balanceEquitativo.edmon.toFixed(2)} €` 
+                    : `Debe recibir: ${Math.abs(stats.balanceEquitativo.edmon).toFixed(2)} €`}
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-purple-500 rounded-md p-3">
+                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-gray-400 mb-1 text-sm">Pagado por Albert</h3>
+                  <p className="text-xl font-semibold text-white">{stats.byPerson.albert.toFixed(2)} €</p>
+                  {stats.assignedToPerson.albert > 0 && (
+                    <div className="mt-1">
+                      <span className="text-sm text-gray-400">Pagado a: -{stats.assignedToPerson.albert.toFixed(2)} €</span>
+                      <p className="text-md font-semibold text-white">Neto: {stats.netByPerson.albert.toFixed(2)} €</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="mt-2 pt-2 border-t border-gray-700">
+                <div className={`text-sm ${stats.balanceEquitativo.albert > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {stats.balanceEquitativo.albert > 0 
+                    ? `Debe pagar: ${stats.balanceEquitativo.albert.toFixed(2)} €` 
+                    : `Debe recibir: ${Math.abs(stats.balanceEquitativo.albert).toFixed(2)} €`}
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-gray-800 p-4 rounded-lg">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-yellow-500 rounded-md p-3">
+                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-gray-400 mb-1 text-sm">Pagado por Biel</h3>
+                  <p className="text-xl font-semibold text-white">{stats.byPerson.biel.toFixed(2)} €</p>
+                  {stats.assignedToPerson.biel > 0 && (
+                    <div className="mt-1">
+                      <span className="text-sm text-gray-400">Pagado a: -{stats.assignedToPerson.biel.toFixed(2)} €</span>
+                      <p className="text-md font-semibold text-white">Neto: {stats.netByPerson.biel.toFixed(2)} €</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="mt-2 pt-2 border-t border-gray-700">
+                <div className={`text-sm ${stats.balanceEquitativo.biel > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {stats.balanceEquitativo.biel > 0 
+                    ? `Debe pagar: ${stats.balanceEquitativo.biel.toFixed(2)} €` 
+                    : `Debe recibir: ${Math.abs(stats.balanceEquitativo.biel).toFixed(2)} €`}
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Información sobre el reparto equitativo */}
           <CollapsibleSection 
@@ -1338,68 +1244,67 @@ export default function ExpensesPage() {
               </div>
             </CollapsibleSection>
           </CollapsibleSection>
-        </CollapsibleSection>
 
-        {/* Selector de filtro */}
-        <div className="mt-8 mb-4">
-          <label className="text-sm font-medium text-white mr-2">
-            Filtrar por persona:
-          </label>
-          <div className="mt-1">
-            <select
-              value={filterPaidBy}
-              onChange={(e) => setFilterPaidBy(e.target.value)}
-              className="w-full sm:w-48 p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-white"
-            >
-              <option value="all">Todos</option>
-              <option value="edmon">Edmon</option>
-              <option value="albert">Albert</option>
-              <option value="biel">Biel</option>
-              <option value="todos">Pagado por todos</option>
-            </select>
+          {/* Selector de filtro */}
+          <div className="mt-8 mb-4">
+            <label className="text-sm font-medium text-white mr-2">
+              Filtrar por persona:
+            </label>
+            <div className="mt-1">
+              <select
+                value={filterPaidBy}
+                onChange={(e) => setFilterPaidBy(e.target.value)}
+                className="w-full sm:w-48 p-2 bg-gray-800 border border-gray-700 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-white"
+              >
+                <option value="all">Todos</option>
+                <option value="edmon">Edmon</option>
+                <option value="albert">Albert</option>
+                <option value="biel">Biel</option>
+                <option value="todos">Pagado por todos</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Tabla de gastos */}
+          <div className="mt-4">
+            {loading ? (
+              <div className="flex justify-center items-center h-64">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
+                <span className="ml-3 text-white">Cargando gastos...</span>
+              </div>
+            ) : filteredExpenses.length === 0 ? (
+              <div className="text-center py-12 bg-gray-900 rounded-lg">
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                </svg>
+                <p className="mt-2 text-sm font-medium text-gray-400">
+                  No hay gastos registrados{filterPaidBy !== 'all' ? ` para ${filterPaidBy}` : ''}.
+                </p>
+                <div className="mt-6 flex space-x-3 justify-center">
+                  <button
+                    type="button"
+                    onClick={() => openNewExpenseModal()}
+                    className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    Añadir gasto
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-900 shadow-md rounded-lg overflow-hidden">
+                <DataTable
+                  data={filteredExpenses}
+                  columns={columns}
+                  searchPlaceholder="Buscar por nombre, categoría..."
+                />
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Tabla de gastos */}
-        <div className="mt-4">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500"></div>
-              <span className="ml-3 text-white">Cargando gastos...</span>
-            </div>
-          ) : filteredExpenses.length === 0 ? (
-            <div className="text-center py-12 bg-gray-900 rounded-lg">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
-              </svg>
-              <p className="mt-2 text-sm font-medium text-gray-400">
-                No hay gastos registrados{filterPaidBy !== 'all' ? ` para ${filterPaidBy}` : ''}.
-              </p>
-              <div className="mt-6 flex space-x-3 justify-center">
-                <button
-                  type="button"
-                  onClick={() => openNewExpenseModal()}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  <svg className="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                    <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
-                  Añadir gasto
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-gray-900 shadow-md rounded-lg overflow-hidden">
-              <DataTable
-                data={filteredExpenses}
-                columns={columns}
-                searchPlaceholder="Buscar por nombre, categoría..."
-              />
-            </div>
-          )}
-        </div>
       </div>
-    </div>
-  </MainLayout>
-);
+    </MainLayout>
+  );
 } 
